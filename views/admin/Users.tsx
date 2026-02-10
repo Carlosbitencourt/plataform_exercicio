@@ -1,0 +1,251 @@
+
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, User as UserIcon, TrendingUp } from 'lucide-react';
+import { getDB, addUser, updateUser } from '../../services/storage';
+import { User, UserStatus } from '../../types';
+
+const Users: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    cpf: '',
+    uniqueCode: '',
+    phone: '',
+    depositedValue: 0
+  });
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = () => {
+    setUsers(getDB().users);
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingUser) {
+      updateUser({ ...editingUser, ...formData });
+    } else {
+      addUser(formData);
+    }
+    setFormData({ name: '', cpf: '', uniqueCode: '', phone: '', depositedValue: 0 });
+    setEditingUser(null);
+    setIsModalOpen(false);
+    loadUsers();
+  };
+
+  const openEdit = (user: User) => {
+    setEditingUser(user);
+    setFormData({
+      name: user.name,
+      cpf: user.cpf,
+      uniqueCode: user.uniqueCode,
+      phone: user.phone,
+      depositedValue: user.depositedValue
+    });
+    setIsModalOpen(true);
+  };
+
+  const toggleStatus = (user: User) => {
+    const newStatus = user.status === UserStatus.ACTIVE ? UserStatus.ELIMINATED : UserStatus.ACTIVE;
+    updateUser({ ...user, status: newStatus });
+    loadUsers();
+  };
+
+  const filteredUsers = users.filter(u => 
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    u.cpf.includes(searchTerm) ||
+    u.uniqueCode.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Search and Action Bar - Bordas mais escuras */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="relative w-full md:w-[450px] group">
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-lime-600 transition-colors w-5 h-5" />
+          <input
+            type="text"
+            placeholder="PESQUISAR ATLETA..."
+            className="w-full pl-14 pr-6 py-4 bg-white border-2 border-slate-300 rounded-2xl text-slate-900 font-bold placeholder:text-slate-400 focus:ring-4 focus:ring-lime-400/10 focus:border-lime-500 outline-none transition-all shadow-md uppercase tracking-widest text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <button
+          onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
+          className="flex items-center px-8 py-4 bg-black text-lime-400 rounded-2xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-2xl active:scale-95"
+        >
+          <Plus className="w-6 h-6 mr-2" />
+          Cadastrar Atleta
+        </button>
+      </div>
+
+      {/* Athletes List - Bordas e Sombras Reforçadas */}
+      <div className="bg-white rounded-[2rem] border-2 border-slate-300 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.08)]">
+        <table className="min-w-full divide-y-2 divide-slate-200">
+          <thead className="bg-slate-50">
+            <tr>
+              <th className="px-8 py-6 text-left text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">Perfil do Atleta</th>
+              <th className="px-8 py-6 text-left text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">Identificação</th>
+              <th className="px-8 py-6 text-left text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">Métricas Financeiras</th>
+              <th className="px-8 py-6 text-left text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">Status</th>
+              <th className="px-8 py-6 text-right text-[11px] font-black text-slate-500 uppercase tracking-[0.3em]">Gestão</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y-2 divide-slate-100">
+            {filteredUsers.map((user) => (
+              <tr key={user.id} className="hover:bg-slate-50/80 transition-colors group">
+                <td className="px-8 py-6 whitespace-nowrap">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center text-lime-400 font-black text-xl border-2 border-zinc-800 shadow-md">
+                      {user.name[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="text-sm font-black text-slate-900 uppercase tracking-tight">{user.name}</div>
+                      <div className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">{user.phone}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-8 py-6 whitespace-nowrap">
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">CPF: {user.cpf}</div>
+                  <div className="text-xs text-black font-black font-sport bg-lime-400 inline-block px-3 py-1 rounded-lg border-2 border-lime-500 uppercase tracking-tighter italic shadow-sm">
+                    {user.uniqueCode}
+                  </div>
+                </td>
+                <td className="px-8 py-6 whitespace-nowrap">
+                  <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Aposta: R$ {user.depositedValue.toFixed(2)}</div>
+                  <div className="text-lg font-black text-slate-900 italic font-sport">R$ {user.balance.toFixed(2)}</div>
+                </td>
+                <td className="px-8 py-6 whitespace-nowrap">
+                  <span className={`px-4 py-1.5 inline-flex text-[9px] font-black rounded-full uppercase tracking-[0.2em] italic border-2 shadow-sm ${
+                    user.status === UserStatus.ACTIVE 
+                      ? 'bg-lime-400 text-black border-lime-500' 
+                      : 'bg-rose-50 text-rose-600 border-rose-200'
+                  }`}>
+                    {user.status === UserStatus.ACTIVE ? 'Em Competição' : 'Eliminado'}
+                  </span>
+                </td>
+                <td className="px-8 py-6 whitespace-nowrap text-right">
+                  <div className="flex justify-end gap-3">
+                    <button onClick={() => openEdit(user)} className="p-3 bg-white text-slate-400 hover:text-black hover:border-black rounded-xl transition-all border-2 border-slate-200 shadow-sm">
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => toggleStatus(user)} 
+                      className={`p-3 rounded-xl transition-all border-2 shadow-sm ${
+                        user.status === UserStatus.ACTIVE 
+                          ? 'bg-white text-slate-400 hover:text-rose-600 hover:border-rose-400 border-slate-200' 
+                          : 'bg-white text-slate-400 hover:text-lime-600 hover:border-lime-400 border-slate-200'
+                      }`}
+                    >
+                      {user.status === UserStatus.ACTIVE ? <ShieldAlert className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filteredUsers.length === 0 && (
+          <div className="p-20 text-center text-slate-400 font-black uppercase tracking-[0.3em] italic bg-slate-50">Nenhum Atleta Identificado</div>
+        )}
+      </div>
+
+      {/* Modal - Bordas mais fortes para destacar da página clara */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-[3rem] border-4 border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-300">
+            <div className="p-8 bg-slate-50 flex justify-between items-center border-b-4 border-slate-100">
+              <h3 className="text-2xl font-black italic uppercase font-sport text-slate-900 tracking-widest">
+                {editingUser ? 'Modificar Perfil' : 'Novo Recruta'}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900 p-2 bg-white rounded-xl border-2 border-slate-200 transition-all">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form onSubmit={handleSave} className="p-10 space-y-6">
+              <div className="grid grid-cols-1 gap-6">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nome Completo</label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase placeholder:text-slate-300"
+                    placeholder="DIGITE O NOME"
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">CPF Registro</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none"
+                      value={formData.cpf}
+                      onChange={e => setFormData({ ...formData, cpf: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Tag Única (ID)</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full px-5 py-4 bg-lime-50 border-2 border-lime-200 rounded-2xl text-lime-600 font-black font-sport italic transition-all outline-none uppercase"
+                      value={formData.uniqueCode}
+                      onChange={e => setFormData({ ...formData, uniqueCode: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Telefone</label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none"
+                    value={formData.phone}
+                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Aposta Inicial (R$)</label>
+                  <input
+                    required
+                    type="number"
+                    className="w-full px-5 py-4 bg-white border-2 border-slate-900 rounded-2xl text-slate-900 font-black text-xl focus:ring-2 focus:ring-lime-400 transition-all outline-none"
+                    value={formData.depositedValue}
+                    onChange={e => setFormData({ ...formData, depositedValue: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-4 pt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-8 py-4 text-slate-400 font-black uppercase tracking-widest hover:text-slate-900 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-10 py-4 bg-black text-lime-400 rounded-2xl font-black uppercase italic tracking-tighter shadow-xl hover:scale-[1.05] transition-all"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Users;

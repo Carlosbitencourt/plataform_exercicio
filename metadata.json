@@ -1,0 +1,7 @@
+{
+  "name": "FitReward - Sistema de Exercício com Recompensa",
+  "description": "Uma plataforma completa para incentivar a prática de exercícios físicos através de recompensas financeiras baseadas em pontuação por horário e depósitos, incluindo painel administrativo e sistema de check-in geolocalizado.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
