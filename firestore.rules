@@ -15,11 +15,11 @@ service cloud.firestore {
       );
     }
 
-    // Users collection
+      // Users collection
     match /users/{userId} {
-      // Allow read/write if authenticated. ideally admin only for write, or self for updates like balance?
-      // For now, authenticad users (admins) can manage users.
-      allow read, write: if isAuthenticated();
+      // Public read needed for check-in page lookup.
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // TimeSlots collection
