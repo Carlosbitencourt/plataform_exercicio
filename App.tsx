@@ -10,6 +10,7 @@ import Ranking from './views/admin/Ranking';
 import Login from './views/admin/Login';
 import CheckInPage from './views/public/CheckInPage';
 import Signup from './views/auth/Signup';
+import Dashboard from './views/admin/Dashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Componente para proteger rotas administrativas
@@ -38,6 +39,12 @@ const App: React.FC = () => {
             <Route path="/signup" element={<Signup />} />
 
             {/* Admin Routes */}
+            <Route path="/admin" element={
+              <ProtectedAdminRoute>
+                <Dashboard />
+              </ProtectedAdminRoute>
+            } />
+
             <Route path="/admin/usuarios" element={
               <ProtectedAdminRoute>
                 <Users />
@@ -78,7 +85,6 @@ const App: React.FC = () => {
             <Route path="/checkin" element={<CheckInPage />} />
 
             {/* Default Redirects */}
-            <Route path="/admin" element={<Navigate to="/admin/usuarios" replace />} />
             <Route path="/" element={<Navigate to="/checkin" replace />} />
           </Routes>
         </Layout>

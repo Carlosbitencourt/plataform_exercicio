@@ -16,6 +16,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   if (!isAdminPath) return <div className="min-h-screen bg-slate-100 text-slate-900">{children}</div>;
 
   const menuItems = [
+    { path: '/admin', icon: Activity, label: 'Visão Geral' },
     { path: '/admin/usuarios', icon: Users, label: 'Atletas' },
     { path: '/admin/qrcode', icon: QrCode, label: 'Portal QR' },
     { path: '/admin/horarios', icon: Clock, label: 'Horários' },
@@ -38,7 +39,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </h1>
           </div>
         </div>
-        
+
         <nav className="mt-4 flex-1 px-4 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -47,11 +48,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all ${
-                  isActive 
-                    ? 'bg-lime-400 text-black shadow-[0_10px_20px_rgba(163,230,53,0.2)]' 
+                className={`flex items-center px-4 py-4 text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all ${isActive
+                    ? 'bg-lime-400 text-black shadow-[0_10px_20px_rgba(163,230,53,0.2)]'
                     : 'text-zinc-500 hover:bg-zinc-900 hover:text-white border border-transparent hover:border-zinc-800'
-                }`}
+                  }`}
               >
                 <Icon className={`w-4 h-4 mr-3 ${isActive ? 'text-black' : 'text-zinc-700'}`} />
                 {item.label}
@@ -59,9 +59,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             );
           })}
         </nav>
-        
+
         <div className="p-6 border-t border-zinc-900">
-          <button 
+          <button
             onClick={handleLogout}
             className="w-full flex items-center px-4 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 hover:text-red-500 transition-all"
           >
@@ -77,8 +77,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <h2 className="text-xl font-black italic text-slate-900 font-sport uppercase tracking-[0.2em]">
             {menuItems.find(i => i.path === location.pathname)?.label || 'Performance Area'}
           </h2>
-          <Link 
-            to="/checkin" 
+          <Link
+            to="/checkin"
             className="group flex items-center px-6 py-3 bg-black rounded-xl text-lime-400 text-[10px] font-black uppercase tracking-widest hover:bg-lime-400 hover:text-black transition-all shadow-xl active:scale-95"
           >
             <CheckSquare className="w-4 h-4 mr-2" />
