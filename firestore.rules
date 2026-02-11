@@ -30,7 +30,7 @@ service cloud.firestore {
 
     // CheckIns collection
     match /checkIns/{checkInId} {
-      allow read: if isAuthenticated();
+      allow read: if true; // Public needs to check if already checked in today
       // Allow create if valid structure? Or just authenticated?
       // Public Check-In page does NOT use Auth if it relies on URL token.
       // But we implemented CheckInPage without Firebase Auth login for the user scanning QR.
