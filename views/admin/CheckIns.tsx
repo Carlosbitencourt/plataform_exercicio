@@ -1,35 +1,42 @@
-
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, User, Trophy, Search, Filter, ClipboardList, Activity } from 'lucide-react';
-import { getDB } from '../../services/storage';
-// Use TimeSlot type from types.ts
+import { subscribeToCheckIns, subscribeToUsers, subscribeToTimeSlots } from '../../services/db';
 import { CheckIn, User as UserType, TimeSlot } from '../../types';
 
 const CheckIns: React.FC = () => {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
-  // Added timeSlots state to replace missing constant from constants.ts
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+
+  // Default to today in YYYY-MM-DD format
+  const getTodayStart = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const [dateFilter, setDateFilter] = useState(getTodayStart());
   const [userFilter, setUserFilter] = useState('');
 
   useEffect(() => {
-    const db = getDB();
-    setCheckIns(db.checkIns);
-    setUsers(db.users);
-    // Load timeSlots from database to resolve slot names
-    setTimeSlots(db.timeSlots);
+    const unsubscribeCheckIns = subscribeToCheckIns((data) => setCheckIns(data));
+    const unsubscribeUsers = subscribeToUsers((data) => setUsers(data));
+    const unsubscribeSlots = subscribeToTimeSlots((data) => setTimeSlots(data));
+
+    return () => {
+      unsubscribeCheckIns();
+      unsubscribeUsers();
+      unsubscribeSlots();
+    };
   }, []);
 
   const filteredCheckIns = checkIns.filter(c => {
     const user = users.find(u => u.id === c.userId);
-    const matchesUser = user?.name.toLowerCase().includes(userFilter.toLowerCase()) || 
-                      user?.cpf.includes(userFilter);
+    const matchesUser = user?.name.toLowerCase().includes(userFilter.toLowerCase()) ||
+      user?.cpf.includes(userFilter);
     const matchesDate = c.date === dateFilter;
     return matchesUser && matchesDate;
   });
 
-  // Updated to use timeSlots from local state instead of missing constant
   const getSlotName = (slotId: string) => {
     return timeSlots.find(s => s.id === slotId)?.name || 'N/A';
   };
@@ -67,8 +74,8 @@ const CheckIns: React.FC = () => {
             />
           </div>
         </div>
-        <button 
-          onClick={() => { setUserFilter(''); setDateFilter(new Date().toISOString().split('T')[0]); }}
+        <button
+          onClick={() => { setUserFilter(''); setDateFilter(getTodayStart()); }}
           className="px-8 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:text-slate-900 border border-slate-200 transition-all flex items-center"
         >
           <Filter className="w-4 h-4 mr-2" />
@@ -87,7 +94,8 @@ const CheckIns: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-black text-slate-900 italic uppercase font-sport tracking-widest leading-tight">{getUserName(ci.userId)}</h4>
-                  <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.3em] mt-1">SQUAD #{ci.userId.split('-')[0].toUpperCase()}</p>
+                  {/* Assuming User ID format or just showing ID if logic to split is not robust */}
+                  <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.3em] mt-1">ID: {ci.userId.substring(0, 8).toUpperCase()}</p>
                 </div>
               </div>
               <div className="bg-black text-lime-400 px-4 py-2 rounded-xl flex items-center text-xs font-black shadow-lg italic font-sport">
@@ -95,7 +103,7 @@ const CheckIns: React.FC = () => {
                 {ci.score.toFixed(1)} PTS
               </div>
             </div>
-            
+
             <div className="p-8 space-y-6 text-slate-900">
               <div className="grid grid-cols-2 gap-6">
                 <div className="flex items-center text-[10px] font-black uppercase tracking-widest text-slate-500">

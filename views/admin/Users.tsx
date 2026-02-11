@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, User as UserIcon, TrendingUp } from 'lucide-react';
-import { getDB, addUser, updateUser } from '../../services/storage';
+import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X } from 'lucide-react';
+import { subscribeToUsers, addUser, updateUser } from '../../services/db';
 import { User, UserStatus } from '../../types';
 
 const Users: React.FC = () => {
@@ -19,24 +18,27 @@ const Users: React.FC = () => {
   });
 
   useEffect(() => {
-    loadUsers();
+    const unsubscribe = subscribeToUsers((data) => {
+      setUsers(data);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const loadUsers = () => {
-    setUsers(getDB().users);
-  };
-
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingUser) {
-      updateUser({ ...editingUser, ...formData });
-    } else {
-      addUser(formData);
+    try {
+      if (editingUser) {
+        await updateUser({ ...editingUser, ...formData });
+      } else {
+        await addUser(formData);
+      }
+      setFormData({ name: '', cpf: '', uniqueCode: '', phone: '', depositedValue: 0 });
+      setEditingUser(null);
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error("Error saving user:", error);
+      alert("Erro ao salvar usuário.");
     }
-    setFormData({ name: '', cpf: '', uniqueCode: '', phone: '', depositedValue: 0 });
-    setEditingUser(null);
-    setIsModalOpen(false);
-    loadUsers();
   };
 
   const openEdit = (user: User) => {
@@ -51,14 +53,17 @@ const Users: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const toggleStatus = (user: User) => {
-    const newStatus = user.status === UserStatus.ACTIVE ? UserStatus.ELIMINATED : UserStatus.ACTIVE;
-    updateUser({ ...user, status: newStatus });
-    loadUsers();
+  const toggleStatus = async (user: User) => {
+    try {
+      const newStatus = user.status === UserStatus.ACTIVE ? UserStatus.ELIMINATED : UserStatus.ACTIVE;
+      await updateUser({ ...user, status: newStatus });
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredUsers = users.filter(u =>
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.cpf.includes(searchTerm) ||
     u.uniqueCode.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -104,7 +109,7 @@ const Users: React.FC = () => {
                 <td className="px-8 py-6 whitespace-nowrap">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center text-lime-400 font-black text-xl border-2 border-zinc-800 shadow-md">
-                      {user.name[0].toUpperCase()}
+                      {user.name && user.name[0] ? user.name[0].toUpperCase() : '?'}
                     </div>
                     <div>
                       <div className="text-sm font-black text-slate-900 uppercase tracking-tight">{user.name}</div>
@@ -119,15 +124,14 @@ const Users: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-8 py-6 whitespace-nowrap">
-                  <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Aposta: R$ {user.depositedValue.toFixed(2)}</div>
-                  <div className="text-lg font-black text-slate-900 italic font-sport">R$ {user.balance.toFixed(2)}</div>
+                  <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Aposta: R$ {user.depositedValue?.toFixed(2)}</div>
+                  <div className="text-lg font-black text-slate-900 italic font-sport">R$ {user.balance?.toFixed(2)}</div>
                 </td>
                 <td className="px-8 py-6 whitespace-nowrap">
-                  <span className={`px-4 py-1.5 inline-flex text-[9px] font-black rounded-full uppercase tracking-[0.2em] italic border-2 shadow-sm ${
-                    user.status === UserStatus.ACTIVE 
-                      ? 'bg-lime-400 text-black border-lime-500' 
+                  <span className={`px-4 py-1.5 inline-flex text-[9px] font-black rounded-full uppercase tracking-[0.2em] italic border-2 shadow-sm ${user.status === UserStatus.ACTIVE
+                      ? 'bg-lime-400 text-black border-lime-500'
                       : 'bg-rose-50 text-rose-600 border-rose-200'
-                  }`}>
+                    }`}>
                     {user.status === UserStatus.ACTIVE ? 'Em Competição' : 'Eliminado'}
                   </span>
                 </td>
@@ -136,13 +140,12 @@ const Users: React.FC = () => {
                     <button onClick={() => openEdit(user)} className="p-3 bg-white text-slate-400 hover:text-black hover:border-black rounded-xl transition-all border-2 border-slate-200 shadow-sm">
                       <Edit2 className="w-5 h-5" />
                     </button>
-                    <button 
-                      onClick={() => toggleStatus(user)} 
-                      className={`p-3 rounded-xl transition-all border-2 shadow-sm ${
-                        user.status === UserStatus.ACTIVE 
-                          ? 'bg-white text-slate-400 hover:text-rose-600 hover:border-rose-400 border-slate-200' 
+                    <button
+                      onClick={() => toggleStatus(user)}
+                      className={`p-3 rounded-xl transition-all border-2 shadow-sm ${user.status === UserStatus.ACTIVE
+                          ? 'bg-white text-slate-400 hover:text-rose-600 hover:border-rose-400 border-slate-200'
                           : 'bg-white text-slate-400 hover:text-lime-600 hover:border-lime-400 border-slate-200'
-                      }`}
+                        }`}
                     >
                       {user.status === UserStatus.ACTIVE ? <ShieldAlert className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
                     </button>

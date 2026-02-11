@@ -1,8 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-// Replaced ShieldInfo with Shield which exists in lucide-react
 import { Clock, Plus, Trash2, Shield, Zap, X } from 'lucide-react';
-import { getDB, addTimeSlot, deleteTimeSlot } from '../../services/storage';
+import { subscribeToTimeSlots, addTimeSlot, deleteTimeSlot } from '../../services/db';
 import { TimeSlot } from '../../types';
 
 const TimeSlots: React.FC = () => {
@@ -16,25 +14,36 @@ const TimeSlots: React.FC = () => {
   });
 
   useEffect(() => {
-    loadSlots();
+    const unsubscribe = subscribeToTimeSlots((data) => {
+      setSlots(data);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const loadSlots = () => {
-    setSlots(getDB().timeSlots);
-  };
-
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    addTimeSlot(formData);
-    setFormData({ name: '', startTime: '', endTime: '', weight: 1 });
-    setIsModalOpen(false);
-    loadSlots();
+    try {
+      await addTimeSlot(formData);
+      setFormData({ name: '', startTime: '', endTime: '', weight: 1 });
+      setIsModalOpen(false);
+    } catch (error: any) {
+      console.error("Error saving time slot:", error);
+      if (error.code === 'permission-denied') {
+        alert("Erro: Permissão negada. Verifique se você está logado como administrador.");
+      } else {
+        alert(`Erro ao salvar horário: ${error.message || 'Erro desconhecido'}`);
+      }
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('REMOVER ESTE BLOCO DE HORÁRIO?')) {
-      deleteTimeSlot(id);
-      loadSlots();
+      try {
+        await deleteTimeSlot(id);
+      } catch (error) {
+        console.error("Error deleting time slot:", error);
+        alert("Erro ao remover horário.");
+      }
     }
   };
 
@@ -62,7 +71,7 @@ const TimeSlots: React.FC = () => {
                 <div className="p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-slate-900 shadow-inner group-hover:border-lime-200 transition-colors">
                   <Clock className="w-8 h-8" />
                 </div>
-                <button 
+                <button
                   onClick={() => handleDelete(slot.id)}
                   className="p-3 bg-white text-slate-300 hover:text-rose-600 border-2 border-slate-100 rounded-xl transition-all hover:border-rose-200"
                 >
@@ -91,7 +100,7 @@ const TimeSlots: React.FC = () => {
                 </span>
               </div>
             </div>
-            
+
             <div className="h-2 bg-slate-100 group-hover:bg-lime-400 transition-colors"></div>
           </div>
         ))}
@@ -100,7 +109,6 @@ const TimeSlots: React.FC = () => {
       <div className="bg-white border-2 border-slate-300 p-8 rounded-[2.5rem] relative overflow-hidden group shadow-md flex items-center gap-6">
         <div className="absolute top-0 left-0 w-2 h-full bg-slate-900"></div>
         <div className="p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-slate-400">
-          {/* Changed ShieldInfo to Shield */}
           <Shield className="w-8 h-8" />
         </div>
         <div>

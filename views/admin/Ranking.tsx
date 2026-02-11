@@ -1,17 +1,19 @@
-
 import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, Crown, Star, TrendingUp, Target, ChevronRight, Award } from 'lucide-react';
-import { getDB } from '../../services/storage';
+import { subscribeToUsers } from '../../services/db';
 import { User as UserType } from '../../types';
 
 const Ranking: React.FC = () => {
   const [users, setUsers] = useState<UserType[]>([]);
 
   useEffect(() => {
-    const db = getDB();
-    // Ordena por saldo (mérito total acumulado)
-    const sortedUsers = [...db.users].sort((a, b) => b.balance - a.balance);
-    setUsers(sortedUsers);
+    const unsubscribe = subscribeToUsers((data) => {
+      // Sort in memory to avoid complex compound index requirements for now,
+      // and simpler real-time updates handling.
+      const sorted = [...data].sort((a, b) => b.balance - a.balance);
+      setUsers(sorted);
+    });
+    return () => unsubscribe();
   }, []);
 
   const topThree = users.slice(0, 3);
@@ -22,7 +24,7 @@ const Ranking: React.FC = () => {
       {/* SEÇÃO: PÓDIO ELITE */}
       <section className="relative">
         <div className="absolute inset-0 bg-lime-500/5 blur-[120px] rounded-full -z-10"></div>
-        
+
         <div className="text-center mb-12 space-y-2">
           <div className="inline-flex items-center gap-2 px-4 py-1 bg-black text-lime-400 rounded-full text-[10px] font-black uppercase tracking-[0.3em] italic shadow-xl">
             <Award className="w-3 h-3" /> Hall da Fama
@@ -69,7 +71,7 @@ const Ranking: React.FC = () => {
                 <h4 className="text-3xl font-black italic uppercase font-sport text-slate-900 tracking-tight">{topThree[0].name}</h4>
                 <p className="text-4xl font-black text-yellow-600 font-sport mt-1">R$ {topThree[0].balance.toFixed(2)}</p>
                 <div className="mt-4 inline-flex items-center gap-2 px-4 py-1 bg-yellow-500 text-black rounded-lg text-[9px] font-black uppercase tracking-widest italic">
-                   <Star className="w-3 h-3 fill-current" /> MVP da Temporada
+                  <Star className="w-3 h-3 fill-current" /> MVP da Temporada
                 </div>
               </div>
             </div>
@@ -117,8 +119,8 @@ const Ranking: React.FC = () => {
             </div>
           </div>
           <div className="hidden md:flex items-center gap-2 px-6 py-2 bg-white border-2 border-slate-200 rounded-full shadow-sm">
-             <span className="w-2 h-2 bg-lime-500 rounded-full animate-pulse"></span>
-             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live Ranking Update</span>
+            <span className="w-2 h-2 bg-lime-500 rounded-full animate-pulse"></span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live Ranking Update</span>
           </div>
         </div>
 
@@ -129,10 +131,10 @@ const Ranking: React.FC = () => {
                 <div className="w-16 text-3xl font-black italic font-sport text-slate-400 group-hover:text-black transition-colors">
                   #{index + 4}
                 </div>
-                
+
                 <div className="flex-1 flex items-center gap-6">
                   <div className="w-14 h-14 bg-zinc-900 rounded-2xl flex items-center justify-center text-white font-black text-xl border-2 border-zinc-800 shadow-md group-hover:scale-110 transition-transform">
-                    {user.name[0].toUpperCase()}
+                    {user.name && user.name[0] ? user.name[0].toUpperCase() : '?'}
                   </div>
                   <div>
                     <div className="text-base font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
@@ -178,14 +180,14 @@ const Ranking: React.FC = () => {
               Sincronizado: {new Date().toLocaleTimeString()}
             </p>
             <div className="flex gap-4">
-               <div className="flex items-center gap-1">
-                 <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                 <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Elite</span>
-               </div>
-               <div className="flex items-center gap-1">
-                 <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
-                 <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Challenger</span>
-               </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Elite</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
+                <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Challenger</span>
+              </div>
             </div>
           </div>
         </div>

@@ -1,29 +1,33 @@
-
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Lock, User, LogIn, AlertCircle, Activity } from 'lucide-react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../services/firebase';
 
 const Login: React.FC = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    setTimeout(() => {
-      if (username === 'admin' && password === 'admin123') {
-        sessionStorage.setItem('isAdminAuthenticated', 'true');
-        navigate('/admin/usuarios');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate('/admin/usuarios');
+    } catch (err: any) {
+      if (err.code === 'auth/invalid-credential') {
+        setError('CREDENCIAIS INVÁLIDAS.');
       } else {
-        setError('ACESSO NEGADO. CREDENCIAIS INCORRETAS.');
+        setError('ERRO AO FAZER LOGIN: ' + err.message);
       }
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (
@@ -41,26 +45,26 @@ const Login: React.FC = () => {
           </h1>
           <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em]">Controle Central</p>
         </div>
-        
+
         <form onSubmit={handleLogin} className="p-12 space-y-8">
           <div className="space-y-6">
             <div>
-              <label className="block text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-3 ml-1">Usuário Mestre</label>
+              <label className="block text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-3 ml-1">Email</label>
               <div className="relative group">
                 <User className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-lime-400 transition-colors w-5 h-5" />
                 <input
-                  type="text"
+                  type="email"
                   required
                   className="w-full pl-14 pr-6 py-5 bg-black border border-zinc-800 rounded-2xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase font-sport tracking-widest"
-                  placeholder="USUÁRIO"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="SEU EMAIL"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
             </div>
-            
+
             <div>
-              <label className="block text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-3 ml-1">Senha de Comando</label>
+              <label className="block text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-3 ml-1">Senha</label>
               <div className="relative group">
                 <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-lime-400 transition-colors w-5 h-5" />
                 <input
@@ -97,9 +101,11 @@ const Login: React.FC = () => {
             )}
           </button>
         </form>
-        
+
         <div className="p-5 bg-black text-center">
-          <p className="text-[8px] text-zinc-700 uppercase tracking-[0.5em] font-black">Authorized Personnel Only</p>
+          <Link to="/signup" className="text-[10px] text-zinc-500 hover:text-lime-400 uppercase tracking-[0.2em] font-black transition-colors">
+            CRIAR NOVA CONTA
+          </Link>
         </div>
       </div>
     </div>
