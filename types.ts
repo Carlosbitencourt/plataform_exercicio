@@ -41,6 +41,7 @@ export interface CheckIn {
   longitude: number;
   timeSlotId: string;
   score: number;
+  address?: string;
 }
 
 export interface Distribution {

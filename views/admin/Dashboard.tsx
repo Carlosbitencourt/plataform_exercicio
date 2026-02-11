@@ -8,7 +8,8 @@ import {
     Zap,
     ArrowUpRight,
     ShieldCheck,
-    MoreHorizontal
+    MoreHorizontal,
+    MapPin
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
@@ -161,6 +162,9 @@ const Dashboard: React.FC = () => {
                                                     <h4 className="font-black text-slate-900 uppercase tracking-tight">{user?.name || 'Desconhecido'}</h4>
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                                         <Clock className="w-3 h-3" /> {ci.time} • {ci.date === today ? 'Hoje' : ci.date}
+                                                        {ci.address && (
+                                                            <> • <MapPin className="w-3 h-3" /> <span className="max-w-[150px] truncate">{ci.address}</span></>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>

@@ -19,6 +19,7 @@ const CheckInPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkInAddress, setCheckInAddress] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -126,12 +127,31 @@ const CheckInPage: React.FC = () => {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 20000,
           maximumAge: 0
         });
       });
 
       const { latitude, longitude } = position.coords;
+
+      // Reverse Geocoding
+      let addressStr = '';
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const data = await response.json();
+        if (data && data.display_name) {
+          // Simplificar endereço: pegar rua e número apenas se possível, ou bairro/cidade
+          // display_name do nominatim é longo. Vamos pegar partes.
+          // Ex: "Rua X, Bairro Y, Cidade Z..."
+          const parts = data.display_name.split(',');
+          addressStr = parts.slice(0, 3).join(',');
+        }
+      } catch (geoErr) {
+        console.error("Erro ao buscar endereço", geoErr);
+        // Não falha o checkin por isso, apenas fica sem endereço
+      }
+
+      setCheckInAddress(addressStr);
 
       const R = 6371e3;
       const φ1 = latitude * Math.PI / 180;
@@ -151,21 +171,9 @@ const CheckInPage: React.FC = () => {
         return;
       }
 
-      // Calculate score based on slot weight and user deposit (bet)
-      // We need to implement calculateCheckInScore or just do logic here.
-      // logic: score = (depositedValue * slot.weight) / 100? Or just points?
-      // existing `calculateCheckInScore` likely used `timeSlots` from local storage.
-      // Let's reimplement logic here for safety relying on Firestore data.
-
-      const weight = activeSlot.weight || 1;
-      const basePoints = 10; // Base points for showing up
-      const score = basePoints * weight;
-      // Note: The previous logic might have been different. 
-      // If `calculateCheckInScore` imported from `rewardSystem` relied on `getDB()` it will fail.
-      // Let's assume a simple point system for now: 10 points * weight.
-      // OR better, checking the `calculateCheckInScore` implementation? 
-      // I don't have visibility into `calculateCheckInScore` implementation detail from here easily without reading it.
-      // I'll stick to a simple robust logic here.
+      const activeSlotWeight = activeSlot.weight || 1;
+      const basePoints = 10;
+      const score = basePoints * activeSlotWeight;
 
       await addCheckIn({
         userId: user!.id,
@@ -174,13 +182,15 @@ const CheckInPage: React.FC = () => {
         latitude,
         longitude,
         timeSlotId: activeSlot.id,
-        score
+        score,
+        address: addressStr
       });
 
       const updatedUser = { ...user!, balance: user!.balance + score };
       await updateUser(updatedUser);
       setSuccess(true);
     } catch (err) {
+      console.error(err);
       setError('GPS OBRIGATÓRIO. ATIVE A LOCALIZAÇÃO E TENTE NOVAMENTE.');
     } finally {
       setLoading(false);
@@ -197,6 +207,12 @@ const CheckInPage: React.FC = () => {
           <div className="space-y-2">
             <h2 className="text-4xl font-black italic font-sport text-white uppercase tracking-tighter">Missão Cumprida!</h2>
             <p className="text-zinc-500 font-black uppercase text-[10px] tracking-[0.4em]">Check-in Validado com Sucesso</p>
+            {checkInAddress && (
+              <div className="flex items-center justify-center gap-2 mt-2 text-zinc-600">
+                <div className="w-1 h-1 bg-lime-500 rounded-full"></div>
+                <p className="text-[9px] font-bold uppercase tracking-wider max-w-[200px] truncate">{checkInAddress}</p>
+              </div>
+            )}
           </div>
           <div className="bg-black p-6 rounded-2xl border border-zinc-800 space-y-1">
             <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Atleta: {user?.name}</p>
