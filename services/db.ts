@@ -14,7 +14,21 @@ import {
     limit,
     Timestamp
 } from 'firebase/firestore';
+import { auth } from './firebase'; // Ensure auth is imported for logging
 import { User, TimeSlot, CheckIn, Distribution, QRCodeData, UserStatus } from '../types';
+
+// Helper for debug logging
+const logWrite = (operation: string, path: string, data: any) => {
+    console.group(`🔥 FIREBASE WRITE: ${operation}`);
+    console.log(`UID: ${auth.currentUser?.uid || 'ANONYMOUS/UNAUTHENTICATED'}`);
+    console.log(`PATH: ${path}`);
+    console.log(`DATA:`, data);
+    console.groupEnd();
+
+    if (!auth.currentUser) {
+        console.warn(`⚠️ WRITING WITHOUT AUTH: ${operation} on ${path}`);
+    }
+};
 
 // Collections
 const USERS_COLLECTION = 'users';
@@ -42,12 +56,14 @@ export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status'
         photoUrl: userData.photoUrl || ''
     };
 
+    logWrite('addUser', USERS_COLLECTION, newUser);
     await addDoc(collection(db, USERS_COLLECTION), newUser);
 };
 
 export const updateUser = async (user: User) => {
     const userRef = doc(db, USERS_COLLECTION, user.id);
     const { id, ...data } = user;
+    logWrite('updateUser', `${USERS_COLLECTION}/${user.id}`, data);
     await updateDoc(userRef, data as any);
 };
 
@@ -67,6 +83,7 @@ export const subscribeToTimeSlots = (callback: (slots: TimeSlot[]) => void) => {
 };
 
 export const addTimeSlot = async (slotData: Omit<TimeSlot, 'id'>) => {
+    logWrite('addTimeSlot', TIMESLOTS_COLLECTION, slotData);
     await addDoc(collection(db, TIMESLOTS_COLLECTION), slotData);
 };
 
@@ -92,6 +109,7 @@ export const subscribeToCheckIns = (callback: (checkIns: CheckIn[]) => void) => 
 };
 
 export const addCheckIn = async (checkInData: Omit<CheckIn, 'id'>) => {
+    logWrite('addCheckIn', CHECKINS_COLLECTION, checkInData);
     await addDoc(collection(db, CHECKINS_COLLECTION), checkInData);
 };
 

@@ -6,6 +6,8 @@ import { calculateCheckInScore } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin } from 'lucide-react';
 import { getUserLocation, LocationResult } from '../../services/geolocation';
+import { auth } from '../../services/firebase';
+import { signInAnonymously } from 'firebase/auth';
 
 const CheckInPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -49,6 +51,21 @@ const CheckInPage: React.FC = () => {
           // Fallback if query fails, assume prompt
           setPermissionStatus('prompt');
         });
+    }
+
+    // Ensure Anonymous Auth for Firestore Permissions
+    if (!auth.currentUser) {
+      console.log('CheckInPage: Signing in anonymously...');
+      signInAnonymously(auth)
+        .then((userCred) => {
+          console.log('CheckInPage: Signed in anonymously', userCred.user.uid);
+        })
+        .catch((err) => {
+          console.error('CheckInPage: Anonymous auth failed', err);
+          setError('ERRO DE AUTENTICAÇÃO: Verifique sua conexão.');
+        });
+    } else {
+      console.log('CheckInPage: Already authenticated', auth.currentUser.uid);
     }
 
     return () => {

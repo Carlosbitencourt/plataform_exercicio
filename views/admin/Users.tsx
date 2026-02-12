@@ -53,7 +53,13 @@ const Users: React.FC = () => {
 
 
 
-    const storageRef = ref(storage, `users/${Date.now()}_${file.name}`);
+    if (!auth.currentUser) {
+      alert("Você precisa estar logado para fazer upload.");
+      return;
+    }
+
+    const uid = auth.currentUser.uid;
+    const storageRef = ref(storage, `uploads/${uid}/${Date.now()}_${file.name}`);
     const uploadTask = uploadBytesResumable(storageRef, file);
 
     uploadTask.on('state_changed',
