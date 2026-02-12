@@ -141,13 +141,32 @@ const CheckInPage: React.FC = () => {
     }
 
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
+      const getPos = (opts: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocalização não suportada pelo navegador.'));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, opts);
+      });
+
+      let position: GeolocationPosition;
+
+      try {
+        // Tentativa 1: Alta precisão, timeout curto (5s)
+        position = await getPos({
           enableHighAccuracy: true,
-          timeout: 20000,
+          timeout: 5000,
           maximumAge: 0
         });
-      });
+      } catch (err) {
+        console.warn('GPS Alta precisão falhou, tentando fallback...', err);
+        // Tentativa 2: Baixa precisão, timeout maior (10s), aceita cache de 30s
+        position = await getPos({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 30000
+        });
+      }
 
       const { latitude, longitude, accuracy } = position.coords;
 
@@ -278,9 +297,23 @@ const CheckInPage: React.FC = () => {
       const updatedUser = { ...user!, balance: user!.balance + score };
       await updateUser(updatedUser);
       setSuccess(true);
-    } catch (err) {
-      console.error(err);
-      setError('GPS OBRIGATÓRIO. ATIVE A LOCALIZAÇÃO E TENTE NOVAMENTE.');
+    } catch (err: any) {
+      console.error('Erro no Check-in:', err);
+
+      let msg = 'GPS OBRIGATÓRIO. ATIVE A LOCALIZAÇÃO E TENTE NOVAMENTE.';
+
+      if (err.code === 1) { // PERMISSION_DENIED
+        msg = 'PERMISSÃO DE LOCALIZAÇÃO NEGADA. HABILITE NAS CONFIGURAÇÕES DO NAVEGADOR.';
+      } else if (err.code === 2) { // POSITION_UNAVAILABLE
+        msg = 'SINAL DE GPS NÃO ENCONTRADO. TENTE EM ÁREA ABERTA.';
+      } else if (err.code === 3) { // TIMEOUT
+        msg = 'TIMEOUT: DEMORA AO OBTER LOCALIZAÇÃO. TENTE NOVAMENTE.';
+      } else if (err.message && typeof err.message === 'string' && !err.code) {
+        // Erros manuais (ex: "Geolocalização não suportada")
+        msg = err.message;
+      }
+
+      setError(msg);
     } finally {
       setLoading(false);
     }
