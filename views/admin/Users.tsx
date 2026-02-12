@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser } from '../../services/db';
 import { storage } from '../../services/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadString } from 'firebase/storage';
 import { User, UserStatus } from '../../types';
 
 const Users: React.FC = () => {
@@ -45,22 +45,41 @@ const Users: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log("Starting upload (Base64)...", file.name);
     setUploading(true);
+
     try {
+      // Convert to Base64
+      const reader = new FileReader();
+
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
       const storageRef = ref(storage, `users/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
+      console.log("Created ref, uploading string...");
+
+      // Upload with 15s timeout
+      const uploadPromise = uploadString(storageRef, dataUrl, 'data_url');
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Upload timed out after 15s')), 15000)
+      );
+
+      const snapshot: any = await Promise.race([uploadPromise, timeoutPromise]);
+      console.log("Upload complete, snapshot:", snapshot);
+
       const url = await getDownloadURL(storageRef);
+      console.log("Got download URL:", url);
+
       setFormData(prev => ({ ...prev, photoUrl: url }));
     } catch (error: any) {
       console.error("Error uploading:", error);
       if (error.code === 'storage/unauthorized') {
-        alert("Permissão negada. Verifique as regras do Firebase Storage.");
-      } else if (error.code === 'storage/canceled') {
-        alert("Upload cancelado pelo usuário.");
-      } else if (error.code === 'storage/unknown') {
-        alert("Ocorreu um erro desconhecido. Verifique sua conexão.");
+        alert("Permissão negada. Verifique as regras do Storage.");
       } else {
-        alert(`Erro no upload: ${error.message}`);
+        alert(`Erro mudado: ${error.message}`);
       }
     } finally {
       setUploading(false);
