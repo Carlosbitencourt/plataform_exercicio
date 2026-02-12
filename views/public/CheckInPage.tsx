@@ -152,19 +152,19 @@ const CheckInPage: React.FC = () => {
       let position: GeolocationPosition;
 
       try {
-        // Tentativa 1: Alta precisão, timeout curto (5s)
+        // Tentativa 1: Alta precisão, timeout médio (10s)
         position = await getPos({
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000,
           maximumAge: 0
         });
       } catch (err) {
         console.warn('GPS Alta precisão falhou, tentando fallback...', err);
-        // Tentativa 2: Baixa precisão, timeout maior (10s), aceita cache de 30s
+        // Tentativa 2: Baixa precisão, timeout longo (20s), aceita cache de 5 minutos
         position = await getPos({
           enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 30000
+          timeout: 20000,
+          maximumAge: 300000 // 5 minutos
         });
       }
 
