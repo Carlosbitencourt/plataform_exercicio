@@ -160,26 +160,43 @@ const CheckInPage: React.FC = () => {
         const data = await response.json();
 
         if (data && data.address) {
-          const { road, suburb, neighbourhood, city_district, city, town, village, state } = data.address;
+          const { road, pedestrian, path, footway, suburb, neighbourhood, city_district, city, town, village, municipality, state } = data.address;
 
           const parts = [];
 
-          // Rua/Logradouro
-          if (road) parts.push(road);
+          // Rua/Logradouro - Tentativa expandida
+          const rua = road || pedestrian || path || footway;
+          if (rua) parts.push(rua);
 
-          // Bairro
-          const bairro = suburb || neighbourhood || city_district;
+          // Cidade - Normalização
+          // Muitas vezes "city_district" ou "municipality" vem igual a cidade
+          const cidade = city || town || village || municipality;
+
+          // Bairro - Deduplicação
+          // Se o bairro for igual a cidade, ignoramos para não ficar "Catu, Catu"
+          const bairroRaw = suburb || neighbourhood || city_district;
+          let bairro = null;
+
+          if (bairroRaw && (!cidade || !bairroRaw.includes(cidade))) {
+            bairro = bairroRaw;
+          }
+
           if (bairro) parts.push(bairro);
 
           // Cidade/Estado
-          const cidade = city || town || village;
-          if (cidade && state) parts.push(`${cidade} - ${state}`);
-          else if (cidade) parts.push(cidade);
+          if (cidade) {
+            if (state) parts.push(`${cidade} - ${state}`);
+            else parts.push(cidade);
+          } else if (state) {
+            parts.push(state);
+          }
 
           if (parts.length > 0) {
             addressStr = parts.join(', ');
           } else if (data.display_name) {
+            // Fallback para display_name se falhar a montagem manual
             const displayParts = data.display_name.split(',');
+            // Pega os 3 primeiros componentes para não ficar gigante
             addressStr = displayParts.slice(0, 3).join(',');
           }
         }
