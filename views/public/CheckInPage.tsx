@@ -310,6 +310,10 @@ const CheckInPage: React.FC = () => {
           <button onClick={() => window.location.reload()} className="w-full py-4 bg-white text-black rounded-xl font-black uppercase italic tracking-tighter hover:bg-lime-400 transition-all text-lg">
             Novo Registro
           </button>
+
+          <Link to="/ranking" className="block w-full py-4 bg-transparent border-2 border-zinc-700 text-zinc-400 rounded-xl font-black uppercase italic tracking-tighter hover:border-lime-400 hover:text-lime-400 transition-all text-lg pt-3">
+            Ver Ranking do Dia
+          </Link>
         </div>
       </div>
     );

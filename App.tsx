@@ -83,6 +83,7 @@ const App: React.FC = () => {
 
             {/* Public Routes */}
             <Route path="/checkin" element={<CheckInPage />} />
+            <Route path="/ranking" element={<Ranking />} />
 
             {/* Default Redirects */}
             <Route path="/" element={<Navigate to="/checkin" replace />} />
