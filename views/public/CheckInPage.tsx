@@ -161,16 +161,9 @@ const CheckInPage: React.FC = () => {
           maximumAge: 10000
         });
       } catch (err: any) {
-        // Se for erro de permissão, não tenta novamente (fail fast)
-        const codeStr = String(err.code || '').toUpperCase();
-        if (
-          err.code === 1 ||
-          codeStr.includes('PERMISSION') ||
-          String(err.message || '').toUpperCase().includes('PERMISSION')
-        ) {
-          throw err;
-        }
-
+        // Se for erro de permissão, não tenta novamente (fail fast) REMOVIDO
+        // Agora tentamos o fallback mesmo com erro de permissão, pois alguns devices
+        // reportam erro genérico na alta precisão
         console.warn('GPS Alta precisão falhou, tentando fallback...', err);
         // Tentativa 2: Baixa precisão, timeout longo (20s), aceita cache de 5 minutos
         position = await getPos({
