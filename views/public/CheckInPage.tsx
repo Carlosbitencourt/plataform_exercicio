@@ -88,15 +88,32 @@ const CheckInPage: React.FC = () => {
     const nowStr = getNowStr();
     const dayOfWeek = currentTime.getDay();
 
-    // Logic: find a slot that is currently active for this time AND this day of the week
-    const activeSlot = timeSlots.find(slot =>
-      nowStr >= slot.startTime &&
-      nowStr <= slot.endTime &&
-      (slot.days ? slot.days.includes(dayOfWeek) : true)
-    );
+    const timeToMinutes = (timeStr: string) => {
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const currentMinutes = timeToMinutes(nowStr);
+
+    const activeSlot = timeSlots.find(slot => {
+      if (slot.days && !slot.days.includes(dayOfWeek)) return false;
+
+      const startMin = timeToMinutes(slot.startTime);
+      let endMin = timeToMinutes(slot.endTime);
+
+      // Handle midnight (00:00 as 1440)
+      if (endMin === 0) endMin = 1440;
+
+      if (endMin < startMin) {
+        // Cross-midnight slot (e.g., 23:00 - 01:00)
+        return currentMinutes >= startMin || currentMinutes < endMin;
+      }
+
+      return currentMinutes >= startMin && currentMinutes < endMin;
+    });
 
     if (!activeSlot) {
-      setError(`JANELA FECHADA OU INDISPONÍVEL PARA HOJE (${nowStr}).`);
+      setError(`JANELA FECHADA AGORA (${nowStr}).`);
       setLoading(false);
       return;
     }
