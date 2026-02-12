@@ -5,9 +5,13 @@ import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, getTodayAc
 import { calculateCheckInScore } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin } from 'lucide-react';
-import { getUserLocation, LocationResult } from '../../services/geolocation';
-import { auth } from '../../services/firebase';
-import { signInAnonymously } from 'firebase/auth';
+import {
+  ensureAuth,
+  getUserLocation,
+  safeAddDoc,
+  safeUpdateDoc
+} from '../../services/firebaseGuard';
+import { LocationResult } from '../../services/geolocation';
 
 const CheckInPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -53,19 +57,16 @@ const CheckInPage: React.FC = () => {
         });
     }
 
-    // Ensure Anonymous Auth for Firestore Permissions
-    if (!auth.currentUser) {
-      console.log('CheckInPage: Signing in anonymously...');
-      signInAnonymously(auth)
-        .then((userCred) => {
-          console.log('CheckInPage: Signed in anonymously', userCred.user.uid);
+    // Initial Permission Check
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName })
+        .then(result => {
+          setPermissionStatus(result.state as any);
+          result.onchange = () => setPermissionStatus(result.state as any);
         })
-        .catch((err) => {
-          console.error('CheckInPage: Anonymous auth failed', err);
-          setError('ERRO DE AUTENTICAÇÃO: Verifique sua conexão.');
+        .catch(() => {
+          setPermissionStatus('prompt');
         });
-    } else {
-      console.log('CheckInPage: Already authenticated', auth.currentUser.uid);
     }
 
     return () => {
@@ -119,17 +120,22 @@ const CheckInPage: React.FC = () => {
     setDebugInfo(null);
 
     try {
-      // 1. Validate Time/QR first to avoid unnecessary GPS prompts if invalid
+      // 0. PRE-FLIGHT AUTH CHECK (Invisible)
+      await ensureAuth();
+
+      // 1. Validate Time/QR first
       const validationError = validatePreConditions();
       if (validationError) {
         throw { message: validationError, isSystemError: false };
       }
 
-      // 2. Get Location
+      // 2. Get Location (Guard handles permissions internally/robustly)
+      // Note: getUserLocation from guard calls the robust geolocation service
       const location = await getUserLocation();
 
       // 3. Process Check-in with location
       await processCheckIn(location);
+
 
     } catch (err: any) {
       console.error('Check-in Error:', err);
@@ -262,7 +268,8 @@ const CheckInPage: React.FC = () => {
     const score = basePoints * activeSlotWeight;
     const today = getTodayISO();
 
-    await addCheckIn({
+    // Use Safe Guard for Firestore Writes
+    await safeAddDoc('checkIns', {
       userId: user!.id,
       date: today,
       time: nowStr,
@@ -270,11 +277,15 @@ const CheckInPage: React.FC = () => {
       longitude,
       timeSlotId: activeSlot.id,
       score,
-      address: addressStr
+      address: addressStr,
+      // Ensure strict structure
+      accuracy: accuracy || 0,
+      createdAt: new Date().toISOString()
     });
 
     const updatedUser = { ...user!, balance: user!.balance + score };
-    await updateUser(updatedUser);
+    // We update the user stats using safeUpdateDoc
+    await safeUpdateDoc('users', user!.id, updatedUser);
     setSuccess(true);
   };
 

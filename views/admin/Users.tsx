@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser } from '../../services/db';
-import { storage, auth } from '../../services/firebase';
-import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { auth } from '../../services/firebase';
+import { safeUploadFile } from '../../services/firebaseGuard';
 import { User, UserStatus } from '../../types';
 
 const Users: React.FC = () => {
@@ -51,44 +51,26 @@ const Users: React.FC = () => {
     setUploading(true);
     setUploadProgress(0);
 
+    try {
+      // Simulating progress since safeUploadFile is a Promise
+      const interval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
 
+      const downloadURL = await safeUploadFile(file);
 
-    if (!auth.currentUser) {
-      alert("Você precisa estar logado para fazer upload.");
-      return;
+      clearInterval(interval);
+      setUploadProgress(100);
+      setFormData(prev => ({ ...prev, photoUrl: downloadURL }));
+
+      setTimeout(() => setUploading(false), 500);
+
+    } catch (error: any) {
+      console.error("Error uploading:", error);
+      setUploading(false);
+      setUploadProgress(0);
+      alert(`Erro no Upload: ${error.message}`);
     }
-
-    const uid = auth.currentUser.uid;
-    const storageRef = ref(storage, `uploads/${uid}/${Date.now()}_${file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-
-    uploadTask.on('state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setUploadProgress(progress);
-        console.log('Upload is ' + progress + '% done');
-      },
-      (error: any) => {
-        console.error("Error uploading:", error);
-        setUploading(false);
-        if (error.code === 'storage/unauthorized') {
-          alert("Permissão negada. Verifique as regras do Storage.");
-        } else if (error.code === 'storage/canceled') {
-          alert("Upload cancelado.");
-        } else if (error.code === 'storage/unknown') {
-          alert("Erro desconhecido. Verifique a conexão.");
-        } else {
-          alert(`Erro: ${error.message}`);
-        }
-      },
-      () => {
-        getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-          setFormData(prev => ({ ...prev, photoUrl: downloadURL }));
-          setUploading(false);
-          setUploadProgress(100);
-        });
-      }
-    );
   };
 
   const handleSave = async (e: React.FormEvent) => {
