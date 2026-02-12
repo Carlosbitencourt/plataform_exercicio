@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Plus, Trash2, Shield, Zap, X } from 'lucide-react';
-import { subscribeToTimeSlots, addTimeSlot, deleteTimeSlot } from '../../services/db';
+import { Clock, Plus, Trash2, Shield, Zap, X, Pencil } from 'lucide-react';
+import { subscribeToTimeSlots, addTimeSlot, deleteTimeSlot, updateTimeSlot } from '../../services/db';
 import { TimeSlot } from '../../types';
 import { GYM_LOCATION } from '../../constants';
 
@@ -17,6 +17,7 @@ const DAYS = [
 const TimeSlots: React.FC = () => {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     startTime: '',
@@ -43,7 +44,12 @@ const TimeSlots: React.FC = () => {
       return;
     }
     try {
-      await addTimeSlot(formData);
+      if (editingSlotId) {
+        await updateTimeSlot({ id: editingSlotId, ...formData });
+      } else {
+        await addTimeSlot(formData);
+      }
+
       setFormData({
         name: '',
         startTime: '',
@@ -55,6 +61,7 @@ const TimeSlots: React.FC = () => {
         longitude: GYM_LOCATION.lng,
         radius: GYM_LOCATION.radius
       });
+      setEditingSlotId(null);
       setIsModalOpen(false);
     } catch (error: any) {
       console.error("Error saving time slot:", error);
@@ -65,6 +72,23 @@ const TimeSlots: React.FC = () => {
       }
     }
   };
+
+  const handleEdit = (slot: TimeSlot) => {
+    setEditingSlotId(slot.id);
+    setFormData({
+      name: slot.name,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      weight: slot.weight,
+      days: slot.days,
+      locationName: slot.locationName,
+      latitude: slot.latitude,
+      longitude: slot.longitude,
+      radius: slot.radius
+    });
+    setIsModalOpen(true);
+  };
+
 
   const handleDelete = async (id: string) => {
     if (confirm('REMOVER ESTE BLOCO DE HORÁRIO?')) {
@@ -85,7 +109,21 @@ const TimeSlots: React.FC = () => {
           <p className="text-slate-400 font-black uppercase text-[9px] tracking-[0.4em]">Configuração de Janelas de Check-in</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingSlotId(null);
+            setFormData({
+              name: '',
+              startTime: '',
+              endTime: '',
+              weight: 1,
+              days: [1, 2, 3, 4, 5],
+              locationName: 'ACADEMIA SEDE',
+              latitude: GYM_LOCATION.lat,
+              longitude: GYM_LOCATION.lng,
+              radius: GYM_LOCATION.radius
+            });
+            setIsModalOpen(true);
+          }}
           className="flex items-center px-6 py-3 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-2xl active:scale-95 text-xs"
         >
           <Plus className="w-5 h-5 mr-2" />
@@ -101,12 +139,20 @@ const TimeSlots: React.FC = () => {
                 <div className="p-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-slate-900 shadow-inner group-hover:border-lime-200 transition-colors">
                   <Clock className="w-6 h-6" />
                 </div>
-                <button
-                  onClick={() => handleDelete(slot.id)}
-                  className="p-2 bg-white text-slate-300 hover:text-rose-600 border-2 border-slate-100 rounded-lg transition-all hover:border-rose-200"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEdit(slot)}
+                    className="p-2 bg-white text-slate-300 hover:text-blue-500 border-2 border-slate-100 rounded-lg transition-all hover:border-blue-200"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(slot.id)}
+                    className="p-2 bg-white text-slate-300 hover:text-rose-600 border-2 border-slate-100 rounded-lg transition-all hover:border-rose-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -165,7 +211,7 @@ const TimeSlots: React.FC = () => {
           <div className="bg-white rounded-[1.5rem] border-4 border-slate-200 shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-300">
             <div className="p-4 bg-slate-50 flex justify-between items-center border-b-2 border-slate-100">
               <h3 className="text-lg font-black italic uppercase font-sport text-slate-900 tracking-widest leading-none">
-                Novo Bloco
+                {editingSlotId ? 'Editar Bloco' : 'Novo Bloco'}
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900 p-1.5 bg-white rounded-lg border-2 border-slate-200">
                 <X className="w-4 h-4" />
@@ -298,7 +344,7 @@ const TimeSlots: React.FC = () => {
                   type="submit"
                   className="w-full py-3 bg-black text-lime-400 rounded-lg font-black uppercase italic tracking-tighter shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-[11px]"
                 >
-                  Registrar Bloco Sincronizado
+                  {editingSlotId ? 'Salvar Alterações' : 'Registrar Bloco Sincronizado'}
                 </button>
               </div>
             </form>

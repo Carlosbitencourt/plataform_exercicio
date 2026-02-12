@@ -73,6 +73,12 @@ export const deleteTimeSlot = async (id: string) => {
     await deleteDoc(doc(db, TIMESLOTS_COLLECTION, id));
 };
 
+export const updateTimeSlot = async (timeSlot: TimeSlot) => {
+    const slotRef = doc(db, TIMESLOTS_COLLECTION, timeSlot.id);
+    const { id, ...data } = timeSlot;
+    await updateDoc(slotRef, data as any);
+};
+
 
 // --- CheckIns ---
 
