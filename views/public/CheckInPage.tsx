@@ -73,6 +73,16 @@ const CheckInPage: React.FC = () => {
         } else {
           setUser(foundUser);
           setStep(2);
+
+          // "Warm up" GPS functionality and request permissions immediately
+          if (navigator.geolocation) {
+            console.log('Iniciando Warmup do GPS...');
+            navigator.geolocation.getCurrentPosition(
+              (pos) => console.log('GPS Warmup OK', pos),
+              (err) => console.warn('GPS Warmup Failed', err),
+              { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+          }
         }
       } else {
         setError('ATLETA NÃO IDENTIFICADO.');
@@ -152,11 +162,11 @@ const CheckInPage: React.FC = () => {
       let position: GeolocationPosition;
 
       try {
-        // Tentativa 1: Alta precisão, timeout médio (10s)
+        // Tentativa 1: Alta precisão, timeout médio (10s), aceita cache recente do warmup (10s)
         position = await getPos({
           enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 0
+          maximumAge: 10000
         });
       } catch (err) {
         console.warn('GPS Alta precisão falhou, tentando fallback...', err);
