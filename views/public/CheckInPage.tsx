@@ -22,6 +22,7 @@ const CheckInPage: React.FC = () => {
   const [checkInAddress, setCheckInAddress] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -148,7 +149,7 @@ const CheckInPage: React.FC = () => {
         });
       });
 
-      const { latitude, longitude } = position.coords;
+      const { latitude, longitude, accuracy } = position.coords;
 
       // Reverse Geocoding
       let addressStr = '';
@@ -184,6 +185,15 @@ const CheckInPage: React.FC = () => {
       const distance = R * c;
 
       if (distance > targetRadius && !isLocalBypass) {
+        setDebugInfo({
+          userLat: latitude,
+          userLng: longitude,
+          targetLat,
+          targetLng,
+          distance,
+          radius: targetRadius,
+          accuracy
+        });
         setError(`VOCÊ ESTÁ FORA DO RAIO PERMITIDO PARA: ${locationName.toUpperCase()}.`);
         setLoading(false);
         return;
@@ -268,6 +278,14 @@ const CheckInPage: React.FC = () => {
             <div className="space-y-1">
               <p className="text-rose-500 font-black text-[10px] uppercase tracking-widest text-left">Aviso de Bloqueio</p>
               <p className="text-white text-xs font-bold uppercase tracking-tight leading-snug text-left">{error}</p>
+              {debugInfo && (
+                <div className="mt-2 p-2 bg-black/40 rounded border border-rose-500/30 text-[9px] font-mono text-left space-y-1">
+                  <p className="text-rose-200">DISTÂNCIA: <span className="text-white font-bold">{Math.round(debugInfo.distance)}m</span> / {debugInfo.radius}m</p>
+                  <p className="text-rose-200">SUA: <span className="text-white">{debugInfo.userLat.toFixed(5)}, {debugInfo.userLng.toFixed(5)}</span></p>
+                  <p className="text-rose-200">ALVO: <span className="text-white">{debugInfo.targetLat.toFixed(5)}, {debugInfo.targetLng.toFixed(5)}</span></p>
+                  <p className="text-rose-200">PRECISÃO GPS: <span className="text-white">{Math.round(debugInfo.accuracy)}m</span></p>
+                </div>
+              )}
             </div>
           </div>
         )}
