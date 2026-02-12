@@ -14,6 +14,11 @@ export interface User {
   depositedValue: number;
   status: UserStatus;
   createdAt: string;
+  pixKey?: string;
+  street?: string;
+  neighborhood?: string;
+  city?: string;
+  photoUrl?: string;
 }
 
 export interface TimeSlot {

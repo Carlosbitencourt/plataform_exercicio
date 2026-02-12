@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X } from 'lucide-react';
+import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser } from '../../services/db';
+import { storage } from '../../services/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { User, UserStatus } from '../../types';
 
 const Users: React.FC = () => {
@@ -8,14 +10,29 @@ const Users: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
     cpf: '',
     uniqueCode: '',
     phone: '',
-    depositedValue: 0
+    depositedValue: 0,
+    pixKey: '',
+    street: '',
+    neighborhood: '',
+    city: '',
+    photoUrl: ''
   });
+
+  const generateUniqueCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 4; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
 
   useEffect(() => {
     const unsubscribe = subscribeToUsers((data) => {
@@ -23,6 +40,32 @@ const Users: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `users/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setFormData(prev => ({ ...prev, photoUrl: url }));
+    } catch (error: any) {
+      console.error("Error uploading:", error);
+      if (error.code === 'storage/unauthorized') {
+        alert("Permissão negada. Verifique as regras do Firebase Storage.");
+      } else if (error.code === 'storage/canceled') {
+        alert("Upload cancelado pelo usuário.");
+      } else if (error.code === 'storage/unknown') {
+        alert("Ocorreu um erro desconhecido. Verifique sua conexão.");
+      } else {
+        alert(`Erro no upload: ${error.message}`);
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +75,18 @@ const Users: React.FC = () => {
       } else {
         await addUser(formData);
       }
-      setFormData({ name: '', cpf: '', uniqueCode: '', phone: '', depositedValue: 0 });
+      setFormData({
+        name: '',
+        cpf: '',
+        uniqueCode: '',
+        phone: '',
+        depositedValue: 0,
+        pixKey: '',
+        street: '',
+        neighborhood: '',
+        city: '',
+        photoUrl: ''
+      });
       setEditingUser(null);
       setIsModalOpen(false);
     } catch (error) {
@@ -48,7 +102,12 @@ const Users: React.FC = () => {
       cpf: user.cpf,
       uniqueCode: user.uniqueCode,
       phone: user.phone,
-      depositedValue: user.depositedValue
+      depositedValue: user.depositedValue,
+      pixKey: user.pixKey || '',
+      street: user.street || '',
+      neighborhood: user.neighborhood || '',
+      city: user.city || '',
+      photoUrl: user.photoUrl || ''
     });
     setIsModalOpen(true);
   };
@@ -83,7 +142,22 @@ const Users: React.FC = () => {
           />
         </div>
         <button
-          onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
+          onClick={() => {
+            setEditingUser(null);
+            setFormData({
+              name: '',
+              cpf: '',
+              uniqueCode: generateUniqueCode(),
+              phone: '',
+              depositedValue: 0,
+              pixKey: '',
+              street: '',
+              neighborhood: '',
+              city: '',
+              photoUrl: ''
+            });
+            setIsModalOpen(true);
+          }}
           className="flex items-center px-6 py-3 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-2xl active:scale-95 text-xs"
         >
           <Plus className="w-5 h-5 mr-2" />
@@ -108,8 +182,12 @@ const Users: React.FC = () => {
               <tr key={user.id} className="hover:bg-slate-50/80 transition-colors group">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center text-lime-400 font-black text-lg border-2 border-zinc-800 shadow-md">
-                      {user.name && user.name[0] ? user.name[0].toUpperCase() : '?'}
+                    <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-lime-600 font-black text-lg border-2 border-slate-200 shadow-sm overflow-hidden">
+                      {user.photoUrl ? (
+                        <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{user.name && user.name[0] ? user.name[0].toUpperCase() : '?'}</span>
+                      )}
                     </div>
                     <div>
                       <div className="text-xs font-black text-slate-900 uppercase tracking-tight">{user.name}</div>
@@ -160,11 +238,11 @@ const Users: React.FC = () => {
         )}
       </div>
 
-      {/* Modal - Bordas mais fortes para destacar da página clara */}
+      {/* Modal - Otimizado para telas menores */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-[2rem] border-4 border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-6 bg-slate-50 flex justify-between items-center border-b-4 border-slate-100">
+          <div className="bg-white rounded-[1.5rem] border-4 border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[85vh]">
+            <div className="p-4 bg-slate-50 flex justify-between items-center border-b-4 border-slate-100 shrink-0">
               <h3 className="text-xl font-black italic uppercase font-sport text-slate-900 tracking-widest">
                 {editingUser ? 'Modificar Perfil' : 'Novo Recruta'}
               </h3>
@@ -172,63 +250,133 @@ const Users: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSave} className="p-8 space-y-4">
-              <div className="grid grid-cols-1 gap-6">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nome Completo</label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase placeholder:text-slate-300"
-                    placeholder="DIGITE O NOME"
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  />
+
+            <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                {/* Foto Upload */}
+                <div className="flex flex-col items-center justify-center gap-2 mb-1">
+                  <div className="w-20 h-20 bg-slate-100 rounded-full border-4 border-slate-200 flex items-center justify-center overflow-hidden relative group">
+                    {formData.photoUrl ? (
+                      <img src={formData.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera className="w-8 h-8 text-slate-400" />
+                    )}
+                    <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                      <Upload className="w-6 h-6 text-white" />
+                      <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+                    </label>
+                    {uploading && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="text-white text-xs font-bold animate-pulse">...</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    {uploading ? 'Enviando...' : 'Alterar Foto'}
+                  </p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">CPF Registro</label>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Nome Completo</label>
                     <input
                       required
                       type="text"
-                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none"
-                      value={formData.cpf}
-                      onChange={e => setFormData({ ...formData, cpf: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase placeholder:text-slate-300 text-xs"
+                      placeholder="DIGITE O NOME"
+                      value={formData.name}
+                      onChange={e => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">CPF Registro</label>
+                      <input
+                        required
+                        type="text"
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-xs"
+                        value={formData.cpf}
+                        onChange={e => setFormData({ ...formData, cpf: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Tag Única (ID)</label>
+                      <input
+                        readOnly
+                        type="text"
+                        className="w-full px-4 py-3 bg-lime-50/50 border-2 border-lime-200 rounded-xl text-lime-600 font-black font-sport italic transition-all outline-none uppercase cursor-not-allowed opacity-80 text-xs"
+                        value={formData.uniqueCode}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Telefone</label>
+                      <input
+                        required
+                        type="text"
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-xs"
+                        value={formData.phone}
+                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Aposta (R$)</label>
+                      <input
+                        required
+                        type="number"
+                        className="w-full px-4 py-3 bg-white border-2 border-slate-900 rounded-xl text-slate-900 font-black text-lg focus:ring-2 focus:ring-lime-400 transition-all outline-none"
+                        value={formData.depositedValue}
+                        onChange={e => setFormData({ ...formData, depositedValue: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Pix</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-xs"
+                        placeholder="CHAVE"
+                        value={formData.pixKey}
+                        onChange={e => setFormData({ ...formData, pixKey: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Tag Única (ID)</label>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Endereço (Rua)</label>
                     <input
-                      required
                       type="text"
-                      className="w-full px-5 py-4 bg-lime-50 border-2 border-lime-200 rounded-2xl text-lime-600 font-black font-sport italic transition-all outline-none uppercase"
-                      value={formData.uniqueCode}
-                      onChange={e => setFormData({ ...formData, uniqueCode: e.target.value })}
+                      className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase text-xs"
+                      value={formData.street}
+                      onChange={e => setFormData({ ...formData, street: e.target.value })}
                     />
                   </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Bairro</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase text-xs"
+                        value={formData.neighborhood}
+                        onChange={e => setFormData({ ...formData, neighborhood: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Cidade</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase text-xs"
+                        value={formData.city}
+                        onChange={e => setFormData({ ...formData, city: e.target.value })}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Telefone</label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none"
-                    value={formData.phone}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Aposta Inicial (R$)</label>
-                  <input
-                    required
-                    type="number"
-                    className="w-full px-4 py-3 bg-white border-2 border-slate-900 rounded-xl text-slate-900 font-black text-lg focus:ring-2 focus:ring-lime-400 transition-all outline-none"
-                    value={formData.depositedValue}
-                    onChange={e => setFormData({ ...formData, depositedValue: Number(e.target.value) })}
-                  />
-                </div>
+
               </div>
-              <div className="flex justify-end gap-3 pt-4">
+
+              <div className="p-4 bg-slate-50 border-t-4 border-slate-100 flex justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}

@@ -38,7 +38,8 @@ export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status'
         ...userData,
         balance: userData.depositedValue,
         status: UserStatus.ACTIVE,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        photoUrl: userData.photoUrl || ''
     };
 
     await addDoc(collection(db, USERS_COLLECTION), newUser);
