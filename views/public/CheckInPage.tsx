@@ -162,7 +162,12 @@ const CheckInPage: React.FC = () => {
         });
       } catch (err: any) {
         // Se for erro de permissão, não tenta novamente (fail fast)
-        if (err.code === 1 || err.code === 'PERMISSION_DENIED' || err.code === 'PERMISSION-DENIED') {
+        const codeStr = String(err.code || '').toUpperCase();
+        if (
+          err.code === 1 ||
+          codeStr.includes('PERMISSION') ||
+          String(err.message || '').toUpperCase().includes('PERMISSION')
+        ) {
           throw err;
         }
 
@@ -310,18 +315,37 @@ const CheckInPage: React.FC = () => {
       // Normalize error code
       // Some environments/browsers return string codes or different structures
       let errorCode = err.code;
-      let errorMessage = err.message || 'Sem mensagem';
+      const errorMessage = err.message || 'Sem mensagem';
 
-      // Check for string codes common in some webviews/browsers
-      if (err.code === 'PERMISSION_DENIED' || err.code === 'PERMISSION-DENIED' || err.message?.includes('denied')) {
+      // Robust check for permission errors (String codes, case insensitive, whitespace)
+      const codeStr = String(errorCode).toUpperCase().trim();
+      const msgStr = String(errorMessage).toUpperCase();
+
+      if (
+        codeStr === '1' ||
+        codeStr === 'PERMISSION_DENIED' ||
+        codeStr === 'PERMISSION-DENIED' ||
+        codeStr.includes('PERMISSION') || // Safest catch-all for varied string codes
+        msgStr.includes('DENIED') ||
+        msgStr.includes('PERMISSION') ||
+        msgStr.includes('MISSING OR INSUFFICIENT PERMISSIONS')
+      ) {
         errorCode = 1;
-      } else if (err.code === 'POSITION_UNAVAILABLE' || err.code === 'POSITION-UNAVAILABLE') {
+      } else if (
+        codeStr === '2' ||
+        codeStr === 'POSITION_UNAVAILABLE' ||
+        codeStr === 'POSITION-UNAVAILABLE' ||
+        codeStr.includes('UNAVAILABLE')
+      ) {
         errorCode = 2;
-      } else if (err.code === 'TIMEOUT') {
+      } else if (
+        codeStr === '3' ||
+        codeStr === 'TIMEOUT'
+      ) {
         errorCode = 3;
       }
 
-      let msg = `ERRO GPS (C: ${errorCode || '?'}): ${errorMessage}`;
+      let msg = `ERRO GPS (C: ${err.code || '?'}): ${errorMessage}`;
 
       if (errorCode === 1) { // PERMISSION_DENIED
         msg = 'PERMISSÃO DE LOCALIZAÇÃO NEGADA. HABILITE NAS CONFIGURAÇÕES DO APARELHO.';
