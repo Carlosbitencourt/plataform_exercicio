@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser } from '../../services/db';
 import { storage } from '../../services/firebase';
-import { ref, uploadBytes, getDownloadURL, uploadString } from 'firebase/storage';
+import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { User, UserStatus } from '../../types';
 
 const Users: React.FC = () => {
@@ -10,7 +10,10 @@ const Users: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
+
+  // ... (existing code)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -45,45 +48,41 @@ const Users: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log("Starting upload (Base64)...", file.name);
     setUploading(true);
+    setUploadProgress(0);
 
-    try {
-      // Convert to Base64
-      const reader = new FileReader();
 
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
 
-      const storageRef = ref(storage, `users/${Date.now()}_${file.name}`);
-      console.log("Created ref, uploading string...");
+    const storageRef = ref(storage, `users/${Date.now()}_${file.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
 
-      // Upload with 15s timeout
-      const uploadPromise = uploadString(storageRef, dataUrl, 'data_url');
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Upload timed out after 15s')), 15000)
-      );
-
-      const snapshot: any = await Promise.race([uploadPromise, timeoutPromise]);
-      console.log("Upload complete, snapshot:", snapshot);
-
-      const url = await getDownloadURL(storageRef);
-      console.log("Got download URL:", url);
-
-      setFormData(prev => ({ ...prev, photoUrl: url }));
-    } catch (error: any) {
-      console.error("Error uploading:", error);
-      if (error.code === 'storage/unauthorized') {
-        alert("Permissão negada. Verifique as regras do Storage.");
-      } else {
-        alert(`Erro mudado: ${error.message}`);
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setUploadProgress(progress);
+        console.log('Upload is ' + progress + '% done');
+      },
+      (error: any) => {
+        console.error("Error uploading:", error);
+        setUploading(false);
+        if (error.code === 'storage/unauthorized') {
+          alert("Permissão negada. Verifique as regras do Storage.");
+        } else if (error.code === 'storage/canceled') {
+          alert("Upload cancelado.");
+        } else if (error.code === 'storage/unknown') {
+          alert("Erro desconhecido. Verifique a conexão.");
+        } else {
+          alert(`Erro: ${error.message}`);
+        }
+      },
+      () => {
+        getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+          setFormData(prev => ({ ...prev, photoUrl: downloadURL }));
+          setUploading(false);
+          setUploadProgress(100);
+        });
       }
-    } finally {
-      setUploading(false);
-    }
+    );
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -280,19 +279,36 @@ const Users: React.FC = () => {
                     ) : (
                       <Camera className="w-8 h-8 text-slate-400" />
                     )}
-                    <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                      <Upload className="w-6 h-6 text-white" />
-                      <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
-                    </label>
+
                     {uploading && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <span className="text-white text-xs font-bold animate-pulse">...</span>
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center flex-col">
+                        <span className="text-white text-[10px] font-bold">{Math.round(uploadProgress)}%</span>
+                        <div className="w-12 h-1 bg-slate-700 rounded-full mt-1 overflow-hidden">
+                          <div
+                            className="h-full bg-lime-400 transition-all duration-300"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
                       </div>
                     )}
+
+                    <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
+                      <Upload className="w-6 h-6 text-white" />
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        disabled={uploading}
+                      />
+                    </label>
                   </div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                    {uploading ? 'Enviando...' : 'Alterar Foto'}
-                  </p>
+
+                  {uploading ? (
+                    <p className="text-[10px] font-bold text-slate-400 animate-pulse uppercase">Enviando...</p>
+                  ) : (
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Alterar Foto</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
