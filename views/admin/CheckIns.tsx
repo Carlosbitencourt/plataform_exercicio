@@ -125,9 +125,14 @@ const CheckIns: React.FC = () => {
               <div className="flex items-start p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <MapPin className="w-4 h-4 mr-3 text-slate-400 mt-0.5" />
                 <div className="space-y-0.5">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Coordenadas de Registro</p>
-                  <p className="text-[9px] text-slate-900 font-mono tracking-tighter">LAT: {ci.latitude.toFixed(6)}</p>
-                  <p className="text-[9px] text-slate-900 font-mono tracking-tighter">LNG: {ci.longitude.toFixed(6)}</p>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Localização de Registro</p>
+                  {ci.address && (
+                    <p className="text-[9px] text-slate-600 font-bold uppercase tracking-tight leading-tight mb-1">{ci.address}</p>
+                  )}
+                  <div className="flex gap-3 text-slate-400">
+                    <p className="text-[9px] font-mono tracking-tighter">LAT: {ci.latitude.toFixed(6)}</p>
+                    <p className="text-[9px] font-mono tracking-tighter">LNG: {ci.longitude.toFixed(6)}</p>
+                  </div>
                 </div>
               </div>
             </div>
