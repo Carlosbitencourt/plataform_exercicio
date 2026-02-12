@@ -151,40 +151,60 @@ const CheckInPage: React.FC = () => {
 
       const { latitude, longitude, accuracy } = position.coords;
 
-      // Reverse Geocoding with BigDataCloud (More reliable for client-side)
+      // Reverse Geocoding - Prioritize Nominatim for Street Level details
       let addressStr = '';
+
       try {
-        const response = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=pt`
-        );
+        // Try Nominatim first for detailed street/neighborhood data
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&longitude=${longitude}&zoom=18&addressdetails=1`);
         const data = await response.json();
 
-        if (data) {
-          // Construct address from available fields
+        if (data && data.address) {
+          const { road, suburb, neighbourhood, city_district, city, town, village, state } = data.address;
+
           const parts = [];
-          if (data.locality) parts.push(data.locality);
-          if (data.principalSubdivision) parts.push(data.principalSubdivision);
-          if (data.countryName) parts.push(data.countryName);
+
+          // Rua/Logradouro
+          if (road) parts.push(road);
+
+          // Bairro
+          const bairro = suburb || neighbourhood || city_district;
+          if (bairro) parts.push(bairro);
+
+          // Cidade/Estado
+          const cidade = city || town || village;
+          if (cidade && state) parts.push(`${cidade} - ${state}`);
+          else if (cidade) parts.push(cidade);
 
           if (parts.length > 0) {
             addressStr = parts.join(', ');
-          } else if (data.city || data.town || data.village) {
-            addressStr = [data.city, data.town, data.village].filter(Boolean).join(', ');
+          } else if (data.display_name) {
+            const displayParts = data.display_name.split(',');
+            addressStr = displayParts.slice(0, 3).join(',');
           }
         }
-      } catch (geoErr) {
-        console.error("Erro ao buscar endereço (BigDataCloud)", geoErr);
+      } catch (nomErr) {
+        console.error("Erro Nominatim, tentando fallback...", nomErr);
 
-        // Fallback to Nominatim if first fails
+        // Fallback to BigDataCloud (City/State level)
         try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const response = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=pt`
+          );
           const data = await response.json();
-          if (data && data.display_name) {
-            const parts = data.display_name.split(',');
-            addressStr = parts.slice(0, 3).join(',');
+
+          if (data) {
+            const parts = [];
+            if (data.locality) parts.push(data.locality);
+            if (data.principalSubdivision) parts.push(data.principalSubdivision);
+            if (data.countryName) parts.push(data.countryName);
+
+            if (parts.length > 0) {
+              addressStr = parts.join(', ');
+            }
           }
-        } catch (nomErr) {
-          console.error("Erro ao buscar endereço (Nominatim)", nomErr);
+        } catch (bdcErr) {
+          console.error("Erro BigDataCloud", bdcErr);
         }
       }
 

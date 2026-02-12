@@ -94,6 +94,10 @@ export const addCheckIn = async (checkInData: Omit<CheckIn, 'id'>) => {
     await addDoc(collection(db, CHECKINS_COLLECTION), checkInData);
 };
 
+export const deleteCheckIn = async (id: string) => {
+    await deleteDoc(doc(db, CHECKINS_COLLECTION, id));
+};
+
 // --- Distributions ---
 
 export const subscribeToDistributions = (callback: (distributions: Distribution[]) => void) => {

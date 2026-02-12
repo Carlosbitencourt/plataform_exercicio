@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, User, Trophy, Search, Filter, ClipboardList, Activity } from 'lucide-react';
-import { subscribeToCheckIns, subscribeToUsers, subscribeToTimeSlots } from '../../services/db';
+import { Calendar, Clock, MapPin, User, Trophy, Search, Filter, ClipboardList, Activity, Trash2 } from 'lucide-react';
+import { subscribeToCheckIns, subscribeToUsers, subscribeToTimeSlots, deleteCheckIn } from '../../services/db';
 import { CheckIn, User as UserType, TimeSlot } from '../../types';
 
 const CheckIns: React.FC = () => {
@@ -43,6 +43,17 @@ const CheckIns: React.FC = () => {
 
   const getUserName = (userId: string) => {
     return users.find(u => u.id === userId)?.name || 'Desconhecido';
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('TEM CERTEZA QUE DESEJA EXCLUIR ESTE REGISTRO? ISSO PERMITIRÁ QUE O USUÁRIO FAÇA CHECK-IN NOVAMENTE HOJE.')) {
+      try {
+        await deleteCheckIn(id);
+      } catch (error) {
+        console.error("Error deleting check-in:", error);
+        alert("Erro ao excluir registro.");
+      }
+    }
   };
 
   return (
@@ -99,10 +110,17 @@ const CheckIns: React.FC = () => {
                   <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.3em] mt-0.5">ID: {ci.userId.substring(0, 8).toUpperCase()}</p>
                 </div>
               </div>
-              <div className="bg-black text-lime-400 px-3 py-1.5 rounded-lg flex items-center text-[10px] font-black shadow-lg italic font-sport">
+              <div className="bg-black text-lime-400 px-3 py-1.5 rounded-lg flex items-center text-[10px] font-black shadow-lg italic font-sport ml-auto">
                 <Trophy className="w-3.5 h-3.5 mr-1.5" />
                 {ci.score.toFixed(1)} PTS
               </div>
+              <button
+                onClick={() => handleDelete(ci.id)}
+                className="ml-3 p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                title="Excluir Registro"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
 
             <div className="p-6 space-y-4 text-slate-900">
