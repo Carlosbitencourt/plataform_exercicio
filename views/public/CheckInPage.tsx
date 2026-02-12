@@ -4,7 +4,8 @@ import { User, UserStatus, TimeSlot, QRCodeData, CheckIn } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, getTodayActiveQRCode, addCheckIn, updateUser } from '../../services/db';
 import { calculateCheckInScore } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
-import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight } from 'lucide-react';
+import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin } from 'lucide-react';
+import { getUserLocation, LocationResult } from '../../services/geolocation';
 
 const CheckInPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -17,12 +18,17 @@ const CheckInPage: React.FC = () => {
   const [activeQR, setActiveQR] = useState<QRCodeData | null>(null);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
 
+  // Geolocation & UI States
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [checkInAddress, setCheckInAddress] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [debugInfo, setDebugInfo] = useState<any>(null);
+
+  // iOS Detection for specific instructions
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -32,6 +38,19 @@ const CheckInPage: React.FC = () => {
     const unsubCheckIns = subscribeToCheckIns(setCheckIns);
     const unsubQR = getTodayActiveQRCode(setActiveQR);
 
+    // Initial Permission Check
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName })
+        .then(result => {
+          setPermissionStatus(result.state as any);
+          result.onchange = () => setPermissionStatus(result.state as any);
+        })
+        .catch(() => {
+          // Fallback if query fails, assume prompt
+          setPermissionStatus('prompt');
+        });
+    }
+
     return () => {
       clearInterval(timer);
       unsubUsers();
@@ -40,9 +59,6 @@ const CheckInPage: React.FC = () => {
       unsubQR();
     };
   }, []);
-
-  const dayOfWeek = currentTime.getDay();
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
   const getNowStr = () => {
     const hh = currentTime.getHours().toString().padStart(2, '0');
@@ -62,8 +78,6 @@ const CheckInPage: React.FC = () => {
     setError(null);
 
     const cleanId = identifier.trim();
-    // Using locally cached users from subscription for responsiveness
-    // In a large app, we would use a direct query to Firestore here.
     const foundUser = users.find(u => u.cpf === cleanId || u.uniqueCode.toUpperCase() === cleanId.toUpperCase());
 
     setTimeout(() => {
@@ -73,8 +87,6 @@ const CheckInPage: React.FC = () => {
         } else {
           setUser(foundUser);
           setStep(2);
-
-          // Warmup removido para evitar conflitos
         }
       } else {
         setError('ATLETA NÃO IDENTIFICADO.');
@@ -83,11 +95,49 @@ const CheckInPage: React.FC = () => {
     }, 600);
   };
 
-  const validateCheckIn = async () => {
+  const handleRequestLocation = async () => {
     setLoading(true);
     setError(null);
+    setCheckInAddress(null);
+    setDebugInfo(null);
 
-    const today = getTodayISO();
+    try {
+      // 1. Validate Time/QR first to avoid unnecessary GPS prompts if invalid
+      const validationError = validatePreConditions();
+      if (validationError) {
+        throw { message: validationError, isSystemError: false };
+      }
+
+      // 2. Get Location
+      const location = await getUserLocation();
+
+      // 3. Process Check-in with location
+      await processCheckIn(location);
+
+    } catch (err: any) {
+      console.error('Check-in Error:', err);
+      let msg = err.message || 'Erro desconhecido ao realizar check-in.';
+
+      if (err.code === 'PERMISSION_DENIED') {
+        setPermissionStatus('denied');
+        if (isIOS) {
+          msg = 'ACESSO À LOCALIZAÇÃO NEGADO. VÁ EM AJUSTES > PRIVACIDADE > SERVIÇOS DE LOCALIZAÇÃO E HABILITE PARA O SAFARI.';
+        } else {
+          msg = 'PERMISSÃO DE LOCALIZAÇÃO NEGADA. POR FAVOR, HABILITE NAS CONFIGURAÇÕES DO SITE.';
+        }
+      } else if (err.code === 'POSITION_UNAVAILABLE') {
+        msg = 'SINAL DE GPS NÃO ENCONTRADO. TENTE EM ÁREA ABERTA.';
+      } else if (err.code === 'TIMEOUT') {
+        msg = 'DEMORA AO OBTER LOCALIZAÇÃO. TENTE NOVAMENTE.';
+      }
+
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validatePreConditions = (): string | null => {
     const nowStr = getNowStr();
     const dayOfWeek = currentTime.getDay();
 
@@ -100,261 +150,115 @@ const CheckInPage: React.FC = () => {
 
     const activeSlot = timeSlots.find(slot => {
       if (slot.days && !slot.days.includes(dayOfWeek)) return false;
-
       const startMin = timeToMinutes(slot.startTime);
       let endMin = timeToMinutes(slot.endTime);
-
-      // Handle midnight (00:00 as 1440)
       if (endMin === 0) endMin = 1440;
-
       if (endMin < startMin) {
-        // Cross-midnight slot (e.g., 23:00 - 01:00)
         return currentMinutes >= startMin || currentMinutes < endMin;
       }
-
       return currentMinutes >= startMin && currentMinutes < endMin;
     });
 
     if (!activeSlot) {
-      setError(`JANELA FECHADA AGORA (${nowStr}).`);
-      setLoading(false);
-      return;
+      return `JANELA FECHADA AGORA (${nowStr}).`;
     }
 
     const isLocalBypass = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
     if (!activeQR && !isLocalBypass) {
-      setError('SISTEMA INDISPONÍVEL: QR CODE NÃO FOI ATIVADO HOJE.');
-      setLoading(false);
-      return;
+      return 'SISTEMA INDISPONÍVEL: QR CODE NÃO FOI ATIVADO HOJE.';
     }
 
     if (tokenFromUrl && activeQR && activeQR.token !== tokenFromUrl && !isLocalBypass) {
-      setError('QR CODE INVÁLIDO OU EXPIRADO PARA ESTE ACESSO.');
-      setLoading(false);
-      return;
+      return 'QR CODE INVÁLIDO OU EXPIRADO PARA ESTE ACESSO.';
     }
 
+    const today = getTodayISO();
     const alreadyDidToday = checkIns.some(c => c.userId === user?.id && c.date === today);
     if (alreadyDidToday) {
-      setError('CHECK-IN JÁ REALIZADO HOJE.');
-      setLoading(false);
-      return;
+      return 'CHECK-IN JÁ REALIZADO HOJE.';
     }
 
+    return null;
+  };
+
+  const processCheckIn = async (location: LocationResult) => {
+    const { latitude, longitude, accuracy } = location;
+
+    // Reverse Geocoding
+    let addressStr = '';
     try {
-      const getPos = (opts: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error('Geolocalização não suportada pelo navegador.'));
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(resolve, reject, opts);
-      });
-
-      let position: GeolocationPosition;
-
-      try {
-        // Tentativa 1: Alta precisão, timeout médio (10s), aceita cache recente do warmup (10s)
-        position = await getPos({
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 10000
-        });
-      } catch (err: any) {
-        // Se for erro de permissão, não tenta novamente (fail fast) REMOVIDO
-        // Agora tentamos o fallback mesmo com erro de permissão, pois alguns devices
-        // reportam erro genérico na alta precisão
-        console.warn('GPS Alta precisão falhou, tentando fallback...', err);
-        // Tentativa 2: Baixa precisão, timeout longo (20s), aceita cache de 5 minutos
-        position = await getPos({
-          enableHighAccuracy: false,
-          timeout: 20000,
-          maximumAge: 300000 // 5 minutos
-        });
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`);
+      const data = await response.json();
+      if (data && data.address) {
+        // Simplificado para display_name ou componentes principais
+        addressStr = data.display_name ? data.display_name.split(',').slice(0, 3).join(',') : 'Localização Detectada';
       }
-
-      const { latitude, longitude, accuracy } = position.coords;
-
-      // Reverse Geocoding - Prioritize Nominatim for Street Level details
-      let addressStr = '';
-
-      try {
-        // Try Nominatim first for detailed street/neighborhood data
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`);
-        const data = await response.json();
-
-        if (data && data.address) {
-          const { road, pedestrian, path, footway, suburb, neighbourhood, city_district, city, town, village, municipality, state } = data.address;
-
-          const parts = [];
-
-          // Rua/Logradouro - Tentativa expandida
-          const rua = road || pedestrian || path || footway;
-          if (rua) parts.push(rua);
-
-          // Cidade - Normalização
-          // Muitas vezes "city_district" ou "municipality" vem igual a cidade
-          const cidade = city || town || village || municipality;
-
-          // Bairro - Deduplicação
-          // Se o bairro for igual a cidade, ignoramos para não ficar "Catu, Catu"
-          const bairroRaw = suburb || neighbourhood || city_district;
-          let bairro = null;
-
-          if (bairroRaw && (!cidade || !bairroRaw.includes(cidade))) {
-            bairro = bairroRaw;
-          }
-
-          if (bairro) parts.push(bairro);
-
-          // Cidade/Estado
-          if (cidade) {
-            if (state) parts.push(`${cidade} - ${state}`);
-            else parts.push(cidade);
-          } else if (state) {
-            parts.push(state);
-          }
-
-          if (parts.length > 0) {
-            addressStr = parts.join(', ');
-          } else if (data.display_name) {
-            // Fallback para display_name se falhar a montagem manual
-            const displayParts = data.display_name.split(',');
-            // Pega os 3 primeiros componentes para não ficar gigante
-            addressStr = displayParts.slice(0, 3).join(',');
-          }
-        }
-      } catch (nomErr) {
-        console.error("Erro Nominatim, tentando fallback...", nomErr);
-
-        // Fallback to BigDataCloud (City/State level)
-        try {
-          const response = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=pt`
-          );
-          const data = await response.json();
-
-          if (data) {
-            const parts = [];
-            if (data.locality) parts.push(data.locality);
-            if (data.principalSubdivision) parts.push(data.principalSubdivision);
-            if (data.countryName) parts.push(data.countryName);
-
-            if (parts.length > 0) {
-              addressStr = parts.join(', ');
-            }
-          }
-        } catch (bdcErr) {
-          console.error("Erro BigDataCloud", bdcErr);
-        }
-      }
-
-      setCheckInAddress(addressStr);
-
-      // Use slot-specific coordinates if available, otherwise fallback to global
-      const targetLat = activeSlot.latitude || GYM_LOCATION.lat;
-      const targetLng = activeSlot.longitude || GYM_LOCATION.lng;
-      const targetRadius = activeSlot.radius || GYM_LOCATION.radius;
-      const locationName = activeSlot.locationName || 'ACADEMIA';
-
-      const R = 6371e3;
-      const φ1 = latitude * Math.PI / 180;
-      const φ2 = targetLat * Math.PI / 180;
-      const Δφ = (targetLat - latitude) * Math.PI / 180;
-      const Δλ = (targetLng - longitude) * Math.PI / 180;
-
-      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-        Math.cos(φ1) * Math.cos(φ2) *
-        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distance = R * c;
-
-      if (distance > targetRadius && !isLocalBypass) {
-        setDebugInfo({
-          userLat: latitude,
-          userLng: longitude,
-          targetLat,
-          targetLng,
-          distance,
-          radius: targetRadius,
-          accuracy
-        });
-        setError(`VOCÊ ESTÁ FORA DO RAIO PERMITIDO PARA: ${locationName.toUpperCase()}.`);
-        setLoading(false);
-        return;
-      }
-
-      const activeSlotWeight = activeSlot.weight || 1;
-      const basePoints = 10;
-      const score = basePoints * activeSlotWeight;
-
-      await addCheckIn({
-        userId: user!.id,
-        date: today,
-        time: nowStr,
-        latitude,
-        longitude,
-        timeSlotId: activeSlot.id,
-        score,
-        address: addressStr
-      });
-
-      const updatedUser = { ...user!, balance: user!.balance + score };
-      await updateUser(updatedUser);
-      setSuccess(true);
-    } catch (err: any) {
-      console.error('Erro no Check-in:', err);
-
-      // Normalize error code
-      // Some environments/browsers return string codes or different structures
-      let errorCode = err.code;
-      const errorMessage = err.message || 'Sem mensagem';
-
-      // Robust check for permission errors (String codes, case insensitive, whitespace)
-      const codeStr = String(errorCode).toUpperCase().trim();
-      const msgStr = String(errorMessage).toUpperCase();
-
-      if (
-        codeStr === '1' ||
-        codeStr === 'PERMISSION_DENIED' ||
-        codeStr === 'PERMISSION-DENIED' ||
-        codeStr.includes('PERMISSION') || // Safest catch-all for varied string codes
-        msgStr.includes('DENIED') ||
-        msgStr.includes('PERMISSION') ||
-        msgStr.includes('MISSING OR INSUFFICIENT PERMISSIONS')
-      ) {
-        errorCode = 1;
-      } else if (
-        codeStr === '2' ||
-        codeStr === 'POSITION_UNAVAILABLE' ||
-        codeStr === 'POSITION-UNAVAILABLE' ||
-        codeStr.includes('UNAVAILABLE')
-      ) {
-        errorCode = 2;
-      } else if (
-        codeStr === '3' ||
-        codeStr === 'TIMEOUT'
-      ) {
-        errorCode = 3;
-      }
-
-      let msg = `ERRO GPS (C: ${err.code || '?'}): ${errorMessage}`;
-
-      if (errorCode === 1) { // PERMISSION_DENIED
-        msg = 'PERMISSÃO DE LOCALIZAÇÃO NEGADA. HABILITE NAS CONFIGURAÇÕES DO APARELHO.';
-      } else if (errorCode === 2) { // POSITION_UNAVAILABLE
-        msg = 'SINAL DE GPS NÃO ENCONTRADO. TENTE EM ÁREA ABERTA.';
-      } else if (errorCode === 3) { // TIMEOUT
-        msg = 'TIMEOUT: DEMORA AO OBTER LOCALIZAÇÃO. TENTE NOVAMENTE.';
-      } else if (errorMessage && typeof errorMessage === 'string' && !errorCode) {
-        // Erros manuais (ex: "Geolocalização não suportada")
-        msg = errorMessage;
-      }
-
-      setError(msg);
-    } finally {
-      setLoading(false);
+    } catch (e) {
+      console.warn('Geocoding failed', e);
+      addressStr = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
     }
+    setCheckInAddress(addressStr);
+
+    // Validate Radius
+    const nowStr = getNowStr();
+    const dayOfWeek = currentTime.getDay();
+    const timeToMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const currentMinutes = timeToMinutes(nowStr);
+
+    const activeSlot = timeSlots.find(slot => {
+      // Re-find active slot (safe to assume exists as verified in preCheck)
+      if (slot.days && !slot.days.includes(dayOfWeek)) return false;
+      const startMin = timeToMinutes(slot.startTime);
+      let endMin = timeToMinutes(slot.endTime);
+      if (endMin === 0) endMin = 1440;
+      if (endMin < startMin) return currentMinutes >= startMin || currentMinutes < endMin;
+      return currentMinutes >= startMin && currentMinutes < endMin;
+    });
+
+    if (!activeSlot) throw { message: 'Erro interno: Horário não encontrado.' };
+
+    const targetLat = activeSlot.latitude || GYM_LOCATION.lat;
+    const targetLng = activeSlot.longitude || GYM_LOCATION.lng;
+    const targetRadius = activeSlot.radius || GYM_LOCATION.radius;
+
+    const R = 6371e3;
+    const φ1 = latitude * Math.PI / 180;
+    const φ2 = targetLat * Math.PI / 180;
+    const Δφ = (targetLat - latitude) * Math.PI / 180;
+    const Δλ = (targetLng - longitude) * Math.PI / 180;
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+
+    const isLocalBypass = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    if (distance > targetRadius && !isLocalBypass) {
+      setDebugInfo({
+        userLat: latitude, userLng: longitude, targetLat, targetLng, distance, radius: targetRadius, accuracy
+      });
+      throw { message: `VOCÊ ESTÁ FORA DO RAIO PERMITIDO (${Math.round(distance)}m > ${targetRadius}m). APROXIME-SE DA ACADEMIA.` };
+    }
+
+    const activeSlotWeight = activeSlot.weight || 1;
+    const basePoints = 10;
+    const score = basePoints * activeSlotWeight;
+    const today = getTodayISO();
+
+    await addCheckIn({
+      userId: user!.id,
+      date: today,
+      time: nowStr,
+      latitude,
+      longitude,
+      timeSlotId: activeSlot.id,
+      score,
+      address: addressStr
+    });
+
+    const updatedUser = { ...user!, balance: user!.balance + score };
+    await updateUser(updatedUser);
+    setSuccess(true);
   };
 
   if (success) {
@@ -381,7 +285,6 @@ const CheckInPage: React.FC = () => {
           <button onClick={() => window.location.reload()} className="w-full py-4 bg-white text-black rounded-xl font-black uppercase italic tracking-tighter hover:bg-lime-400 transition-all text-lg">
             Novo Registro
           </button>
-
           <Link to="/ranking" className="block w-full py-4 bg-transparent border-2 border-zinc-700 text-zinc-400 rounded-xl font-black uppercase italic tracking-tighter hover:border-lime-400 hover:text-lime-400 transition-all text-lg pt-3">
             Ver Ranking do Dia
           </Link>
@@ -412,14 +315,12 @@ const CheckInPage: React.FC = () => {
           <div className="bg-rose-500/10 border border-rose-500/20 p-5 rounded-2xl flex items-start gap-4 animate-in slide-in-from-top-2">
             <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-1" />
             <div className="space-y-1">
-              <p className="text-rose-500 font-black text-[10px] uppercase tracking-widest text-left">Aviso de Bloqueio</p>
+              <p className="text-rose-500 font-black text-[10px] uppercase tracking-widest text-left">Aviso de Sistema</p>
               <p className="text-white text-xs font-bold uppercase tracking-tight leading-snug text-left">{error}</p>
               {debugInfo && (
                 <div className="mt-2 p-2 bg-black/40 rounded border border-rose-500/30 text-[9px] font-mono text-left space-y-1">
                   <p className="text-rose-200">DISTÂNCIA: <span className="text-white font-bold">{Math.round(debugInfo.distance)}m</span> / {debugInfo.radius}m</p>
-                  <p className="text-rose-200">SUA: <span className="text-white">{debugInfo.userLat.toFixed(5)}, {debugInfo.userLng.toFixed(5)}</span></p>
-                  <p className="text-rose-200">ALVO: <span className="text-white">{debugInfo.targetLat.toFixed(5)}, {debugInfo.targetLng.toFixed(5)}</span></p>
-                  <p className="text-rose-200">PRECISÃO GPS: <span className="text-white">{Math.round(debugInfo.accuracy)}m</span></p>
+                  <p className="text-rose-200">PRECISÃO: <span className="text-white">{Math.round(debugInfo.accuracy)}m</span></p>
                 </div>
               )}
             </div>
@@ -488,16 +389,39 @@ const CheckInPage: React.FC = () => {
                 >
                   <ArrowLeft className="w-6 h-6" />
                 </button>
-                <button
-                  onClick={validateCheckIn}
-                  disabled={loading}
-                  className="py-5 bg-lime-400 text-black rounded-2xl font-black text-xl uppercase italic tracking-tighter hover:bg-white transition-all flex items-center justify-center gap-3 font-sport shadow-[0_20px_40px_rgba(163,230,53,0.15)] active:scale-95"
-                >
-                  {loading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div> : (
-                    <>CHECK-IN</>
-                  )}
-                </button>
+
+                {(!permissionStatus || permissionStatus === 'prompt' || permissionStatus === 'granted') && (
+                  <button
+                    onClick={handleRequestLocation}
+                    disabled={loading}
+                    className="py-5 bg-lime-400 text-black rounded-2xl font-black text-xl uppercase italic tracking-tighter hover:bg-white transition-all flex items-center justify-center gap-3 font-sport shadow-[0_20px_40px_rgba(163,230,53,0.15)] active:scale-95"
+                  >
+                    {loading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div> : (
+                      <>
+                        <MapPin className="w-6 h-6" />
+                        CHECK-IN
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {permissionStatus === 'denied' && (
+                  <button
+                    onClick={handleRequestLocation}
+                    className="py-5 bg-rose-500 text-white rounded-2xl font-black text-sm uppercase italic tracking-tighter hover:bg-rose-400 transition-all flex items-center justify-center gap-2 font-sport shadow-[0_20px_40px_rgba(244,63,94,0.15)] active:scale-95 px-4"
+                  >
+                    <AlertCircle className="w-5 h-5 mx-auto mb-1" />
+                    {isIOS ? 'HABILITAR NO SAFARI' : 'TENTAR NOVAMENTE'}
+                  </button>
+                )}
+
               </div>
+
+              {permissionStatus === 'denied' && (
+                <p className="text-[9px] text-zinc-500 text-center font-black uppercase tracking-widest max-w-[280px] mx-auto">
+                  Localização obrigatória para validar presença na academia.
+                </p>
+              )}
             </div>
           </div>
         )}
