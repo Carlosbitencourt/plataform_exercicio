@@ -160,7 +160,12 @@ const CheckInPage: React.FC = () => {
           timeout: 10000,
           maximumAge: 10000
         });
-      } catch (err) {
+      } catch (err: any) {
+        // Se for erro de permissão, não tenta novamente (fail fast)
+        if (err.code === 1 || err.code === 'PERMISSION_DENIED' || err.code === 'PERMISSION-DENIED') {
+          throw err;
+        }
+
         console.warn('GPS Alta precisão falhou, tentando fallback...', err);
         // Tentativa 2: Baixa precisão, timeout longo (20s), aceita cache de 5 minutos
         position = await getPos({
@@ -302,17 +307,31 @@ const CheckInPage: React.FC = () => {
     } catch (err: any) {
       console.error('Erro no Check-in:', err);
 
-      let msg = `ERRO GPS (C: ${err.code || '?'}): ${err.message || 'Sem mensagem'}`;
+      // Normalize error code
+      // Some environments/browsers return string codes or different structures
+      let errorCode = err.code;
+      let errorMessage = err.message || 'Sem mensagem';
 
-      if (err.code === 1) { // PERMISSION_DENIED
-        msg = 'PERMISSÃO DE LOCALIZAÇÃO NEGADA. HABILITE NAS CONFIGURAÇÕES DO NAVEGADOR.';
-      } else if (err.code === 2) { // POSITION_UNAVAILABLE
+      // Check for string codes common in some webviews/browsers
+      if (err.code === 'PERMISSION_DENIED' || err.code === 'PERMISSION-DENIED' || err.message?.includes('denied')) {
+        errorCode = 1;
+      } else if (err.code === 'POSITION_UNAVAILABLE' || err.code === 'POSITION-UNAVAILABLE') {
+        errorCode = 2;
+      } else if (err.code === 'TIMEOUT') {
+        errorCode = 3;
+      }
+
+      let msg = `ERRO GPS (C: ${errorCode || '?'}): ${errorMessage}`;
+
+      if (errorCode === 1) { // PERMISSION_DENIED
+        msg = 'PERMISSÃO DE LOCALIZAÇÃO NEGADA. HABILITE NAS CONFIGURAÇÕES DO APARELHO.';
+      } else if (errorCode === 2) { // POSITION_UNAVAILABLE
         msg = 'SINAL DE GPS NÃO ENCONTRADO. TENTE EM ÁREA ABERTA.';
-      } else if (err.code === 3) { // TIMEOUT
+      } else if (errorCode === 3) { // TIMEOUT
         msg = 'TIMEOUT: DEMORA AO OBTER LOCALIZAÇÃO. TENTE NOVAMENTE.';
-      } else if (err.message && typeof err.message === 'string' && !err.code) {
+      } else if (errorMessage && typeof errorMessage === 'string' && !errorCode) {
         // Erros manuais (ex: "Geolocalização não suportada")
-        msg = err.message;
+        msg = errorMessage;
       }
 
       setError(msg);
