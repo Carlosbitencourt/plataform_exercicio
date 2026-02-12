@@ -156,7 +156,7 @@ const CheckInPage: React.FC = () => {
 
       try {
         // Try Nominatim first for detailed street/neighborhood data
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&longitude=${longitude}&zoom=18&addressdetails=1`);
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`);
         const data = await response.json();
 
         if (data && data.address) {
