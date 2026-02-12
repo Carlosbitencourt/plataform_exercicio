@@ -151,17 +151,41 @@ const CheckInPage: React.FC = () => {
 
       const { latitude, longitude, accuracy } = position.coords;
 
-      // Reverse Geocoding
+      // Reverse Geocoding with BigDataCloud (More reliable for client-side)
       let addressStr = '';
       try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const response = await fetch(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=pt`
+        );
         const data = await response.json();
-        if (data && data.display_name) {
-          const parts = data.display_name.split(',');
-          addressStr = parts.slice(0, 3).join(',');
+
+        if (data) {
+          // Construct address from available fields
+          const parts = [];
+          if (data.locality) parts.push(data.locality);
+          if (data.principalSubdivision) parts.push(data.principalSubdivision);
+          if (data.countryName) parts.push(data.countryName);
+
+          if (parts.length > 0) {
+            addressStr = parts.join(', ');
+          } else if (data.city || data.town || data.village) {
+            addressStr = [data.city, data.town, data.village].filter(Boolean).join(', ');
+          }
         }
       } catch (geoErr) {
-        console.error("Erro ao buscar endereço", geoErr);
+        console.error("Erro ao buscar endereço (BigDataCloud)", geoErr);
+
+        // Fallback to Nominatim if first fails
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await response.json();
+          if (data && data.display_name) {
+            const parts = data.display_name.split(',');
+            addressStr = parts.slice(0, 3).join(',');
+          }
+        } catch (nomErr) {
+          console.error("Erro ao buscar endereço (Nominatim)", nomErr);
+        }
       }
 
       setCheckInAddress(addressStr);
