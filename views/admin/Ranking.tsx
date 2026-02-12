@@ -84,14 +84,14 @@ const Ranking: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-lime-400/10 text-lime-400 rounded-full text-[9px] font-black uppercase tracking-[0.3em] border border-lime-400/20">
+      <div className="text-center space-y-1.5">
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-lime-400/10 text-lime-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-lime-400/20">
           <Clock className="w-3 h-3" /> Ranking Diário
         </div>
-        <h2 className="text-3xl font-black italic uppercase font-sport text-slate-900 tracking-tighter">
+        <h2 className="text-2xl font-black italic uppercase font-sport text-slate-900 tracking-tighter">
           Quem Chegou Primeiro?
         </h2>
-        <p className="text-slate-400 font-bold uppercase text-[9px] tracking-[0.4em]">
+        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">
           {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </div>
@@ -100,10 +100,10 @@ const Ranking: React.FC = () => {
         <div className="bg-white rounded-[2rem] border-2 border-slate-200 overflow-hidden shadow-xl">
           <div className="grid grid-cols-1 divide-y-2 divide-slate-100">
             {rankedUsers.length > 0 ? rankedUsers.map((item, index) => (
-              <div key={item.user.id} className="flex items-center p-6 hover:bg-slate-50 transition-colors group">
-                <div className="mr-6 relative">
+              <div key={item.user.id} className="flex items-center p-4 hover:bg-slate-50 transition-colors group">
+                <div className="mr-5 relative">
                   {item.user.photoUrl ? (
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border-4 shadow-lg transition-transform group-hover:scale-110 overflow-hidden relative bg-white ${getBorderColor(index)}`}>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border-4 shadow-lg transition-transform group-hover:scale-110 overflow-hidden relative bg-white ${getBorderColor(index)}`}>
                       <img
                         src={item.user.photoUrl}
                         alt={item.user.name}
@@ -112,52 +112,52 @@ const Ranking: React.FC = () => {
                           (e.target as HTMLImageElement).style.display = 'none';
                           const parent = (e.target as HTMLImageElement).parentElement;
                           if (parent) {
-                            parent.classList.remove('rounded-2xl', 'border-4', 'bg-white', 'w-14', 'h-14');
-                            parent.classList.add('w-12', 'h-12', 'rounded-xl', 'font-black', 'text-xl', 'italic', 'font-sport', 'border-2');
+                            parent.classList.remove('rounded-xl', 'border-4', 'bg-white', 'w-12', 'h-12');
+                            parent.classList.add('w-10', 'h-10', 'rounded-lg', 'font-black', 'text-lg', 'italic', 'font-sport', 'border-2');
                             // Apply fallback medal style manually or reset to render the "else" block (harder here, simple DOM manipulation is easier)
-                            parent.className = `w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`;
+                            parent.className = `w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`;
                             parent.innerHTML = `#${index + 1}`;
                           }
                         }}
                       />
-                      <div className="absolute -bottom-1 -right-1 bg-slate-900 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm z-10">
+                      <div className="absolute -bottom-1 -right-1 bg-slate-900 text-white text-[9px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm z-10">
                         {index + 1}
                       </div>
                     </div>
                   ) : (
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`}>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`}>
                       #{index + 1}
                     </div>
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1">
+                  <div className="flex items-center gap-2 mb-0.5">
                     <h3 className="text-lg font-black italic uppercase font-sport text-slate-900 truncate">
                       {item.user.name}
                     </h3>
                     {index === 0 && (
-                      <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[8px] font-black uppercase tracking-widest rounded border border-yellow-200 flex items-center gap-1">
-                        <Trophy className="w-3 h-3" /> Líder
+                      <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-[9px] font-black uppercase tracking-widest rounded border border-yellow-200 flex items-center gap-1">
+                        <Trophy className="w-2.5 h-2.5" /> Líder
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <span className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-lime-500" />
-                      Check-in: <span className="text-slate-900 font-sport italic text-sm">{item.checkInTime}</span>
+                  <div className="flex items-center gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-lime-500" />
+                      Check-in: <span className="text-slate-900 font-sport italic text-xs">{item.checkInTime}</span>
                     </span>
                     {item.checkIn.score > 0 && (
-                      <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-500">
+                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">
                         +{item.checkIn.score.toFixed(0)} pts
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="text-right pl-4">
-                  <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-0.5">Saldo Total</p>
-                  <p className="font-black font-sport italic text-slate-900">R$ {item.user.balance.toFixed(2)}</p>
+                <div className="text-right pl-3">
+                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-0.5">Saldo Total</p>
+                  <p className="font-black font-sport italic text-slate-900 text-base">R$ {item.user.balance.toFixed(2)}</p>
                 </div>
               </div>
             )) : (

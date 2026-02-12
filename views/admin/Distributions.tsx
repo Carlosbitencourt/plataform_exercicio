@@ -126,41 +126,42 @@ const Distributions: React.FC = () => {
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       {/* Performance Stats Dashboard - Bordas Reforçadas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-[1.5rem] border-2 border-slate-300 shadow-md relative overflow-hidden group">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-[1.25rem] border-2 border-slate-300 shadow-md relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-            <DollarSign className="w-20 h-20 text-slate-900" />
+            <DollarSign className="w-16 h-16 text-slate-900" />
           </div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Payout Total</p>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Payout Total</p>
           <h3 className="text-3xl font-black text-slate-900 italic font-sport tracking-tight">R$ {totalDistributed.toFixed(2)}</h3>
-          <div className="mt-3 h-1.5 w-12 bg-lime-400 rounded-full border border-lime-500"></div>
+          <div className="mt-3 h-1.5 w-10 bg-lime-400 rounded-full border border-lime-500"></div>
         </div>
 
-        <div className="bg-white p-6 rounded-[1.5rem] border-2 border-slate-300 shadow-md relative overflow-hidden group">
+        <div className="bg-white p-5 rounded-[1.25rem] border-2 border-slate-300 shadow-md relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Zap className="w-20 h-20 text-slate-900" />
+            <Zap className="w-16 h-16 text-slate-900" />
           </div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Eventos de Caixa</p>
-          <h3 className="text-3xl font-black text-slate-900 italic font-sport tracking-tight">{distributions.length} <span className="text-[11px] uppercase font-sans text-slate-400 tracking-widest ml-1">Transações</span></h3>
-          <div className="mt-3 h-1.5 w-12 bg-zinc-900 rounded-full border border-zinc-800"></div>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Eventos de Caixa</p>
+          <h3 className="text-3xl font-black text-slate-900 italic font-sport tracking-tight">{distributions.length} <span className="text-[10px] uppercase font-sans text-slate-400 tracking-widest ml-1">Transações</span></h3>
+          <div className="mt-3 h-1.5 w-10 bg-zinc-900 rounded-full border border-zinc-800"></div>
         </div>
 
-        <div className="bg-white p-6 rounded-[1.5rem] border-2 border-slate-300 shadow-md relative overflow-hidden group">
+        <div className="bg-white p-5 rounded-[1.25rem] border-2 border-slate-300 shadow-md relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Users className="w-20 h-20 text-slate-900" />
+            <Users className="w-16 h-16 text-slate-900" />
           </div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Atletas Ativos</p>
-          <h3 className="text-3xl font-black text-slate-900 italic font-sport tracking-tight">{users.filter(u => u.status === UserStatus.ACTIVE).length} <span className="text-[11px] uppercase font-sans text-slate-400 tracking-widest ml-1">Competidores</span></h3>
-          <div className="mt-3 h-1.5 w-12 bg-lime-500 rounded-full border border-lime-600"></div>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Atletas Ativos</p>
+          <h3 className="text-3xl font-black text-slate-900 italic font-sport tracking-tight">{users.filter(u => u.status === UserStatus.ACTIVE).length} <span className="text-[10px] uppercase font-sans text-slate-400 tracking-widest ml-1">Competidores</span></h3>
+          <div className="mt-3 h-1.5 w-10 bg-lime-500 rounded-full border border-lime-600"></div>
         </div>
       </div>
 
       {/* Trigger Distribution - Forte Contraste */}
-      <div className="bg-black rounded-[2rem] p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group shadow-[0_20px_40px_rgba(0,0,0,0.3)]">
+      {/* Trigger Distribution - Forte Contraste */}
+      <div className="bg-black rounded-[1.5rem] p-6 flex flex-col md:flex-row items-center justify-between gap-5 relative overflow-hidden group shadow-[0_15px_30px_rgba(0,0,0,0.3)]">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
-        <div className="space-y-2 relative z-10 text-center md:text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-lime-400 text-black text-[9px] font-black uppercase tracking-widest rounded-full italic shadow-lg">
-            <Zap className="w-2.5 h-2.5 fill-current" /> Manual Payout Override
+        <div className="space-y-1.5 relative z-10 text-center md:text-left">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-lime-400 text-black text-[8px] font-black uppercase tracking-widest rounded-full italic shadow-lg">
+            <Zap className="w-2 h-2 fill-current" /> Manual Payout Override
           </div>
           <h3 className="text-3xl font-black text-white italic uppercase font-sport tracking-widest leading-none">Rodar Distribuição</h3>
           <p className="text-zinc-400 text-xs font-semibold max-w-lg">Dispara o cálculo diário: penaliza faltantes em R$ 10,00 e redistribui para os presentes com base na performance.</p>
@@ -168,12 +169,12 @@ const Distributions: React.FC = () => {
         <button
           onClick={handleProcess}
           disabled={isProcessing}
-          className={`relative z-10 px-8 py-5 bg-lime-400 text-black rounded-xl font-black text-base uppercase italic tracking-tighter flex items-center shadow-2xl transition-all ${isProcessing ? 'opacity-50' : 'hover:bg-white hover:scale-[1.05] active:scale-95'}`}
+          className={`relative z-10 px-6 py-3.5 bg-lime-400 text-black rounded-xl font-black text-base uppercase italic tracking-tighter flex items-center shadow-xl transition-all ${isProcessing ? 'opacity-50' : 'hover:bg-white hover:scale-[1.05] active:scale-95'}`}
         >
           {isProcessing ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-3"></div>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2.5"></div>
           ) : (
-            <Play className="w-6 h-6 mr-3 fill-current" />
+            <Play className="w-5 h-5 mr-2.5 fill-current" />
           )}
           {isProcessing ? 'Calculando...' : 'Rodar Agora'}
         </button>
@@ -196,42 +197,42 @@ const Distributions: React.FC = () => {
       )}
 
       {/* History Table - Bordas e divisores destacados */}
-      <div className="bg-white rounded-[2rem] border-2 border-slate-300 overflow-hidden shadow-xl">
-        <div className="px-8 py-5 border-b-2 border-slate-200 flex justify-between items-center bg-slate-50">
-          <h3 className="text-base font-black text-slate-900 uppercase italic tracking-widest font-sport">Log de Transações</h3>
-          <div className="p-1.5 bg-white border-2 border-slate-100 rounded-lg text-slate-400">
-            <TrendingUp className="w-4 h-4" />
+      <div className="bg-white rounded-[1.5rem] border-2 border-slate-300 overflow-hidden shadow-lg">
+        <div className="px-5 py-3.5 border-b-2 border-slate-200 flex justify-between items-center bg-slate-50">
+          <h3 className="text-sm font-black text-slate-900 uppercase italic tracking-widest font-sport">Log de Transações</h3>
+          <div className="p-1.5 bg-white border border-slate-100 rounded-lg text-slate-400">
+            <TrendingUp className="w-3.5 h-3.5" />
           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y-2 divide-slate-200">
             <thead className="bg-slate-50/50">
               <tr>
-                <th className="px-8 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Timeline</th>
-                <th className="px-8 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Atleta</th>
-                <th className="px-8 py-4 text-left text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Motivo</th>
-                <th className="px-8 py-4 text-right text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Crédito</th>
+                <th className="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Timeline</th>
+                <th className="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Atleta</th>
+                <th className="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Motivo</th>
+                <th className="px-5 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Crédito</th>
               </tr>
             </thead>
             <tbody className="divide-y-2 divide-slate-100">
               {distributions.map((dist) => (
                 <tr key={dist.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-8 py-4 whitespace-nowrap text-xs text-slate-500">
+                  <td className="px-5 py-3 whitespace-nowrap text-[10px] text-slate-500">
                     <div className="flex items-center font-bold tracking-tighter">
-                      <Calendar className="w-3.5 h-3.5 mr-2 text-lime-500" />
+                      <Calendar className="w-3 h-3 mr-1.5 text-lime-500" />
                       {dist.date}
                     </div>
                   </td>
-                  <td className="px-8 py-4 whitespace-nowrap">
+                  <td className="px-5 py-3 whitespace-nowrap">
                     <div className="text-xs font-black text-slate-900 uppercase tracking-tight">
                       {users.find(u => u.id === dist.userId)?.name || 'DESCONHECIDO'}
                     </div>
                   </td>
-                  <td className="px-8 py-4 whitespace-nowrap text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  <td className="px-5 py-3 whitespace-nowrap text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                     {dist.reason}
                   </td>
-                  <td className="px-8 py-4 whitespace-nowrap text-right">
-                    <span className={`text-lg font-black font-sport italic tracking-tighter px-3 py-0.5 rounded-lg border-2 shadow-sm ${dist.amount >= 0
+                  <td className="px-5 py-3 whitespace-nowrap text-right">
+                    <span className={`text-base font-black font-sport italic tracking-tighter px-2.5 py-0.5 rounded-lg border shadow-sm ${dist.amount >= 0
                       ? 'text-lime-600 bg-lime-50 border-lime-200'
                       : 'text-rose-600 bg-rose-50 border-rose-200'
                       }`}>

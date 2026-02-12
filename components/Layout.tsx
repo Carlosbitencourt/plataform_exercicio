@@ -48,7 +48,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center px-4 py-3 text-[9px] font-black uppercase tracking-[0.2em] rounded-xl transition-all ${isActive
+                className={`flex items-center px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${isActive
                   ? 'bg-lime-400 text-black shadow-[0_8px_16px_rgba(163,230,53,0.2)]'
                   : 'text-zinc-500 hover:bg-zinc-900 hover:text-white border border-transparent hover:border-zinc-800'
                   }`}
@@ -63,7 +63,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="p-5 border-t border-zinc-900">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center px-4 py-2 text-[9px] font-black uppercase tracking-[0.3em] text-zinc-600 hover:text-red-500 transition-all"
+            className="w-full flex items-center px-4 py-2 text-xs font-black uppercase tracking-wider text-zinc-600 hover:text-red-500 transition-all"
           >
             <LogOut className="w-4 h-4 mr-3" />
             Logout
@@ -73,15 +73,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       {/* Main Content Area - Bordas mais destacadas no Header */}
       <main className="flex-1 overflow-y-auto flex flex-col">
-        <header className="bg-white border-b-2 border-slate-300 py-4 px-8 flex justify-between items-center sticky top-0 z-10 shadow-sm">
-          <h2 className="text-lg font-black italic text-slate-900 font-sport uppercase tracking-[0.2em]">
+        <header className="bg-white border-b-2 border-slate-300 py-3 px-6 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+          <h2 className="text-sm font-black italic text-slate-900 font-sport uppercase tracking-[0.2em]">
             {menuItems.find(i => i.path === location.pathname)?.label || 'Performance Area'}
           </h2>
           <Link
             to="/checkin"
-            className="group flex items-center px-5 py-2.5 bg-black rounded-lg text-lime-400 text-[9px] font-black uppercase tracking-widest hover:bg-lime-400 hover:text-black transition-all shadow-xl active:scale-95"
+            className="group flex items-center px-4 py-2 bg-black rounded-lg text-lime-400 text-[10px] font-black uppercase tracking-wider hover:bg-lime-400 hover:text-black transition-all shadow-xl active:scale-95"
           >
-            <CheckSquare className="w-4 h-4 mr-2" />
+            <CheckSquare className="w-3.5 h-3.5 mr-2" />
             Terminal de Check-in
           </Link>
         </header>
