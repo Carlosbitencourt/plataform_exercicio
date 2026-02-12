@@ -107,9 +107,9 @@ const Users: React.FC = () => {
       });
       setEditingUser(null);
       setIsModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving user:", error);
-      alert("Erro ao salvar usuário.");
+      alert(`Erro ao salvar usuário: ${error.message}`);
     }
   };
 
