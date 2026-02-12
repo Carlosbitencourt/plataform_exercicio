@@ -74,15 +74,7 @@ const CheckInPage: React.FC = () => {
           setUser(foundUser);
           setStep(2);
 
-          // "Warm up" GPS functionality and request permissions immediately
-          if (navigator.geolocation) {
-            console.log('Iniciando Warmup do GPS...');
-            navigator.geolocation.getCurrentPosition(
-              (pos) => console.log('GPS Warmup OK', pos),
-              (err) => console.warn('GPS Warmup Failed', err),
-              { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-            );
-          }
+          // Warmup removido para evitar conflitos
         }
       } else {
         setError('ATLETA NÃO IDENTIFICADO.');
@@ -310,7 +302,7 @@ const CheckInPage: React.FC = () => {
     } catch (err: any) {
       console.error('Erro no Check-in:', err);
 
-      let msg = 'GPS OBRIGATÓRIO. ATIVE A LOCALIZAÇÃO E TENTE NOVAMENTE.';
+      let msg = `ERRO GPS (C: ${err.code || '?'}): ${err.message || 'Sem mensagem'}`;
 
       if (err.code === 1) { // PERMISSION_DENIED
         msg = 'PERMISSÃO DE LOCALIZAÇÃO NEGADA. HABILITE NAS CONFIGURAÇÕES DO NAVEGADOR.';
