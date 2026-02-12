@@ -73,6 +73,15 @@ const Ranking: React.FC = () => {
     }
   };
 
+  const getBorderColor = (index: number) => {
+    switch (index) {
+      case 0: return 'border-yellow-500 shadow-yellow-400/50';
+      case 1: return 'border-zinc-400 shadow-zinc-300/50';
+      case 2: return 'border-orange-500 shadow-orange-400/50';
+      default: return 'border-slate-200';
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
       <div className="text-center space-y-2">
@@ -92,8 +101,34 @@ const Ranking: React.FC = () => {
           <div className="grid grid-cols-1 divide-y-2 divide-slate-100">
             {rankedUsers.length > 0 ? rankedUsers.map((item, index) => (
               <div key={item.user.id} className="flex items-center p-6 hover:bg-slate-50 transition-colors group">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl italic font-sport border-2 shadow-lg mr-6 transition-transform group-hover:scale-110 ${getMedalColor(index)}`}>
-                  #{index + 1}
+                <div className="mr-6 relative">
+                  {item.user.photoUrl ? (
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border-4 shadow-lg transition-transform group-hover:scale-110 overflow-hidden relative bg-white ${getBorderColor(index)}`}>
+                      <img
+                        src={item.user.photoUrl}
+                        alt={item.user.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          const parent = (e.target as HTMLImageElement).parentElement;
+                          if (parent) {
+                            parent.classList.remove('rounded-2xl', 'border-4', 'bg-white', 'w-14', 'h-14');
+                            parent.classList.add('w-12', 'h-12', 'rounded-xl', 'font-black', 'text-xl', 'italic', 'font-sport', 'border-2');
+                            // Apply fallback medal style manually or reset to render the "else" block (harder here, simple DOM manipulation is easier)
+                            parent.className = `w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`;
+                            parent.innerHTML = `#${index + 1}`;
+                          }
+                        }}
+                      />
+                      <div className="absolute -bottom-1 -right-1 bg-slate-900 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm z-10">
+                        {index + 1}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`}>
+                      #{index + 1}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex-1 min-w-0">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser } from '../../services/db';
-import { storage } from '../../services/firebase';
+import { storage, auth } from '../../services/firebase';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { User, UserStatus } from '../../types';
 
@@ -87,6 +87,8 @@ const Users: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Current User:", auth.currentUser); // Debug auth
+    console.log("Form Data:", formData);
     try {
       if (editingUser) {
         await updateUser({ ...editingUser, ...formData });
