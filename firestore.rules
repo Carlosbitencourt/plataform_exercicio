@@ -19,7 +19,10 @@ service cloud.firestore {
     match /users/{userId} {
       // Public read needed for check-in page lookup.
       allow read: if true;
-      allow write: if isAuthenticated();
+      // Kiosk Check-In needs to update balance/stats without being the user owner.
+      // Ideally this should be a Cloud Function, but for this architecture:
+      allow update: if true; 
+      allow create, delete: if isAuthenticated();
     }
 
     // TimeSlots collection
