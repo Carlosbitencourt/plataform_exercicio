@@ -48,27 +48,28 @@ const CheckIns: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Filtros de Comando - Tema Claro */}
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 flex flex-col md:flex-row gap-6 items-end shadow-sm">
+      {/* Filtros de Comando - Tema Claro */}
+      <div className="bg-white p-6 rounded-[1.5rem] border border-slate-200 flex flex-col md:flex-row gap-5 items-end shadow-sm">
         <div className="flex-1 w-full group">
-          <label className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 ml-1">Atleta em Campo</label>
+          <label className="block text-[8px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2.5 ml-1">Atleta em Campo</label>
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-lime-500 transition-colors w-5 h-5" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-lime-500 transition-colors w-4 h-4" />
             <input
               type="text"
-              className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold placeholder:text-slate-200 focus:ring-4 focus:ring-lime-400/5 focus:border-lime-400 outline-none transition-all uppercase tracking-widest text-xs"
+              className="w-full pl-12 pr-5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold placeholder:text-slate-200 focus:ring-4 focus:ring-lime-400/5 focus:border-lime-400 outline-none transition-all uppercase tracking-widest text-[11px]"
               placeholder="NOME OU DOCUMENTO..."
               value={userFilter}
               onChange={e => setUserFilter(e.target.value)}
             />
           </div>
         </div>
-        <div className="w-full md:w-64 group">
-          <label className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mb-3 ml-1">Linha do Tempo</label>
+        <div className="w-full md:w-56 group">
+          <label className="block text-[8px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2.5 ml-1">Linha do Tempo</label>
           <div className="relative">
-            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-lime-500 transition-colors w-5 h-5" />
+            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-lime-500 transition-colors w-4 h-4" />
             <input
               type="date"
-              className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-black focus:ring-4 focus:ring-lime-400/5 focus:border-lime-400 outline-none transition-all"
+              className="w-full pl-12 pr-5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-black focus:ring-4 focus:ring-lime-400/5 focus:border-lime-400 outline-none transition-all text-xs"
               value={dateFilter}
               onChange={e => setDateFilter(e.target.value)}
             />
@@ -76,57 +77,57 @@ const CheckIns: React.FC = () => {
         </div>
         <button
           onClick={() => { setUserFilter(''); setDateFilter(getTodayStart()); }}
-          className="px-8 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:text-slate-900 border border-slate-200 transition-all flex items-center"
+          className="px-6 py-3 bg-slate-100 text-slate-500 rounded-xl font-black uppercase tracking-[0.2em] text-[9px] hover:text-slate-900 border border-slate-200 transition-all flex items-center"
         >
-          <Filter className="w-4 h-4 mr-2" />
+          <Filter className="w-3.5 h-3.5 mr-2" />
           Resetar
         </button>
       </div>
 
       {/* Grid de Registros - Cards Brancos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredCheckIns.map((ci) => (
-          <div key={ci.id} className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden hover:border-lime-400 hover:-translate-y-2 transition-all shadow-md group">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white border border-slate-200 rounded-2xl text-lime-600 shadow-sm group-hover:scale-110 transition-transform">
-                  <User className="w-6 h-6" />
+          <div key={ci.id} className="bg-white rounded-[1.5rem] border border-slate-200 overflow-hidden hover:border-lime-400 hover:-translate-y-1.5 transition-all shadow-md group">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white border border-slate-200 rounded-xl text-lime-600 shadow-sm group-hover:scale-110 transition-transform">
+                  <User className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-black text-slate-900 italic uppercase font-sport tracking-widest leading-tight">{getUserName(ci.userId)}</h4>
+                  <h4 className="font-black text-slate-900 italic uppercase font-sport tracking-widest leading-tight text-sm">{getUserName(ci.userId)}</h4>
                   {/* Assuming User ID format or just showing ID if logic to split is not robust */}
-                  <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.3em] mt-1">ID: {ci.userId.substring(0, 8).toUpperCase()}</p>
+                  <p className="text-[8px] text-slate-400 font-black uppercase tracking-[0.3em] mt-0.5">ID: {ci.userId.substring(0, 8).toUpperCase()}</p>
                 </div>
               </div>
-              <div className="bg-black text-lime-400 px-4 py-2 rounded-xl flex items-center text-xs font-black shadow-lg italic font-sport">
-                <Trophy className="w-4 h-4 mr-1.5" />
+              <div className="bg-black text-lime-400 px-3 py-1.5 rounded-lg flex items-center text-[10px] font-black shadow-lg italic font-sport">
+                <Trophy className="w-3.5 h-3.5 mr-1.5" />
                 {ci.score.toFixed(1)} PTS
               </div>
             </div>
 
-            <div className="p-8 space-y-6 text-slate-900">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="flex items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  <Calendar className="w-4 h-4 mr-3 text-lime-500/50" />
+            <div className="p-6 space-y-4 text-slate-900">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  <Calendar className="w-3.5 h-3.5 mr-2 text-lime-500/50" />
                   {ci.date}
                 </div>
-                <div className="flex items-center text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  <Clock className="w-4 h-4 mr-3 text-lime-500/50" />
+                <div className="flex items-center text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  <Clock className="w-3.5 h-3.5 mr-2 text-lime-500/50" />
                   {ci.time}
                 </div>
               </div>
 
-              <div className="flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-lime-700 bg-lime-50 p-4 rounded-2xl border border-lime-100">
-                <Activity className="w-4 h-4 mr-3" />
+              <div className="flex items-center text-[9px] font-black uppercase tracking-[0.2em] text-lime-700 bg-lime-50 p-3 rounded-xl border border-lime-100">
+                <Activity className="w-3.5 h-3.5 mr-2.5" />
                 BLOCO: {getSlotName(ci.timeSlotId)}
               </div>
 
-              <div className="flex items-start p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <MapPin className="w-5 h-5 mr-4 text-slate-400 mt-1" />
-                <div className="space-y-1">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Coordenadas de Registro</p>
-                  <p className="text-[10px] text-slate-900 font-mono tracking-tighter">LAT: {ci.latitude.toFixed(6)}</p>
-                  <p className="text-[10px] text-slate-900 font-mono tracking-tighter">LNG: {ci.longitude.toFixed(6)}</p>
+              <div className="flex items-start p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <MapPin className="w-4 h-4 mr-3 text-slate-400 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Coordenadas de Registro</p>
+                  <p className="text-[9px] text-slate-900 font-mono tracking-tighter">LAT: {ci.latitude.toFixed(6)}</p>
+                  <p className="text-[9px] text-slate-900 font-mono tracking-tighter">LNG: {ci.longitude.toFixed(6)}</p>
                 </div>
               </div>
             </div>

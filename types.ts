@@ -22,6 +22,11 @@ export interface TimeSlot {
   startTime: string; // HH:mm
   endTime: string;   // HH:mm
   weight: number;
+  days: number[];    // 0 = Sunday, 1 = Monday, etc.
+  locationName: string;
+  latitude: number;
+  longitude: number;
+  radius: number;
 }
 
 export interface QRCodeData {

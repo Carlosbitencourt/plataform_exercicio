@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Clock, Plus, Trash2, Shield, Zap, X } from 'lucide-react';
 import { subscribeToTimeSlots, addTimeSlot, deleteTimeSlot } from '../../services/db';
 import { TimeSlot } from '../../types';
+import { GYM_LOCATION } from '../../constants';
+
+const DAYS = [
+  { id: 0, label: 'DOM' },
+  { id: 1, label: 'SEG' },
+  { id: 2, label: 'TER' },
+  { id: 3, label: 'QUA' },
+  { id: 4, label: 'QUI' },
+  { id: 5, label: 'SEX' },
+  { id: 6, label: 'SÁB' },
+];
 
 const TimeSlots: React.FC = () => {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
@@ -10,7 +21,12 @@ const TimeSlots: React.FC = () => {
     name: '',
     startTime: '',
     endTime: '',
-    weight: 1
+    weight: 1,
+    days: [1, 2, 3, 4, 5], // Default SEG-SEX
+    locationName: 'ACADEMIA SEDE',
+    latitude: GYM_LOCATION.lat,
+    longitude: GYM_LOCATION.lng,
+    radius: GYM_LOCATION.radius
   });
 
   useEffect(() => {
@@ -22,9 +38,23 @@ const TimeSlots: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.days.length === 0) {
+      alert("Selecione pelo menos um dia da semana.");
+      return;
+    }
     try {
       await addTimeSlot(formData);
-      setFormData({ name: '', startTime: '', endTime: '', weight: 1 });
+      setFormData({
+        name: '',
+        startTime: '',
+        endTime: '',
+        weight: 1,
+        days: [1, 2, 3, 4, 5],
+        locationName: 'ACADEMIA SEDE',
+        latitude: GYM_LOCATION.lat,
+        longitude: GYM_LOCATION.lng,
+        radius: GYM_LOCATION.radius
+      });
       setIsModalOpen(false);
     } catch (error: any) {
       console.error("Error saving time slot:", error);
@@ -49,53 +79,64 @@ const TimeSlots: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
         <div className="space-y-1">
-          <h3 className="text-3xl font-black italic uppercase font-sport text-slate-900 tracking-widest leading-none">Células de Treino</h3>
-          <p className="text-slate-400 font-black uppercase text-[10px] tracking-[0.4em]">Configuração de Janelas de Check-in</p>
+          <h3 className="text-2xl font-black italic uppercase font-sport text-slate-900 tracking-widest leading-none">Células de Treino</h3>
+          <p className="text-slate-400 font-black uppercase text-[9px] tracking-[0.4em]">Configuração de Janelas de Check-in</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center px-8 py-4 bg-black text-lime-400 rounded-2xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-2xl active:scale-95"
+          className="flex items-center px-6 py-3 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-2xl active:scale-95 text-xs"
         >
-          <Plus className="w-6 h-6 mr-2" />
+          <Plus className="w-5 h-5 mr-2" />
           Novo Horário
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {slots.map((slot) => (
-          <div key={slot.id} className="bg-white rounded-[2rem] border-2 border-slate-300 overflow-hidden shadow-lg group relative transition-all hover:border-lime-500 hover:-translate-y-1">
-            <div className="p-8 space-y-6">
+          <div key={slot.id} className="bg-white rounded-[1.2rem] border-2 border-slate-300 overflow-hidden shadow-lg group relative transition-all hover:border-lime-500 hover:-translate-y-1">
+            <div className="p-6 space-y-4">
               <div className="flex justify-between items-start">
-                <div className="p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-slate-900 shadow-inner group-hover:border-lime-200 transition-colors">
-                  <Clock className="w-8 h-8" />
+                <div className="p-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-slate-900 shadow-inner group-hover:border-lime-200 transition-colors">
+                  <Clock className="w-6 h-6" />
                 </div>
                 <button
                   onClick={() => handleDelete(slot.id)}
-                  className="p-3 bg-white text-slate-300 hover:text-rose-600 border-2 border-slate-100 rounded-xl transition-all hover:border-rose-200"
+                  className="p-2 bg-white text-slate-300 hover:text-rose-600 border-2 border-slate-100 rounded-lg transition-all hover:border-rose-200"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
 
               <div>
-                <h4 className="text-xl font-black text-slate-900 uppercase italic font-sport tracking-widest">{slot.name}</h4>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="px-3 py-1 bg-black text-white text-[10px] font-black rounded-lg uppercase tracking-widest">
+                <h4 className="text-lg font-black text-slate-900 uppercase italic font-sport tracking-widest">{slot.name}</h4>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span className="px-2.5 py-0.5 bg-black text-white text-[9px] font-black rounded-lg uppercase tracking-widest">
                     {slot.startTime} - {slot.endTime}
                   </span>
+                  <div className="flex gap-1">
+                    {DAYS.filter(d => slot.days?.includes(d.id)).map(d => (
+                      <span key={d.id} className="text-[7px] font-black text-lime-600 bg-lime-50 px-1 py-0.5 rounded border border-lime-100 uppercase">
+                        {d.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2 text-slate-400 group-hover:text-slate-600 transition-colors">
+                  <Shield className="w-3.5 h-3.5" />
+                  <span className="text-[8px] font-black uppercase tracking-widest">{slot.locationName || 'LOCAL PADRÃO'}</span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-lime-400 rounded-lg shadow-sm">
-                    <Zap className="w-4 h-4 text-black fill-current" />
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border-2 border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-lime-400 rounded-lg shadow-sm">
+                    <Zap className="w-3.5 h-3.5 text-black fill-current" />
                   </div>
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Peso Recompensa</span>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Peso Recompensa</span>
                 </div>
-                <span className="text-3xl font-black text-slate-900 font-sport italic tracking-tighter">
+                <span className="text-2xl font-black text-slate-900 font-sport italic tracking-tighter">
                   x{slot.weight}
                 </span>
               </div>
@@ -106,14 +147,14 @@ const TimeSlots: React.FC = () => {
         ))}
       </div>
 
-      <div className="bg-white border-2 border-slate-300 p-8 rounded-[2.5rem] relative overflow-hidden group shadow-md flex items-center gap-6">
-        <div className="absolute top-0 left-0 w-2 h-full bg-slate-900"></div>
-        <div className="p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-slate-400">
-          <Shield className="w-8 h-8" />
+      <div className="bg-white border-2 border-slate-300 p-6 rounded-[1.5rem] relative overflow-hidden group shadow-md flex items-center gap-5">
+        <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900"></div>
+        <div className="p-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-slate-400">
+          <Shield className="w-6 h-6" />
         </div>
         <div>
-          <h4 className="font-black italic uppercase font-sport text-slate-900 tracking-[0.2em] text-lg">Regras do Sistema</h4>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+          <h4 className="font-black italic uppercase font-sport text-slate-900 tracking-[0.2em] text-base">Regras do Sistema</h4>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">
             Check-ins realizados fora destas janelas serão invalidados automaticamente pelo servidor.
           </p>
         </div>
@@ -121,67 +162,143 @@ const TimeSlots: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-[3rem] border-4 border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-8 bg-slate-50 flex justify-between items-center border-b-4 border-slate-100">
-              <h3 className="text-2xl font-black italic uppercase font-sport text-slate-900 tracking-widest">
+          <div className="bg-white rounded-[1.5rem] border-4 border-slate-200 shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-300">
+            <div className="p-4 bg-slate-50 flex justify-between items-center border-b-2 border-slate-100">
+              <h3 className="text-lg font-black italic uppercase font-sport text-slate-900 tracking-widest leading-none">
                 Novo Bloco
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900 p-2 bg-white rounded-xl border-2 border-slate-200">
-                <X className="w-6 h-6" />
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900 p-1.5 bg-white rounded-lg border-2 border-slate-200">
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleSave} className="p-10 space-y-6">
-              <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Identificação do Bloco</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="EX: MANHÃ ELITE"
-                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase"
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSave} className="p-5 overflow-hidden flex flex-col">
+              <div className="space-y-3 overflow-y-auto max-h-[65vh] pr-1 custom-scrollbar pb-2">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Abertura</label>
+                  <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Identificação do Bloco</label>
                   <input
                     required
-                    type="time"
-                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-slate-900 font-bold"
-                    value={formData.startTime}
-                    onChange={e => setFormData({ ...formData, startTime: e.target.value })}
+                    type="text"
+                    placeholder="EX: MANHÃ ELITE"
+                    className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase text-[13px]"
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Abertura</label>
+                    <input
+                      required
+                      type="time"
+                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs"
+                      value={formData.startTime}
+                      onChange={e => setFormData({ ...formData, startTime: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Fechamento</label>
+                    <input
+                      required
+                      type="time"
+                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs"
+                      value={formData.endTime}
+                      onChange={e => setFormData({ ...formData, endTime: e.target.value })}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Fechamento</label>
+                  <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2">Dias de Ativação</label>
+                  <div className="flex flex-wrap gap-1">
+                    {DAYS.map(day => (
+                      <button
+                        key={day.id}
+                        type="button"
+                        onClick={() => {
+                          const newDays = formData.days.includes(day.id)
+                            ? formData.days.filter(d => d !== day.id)
+                            : [...formData.days, day.id];
+                          setFormData({ ...formData, days: newDays });
+                        }}
+                        className={`px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-widest transition-all border-2 ${formData.days.includes(day.id)
+                          ? 'bg-lime-400 border-lime-400 text-black shadow-lg shadow-lime-400/20'
+                          : 'bg-white border-slate-100 text-slate-300 hover:border-slate-300'
+                          }`}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Identificação do Local</label>
                   <input
                     required
-                    type="time"
-                    className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-slate-900 font-bold"
-                    value={formData.endTime}
-                    onChange={e => setFormData({ ...formData, endTime: e.target.value })}
+                    type="text"
+                    placeholder="EX: SEDE CENTRAL"
+                    className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase text-[13px]"
+                    value={formData.locationName}
+                    onChange={e => setFormData({ ...formData, locationName: e.target.value })}
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Latitude</label>
+                    <input
+                      required
+                      type="number"
+                      step="any"
+                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs"
+                      value={formData.latitude}
+                      onChange={e => setFormData({ ...formData, latitude: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Longitude</label>
+                    <input
+                      required
+                      type="number"
+                      step="any"
+                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs"
+                      value={formData.longitude}
+                      onChange={e => setFormData({ ...formData, longitude: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Raio Valid. (m)</label>
+                    <input
+                      required
+                      type="number"
+                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs"
+                      value={formData.radius}
+                      onChange={e => setFormData({ ...formData, radius: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Peso Recompensa</label>
+                    <input
+                      required
+                      type="number"
+                      min="1"
+                      max="10"
+                      className="w-full px-3 py-2 bg-slate-900 text-lime-400 rounded-lg font-black text-[15px] border-none outline-none"
+                      value={formData.weight}
+                      onChange={e => setFormData({ ...formData, weight: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Peso da Recompensa (Multiplicador)</label>
-                <input
-                  required
-                  type="number"
-                  min="1"
-                  max="10"
-                  className="w-full px-5 py-4 bg-white border-2 border-slate-900 rounded-2xl text-slate-900 font-black text-xl"
-                  value={formData.weight}
-                  onChange={e => setFormData({ ...formData, weight: Number(e.target.value) })}
-                />
-              </div>
-              <div className="flex gap-4 pt-4">
+
+              <div className="pt-3">
                 <button
                   type="submit"
-                  className="flex-1 py-5 bg-black text-lime-400 rounded-2xl font-black uppercase italic tracking-tighter shadow-xl hover:scale-[1.05] transition-all"
+                  className="w-full py-3 bg-black text-lime-400 rounded-lg font-black uppercase italic tracking-tighter shadow-xl hover:scale-[1.02] active:scale-95 transition-all text-[11px]"
                 >
-                  Registrar Bloco
+                  Registrar Bloco Sincronizado
                 </button>
               </div>
             </form>

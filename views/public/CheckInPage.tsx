@@ -84,20 +84,19 @@ const CheckInPage: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    if (isWeekend) {
-      setError('O PORTAL ABRE APENAS DE SEGUNDA A SEXTA.');
-      setLoading(false);
-      return;
-    }
-
     const today = getTodayISO();
     const nowStr = getNowStr();
+    const dayOfWeek = currentTime.getDay();
 
-    // Logic: find a slot that is currently active
-    const activeSlot = timeSlots.find(slot => nowStr >= slot.startTime && nowStr <= slot.endTime);
+    // Logic: find a slot that is currently active for this time AND this day of the week
+    const activeSlot = timeSlots.find(slot =>
+      nowStr >= slot.startTime &&
+      nowStr <= slot.endTime &&
+      (slot.days ? slot.days.includes(dayOfWeek) : true)
+    );
 
     if (!activeSlot) {
-      setError(`JANELA FECHADA AGORA (${nowStr}).`);
+      setError(`JANELA FECHADA OU INDISPONÍVEL PARA HOJE (${nowStr}).`);
       setLoading(false);
       return;
     }
@@ -140,24 +139,26 @@ const CheckInPage: React.FC = () => {
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
         const data = await response.json();
         if (data && data.display_name) {
-          // Simplificar endereço: pegar rua e número apenas se possível, ou bairro/cidade
-          // display_name do nominatim é longo. Vamos pegar partes.
-          // Ex: "Rua X, Bairro Y, Cidade Z..."
           const parts = data.display_name.split(',');
           addressStr = parts.slice(0, 3).join(',');
         }
       } catch (geoErr) {
         console.error("Erro ao buscar endereço", geoErr);
-        // Não falha o checkin por isso, apenas fica sem endereço
       }
 
       setCheckInAddress(addressStr);
 
+      // Use slot-specific coordinates if available, otherwise fallback to global
+      const targetLat = activeSlot.latitude || GYM_LOCATION.lat;
+      const targetLng = activeSlot.longitude || GYM_LOCATION.lng;
+      const targetRadius = activeSlot.radius || GYM_LOCATION.radius;
+      const locationName = activeSlot.locationName || 'ACADEMIA';
+
       const R = 6371e3;
       const φ1 = latitude * Math.PI / 180;
-      const φ2 = GYM_LOCATION.lat * Math.PI / 180;
-      const Δφ = (GYM_LOCATION.lat - latitude) * Math.PI / 180;
-      const Δλ = (GYM_LOCATION.lng - longitude) * Math.PI / 180;
+      const φ2 = targetLat * Math.PI / 180;
+      const Δφ = (targetLat - latitude) * Math.PI / 180;
+      const Δλ = (targetLng - longitude) * Math.PI / 180;
 
       const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
         Math.cos(φ1) * Math.cos(φ2) *
@@ -165,8 +166,8 @@ const CheckInPage: React.FC = () => {
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       const distance = R * c;
 
-      if (distance > GYM_LOCATION.radius && !isLocalBypass) {
-        setError('VOCÊ ESTÁ FORA DO RAIO DA ACADEMIA.');
+      if (distance > targetRadius && !isLocalBypass) {
+        setError(`VOCÊ ESTÁ FORA DO RAIO PERMITIDO PARA: ${locationName.toUpperCase()}.`);
         setLoading(false);
         return;
       }
@@ -200,13 +201,13 @@ const CheckInPage: React.FC = () => {
   if (success) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-6 font-sans">
-        <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3rem] text-center space-y-8 max-w-md w-full shadow-[0_0_100px_rgba(163,230,53,0.1)]">
-          <div className="inline-flex p-6 bg-lime-400 rounded-full shadow-[0_0_40px_rgba(163,230,53,0.3)] animate-bounce">
-            <CheckCircle className="w-12 h-12 text-black" />
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] text-center space-y-6 max-w-sm w-full shadow-[0_0_80px_rgba(163,230,53,0.1)]">
+          <div className="inline-flex p-5 bg-lime-400 rounded-full shadow-[0_0_30px_rgba(163,230,53,0.3)] animate-bounce">
+            <CheckCircle className="w-10 h-10 text-black" />
           </div>
-          <div className="space-y-2">
-            <h2 className="text-4xl font-black italic font-sport text-white uppercase tracking-tighter">Missão Cumprida!</h2>
-            <p className="text-zinc-500 font-black uppercase text-[10px] tracking-[0.4em]">Check-in Validado com Sucesso</p>
+          <div className="space-y-1.5">
+            <h2 className="text-3xl font-black italic font-sport text-white uppercase tracking-tighter">Missão Cumprida!</h2>
+            <p className="text-zinc-500 font-black uppercase text-[9px] tracking-[0.4em]">Check-in Validado com Sucesso</p>
             {checkInAddress && (
               <div className="flex items-center justify-center gap-2 mt-2 text-zinc-600">
                 <div className="w-1 h-1 bg-lime-500 rounded-full"></div>
@@ -214,11 +215,11 @@ const CheckInPage: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="bg-black p-6 rounded-2xl border border-zinc-800 space-y-1">
-            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Atleta: {user?.name}</p>
-            <p className="text-lime-400 text-2xl font-black font-sport italic tracking-tighter">RECOMPENSA CREDITADA</p>
+          <div className="bg-black p-5 rounded-xl border border-zinc-800 space-y-1">
+            <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest">Atleta: {user?.name}</p>
+            <p className="text-lime-400 text-xl font-black font-sport italic tracking-tighter">RECOMPENSA CREDITADA</p>
           </div>
-          <button onClick={() => window.location.reload()} className="w-full py-5 bg-white text-black rounded-2xl font-black uppercase italic tracking-tighter hover:bg-lime-400 transition-all">
+          <button onClick={() => window.location.reload()} className="w-full py-4 bg-white text-black rounded-xl font-black uppercase italic tracking-tighter hover:bg-lime-400 transition-all text-lg">
             Novo Registro
           </button>
         </div>
@@ -231,15 +232,15 @@ const CheckInPage: React.FC = () => {
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-lime-500/50 to-transparent"></div>
 
       <div className="w-full max-w-md space-y-10 relative z-10">
-        <div className="text-center space-y-4">
-          <div className="inline-flex p-4 bg-lime-400 rounded-2xl shadow-lg mb-2">
-            <Activity className="w-8 h-8 text-black" />
+        <div className="text-center space-y-3">
+          <div className="inline-flex p-3 bg-lime-400 rounded-xl shadow-lg mb-1">
+            <Activity className="w-6 h-6 text-black" />
           </div>
-          <h1 className="text-5xl font-black italic font-sport uppercase tracking-tighter leading-none">
+          <h1 className="text-4xl font-black italic font-sport uppercase tracking-tighter leading-none">
             Fit<span className="text-lime-400">Reward</span>
           </h1>
-          <div className="flex items-center justify-center gap-4 text-zinc-500 font-black uppercase text-[10px] tracking-[0.4em]">
-            <Clock className="w-3 h-3 text-lime-500" />
+          <div className="flex items-center justify-center gap-3 text-zinc-500 font-black uppercase text-[9px] tracking-[0.4em]">
+            <Clock className="w-2.5 h-2.5 text-lime-500" />
             {currentTime.toLocaleTimeString('pt-BR')}
           </div>
         </div>
@@ -256,15 +257,15 @@ const CheckInPage: React.FC = () => {
 
         {step === 1 ? (
           <form onSubmit={handleSearch} className="space-y-8">
-            <div className="space-y-4">
-              <label className="block text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Identificação do Atleta</label>
+            <div className="space-y-3">
+              <label className="block text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Identificação do Atleta</label>
               <div className="relative group">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-lime-400 transition-colors w-5 h-5" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-lime-400 transition-colors w-4 h-4" />
                 <input
                   required
                   type="text"
                   placeholder="CPF OU TAG ÚNICA"
-                  className="w-full pl-14 pr-6 py-7 bg-zinc-900/50 border border-zinc-800 rounded-3xl text-white font-bold placeholder:text-zinc-700 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase font-sport tracking-widest text-xl"
+                  className="w-full pl-12 pr-5 py-5 bg-zinc-900/50 border border-zinc-800 rounded-2xl text-white font-bold placeholder:text-zinc-700 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase font-sport tracking-widest text-lg"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                 />
@@ -273,55 +274,55 @@ const CheckInPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-7 bg-white text-black rounded-3xl font-black text-2xl uppercase italic tracking-tighter hover:bg-lime-400 transition-all flex items-center justify-center gap-3 font-sport shadow-2xl active:scale-95"
+              className="w-full py-5 bg-white text-black rounded-2xl font-black text-xl uppercase italic tracking-tighter hover:bg-lime-400 transition-all flex items-center justify-center gap-2 font-sport shadow-2xl active:scale-95"
             >
-              {loading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div> : (
-                <>PRÓXIMO <ChevronRight className="w-8 h-8" /></>
+              {loading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div> : (
+                <>PRÓXIMO <ChevronRight className="w-6 h-6" /></>
               )}
             </button>
           </form>
         ) : (
           <div className="space-y-8 animate-in slide-in-from-right-4">
-            <div className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] space-y-6">
-              <div className="flex items-center gap-5">
-                <div className="w-20 h-20 bg-lime-400 rounded-3xl flex items-center justify-center text-black font-black text-3xl font-sport italic shadow-lg">
+            <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-[1.5rem] space-y-5">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-lime-400 rounded-2xl flex items-center justify-center text-black font-black text-2xl font-sport italic shadow-lg">
                   {user?.name[0].toUpperCase() || '?'}
                 </div>
                 <div>
-                  <h3 className="text-2xl font-black text-white uppercase italic font-sport tracking-tight leading-none mb-2">{user?.name}</h3>
-                  <div className="inline-flex items-center px-3 py-1 bg-black rounded-lg border border-zinc-800">
-                    <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mr-2">ID:</span>
-                    <span className="text-[10px] text-lime-400 font-black font-sport italic">{user?.uniqueCode}</span>
+                  <h3 className="text-xl font-black text-white uppercase italic font-sport tracking-tight leading-none mb-1.5">{user?.name}</h3>
+                  <div className="inline-flex items-center px-2 py-0.5 bg-black rounded-lg border border-zinc-800">
+                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mr-2">ID:</span>
+                    <span className="text-[9px] text-lime-400 font-black font-sport italic">{user?.uniqueCode}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <div className="bg-black/40 p-5 rounded-2xl border border-zinc-800/50">
-                  <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-1">Saldo Atual</p>
-                  <p className="text-lg font-black text-white font-sport italic">R$ {user?.balance.toFixed(2)}</p>
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="bg-black/40 p-4 rounded-xl border border-zinc-800/50">
+                  <p className="text-[7.5px] font-black text-zinc-600 uppercase tracking-widest mb-1">Saldo Atual</p>
+                  <p className="text-base font-black text-white font-sport italic">R$ {user?.balance.toFixed(2)}</p>
                 </div>
-                <div className="bg-black/40 p-5 rounded-2xl border border-zinc-800/50">
-                  <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-1">Aposta Diária</p>
-                  <p className="text-lg font-black text-white font-sport italic">R$ {user?.depositedValue.toFixed(2)}</p>
+                <div className="bg-black/40 p-4 rounded-xl border border-zinc-800/50">
+                  <p className="text-[7.5px] font-black text-zinc-600 uppercase tracking-widest mb-1">Aposta Diária</p>
+                  <p className="text-base font-black text-white font-sport italic">R$ {user?.depositedValue.toFixed(2)}</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-[80px_1fr] gap-4">
+              <div className="grid grid-cols-[70px_1fr] gap-3">
                 <button
                   onClick={() => setStep(1)}
-                  className="py-6 bg-zinc-900 border border-zinc-800 text-zinc-500 rounded-3xl flex items-center justify-center hover:text-white transition-all active:scale-90"
+                  className="py-5 bg-zinc-900 border border-zinc-800 text-zinc-500 rounded-2xl flex items-center justify-center hover:text-white transition-all active:scale-90"
                 >
-                  <ArrowLeft className="w-7 h-7" />
+                  <ArrowLeft className="w-6 h-6" />
                 </button>
                 <button
                   onClick={validateCheckIn}
                   disabled={loading}
-                  className="py-6 bg-lime-400 text-black rounded-3xl font-black text-2xl uppercase italic tracking-tighter hover:bg-white transition-all flex items-center justify-center gap-3 font-sport shadow-[0_25px_50px_rgba(163,230,53,0.2)] active:scale-95"
+                  className="py-5 bg-lime-400 text-black rounded-2xl font-black text-xl uppercase italic tracking-tighter hover:bg-white transition-all flex items-center justify-center gap-3 font-sport shadow-[0_20px_40px_rgba(163,230,53,0.15)] active:scale-95"
                 >
-                  {loading ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div> : (
+                  {loading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div> : (
                     <>CHECK-IN</>
                   )}
                 </button>
