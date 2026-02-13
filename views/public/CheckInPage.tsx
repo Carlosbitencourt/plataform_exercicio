@@ -4,7 +4,7 @@ import { User, UserStatus, TimeSlot, QRCodeData, CheckIn } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, getTodayActiveQRCode, addCheckIn, updateUser } from '../../services/db';
 import { calculateCheckInScore } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
-import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin } from 'lucide-react';
+import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin, Map, X, ExternalLink, Calendar, Star, Navigation } from 'lucide-react';
 import {
   ensureAuth,
   getUserLocation,
@@ -32,6 +32,8 @@ const CheckInPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [showLocationsModal, setShowLocationsModal] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<TimeSlot | null>(null);
 
   // iOS Detection for specific instructions
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
@@ -421,8 +423,12 @@ const CheckInPage: React.FC = () => {
           <div className="space-y-8 animate-in slide-in-from-right-4">
             <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-[1.5rem] space-y-5">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-lime-400 rounded-2xl flex items-center justify-center text-black font-black text-2xl font-sport italic shadow-lg">
-                  {user?.name[0].toUpperCase() || '?'}
+                <div className="w-16 h-16 bg-lime-400 rounded-2xl flex items-center justify-center text-black font-black text-2xl font-sport italic shadow-lg overflow-hidden">
+                  {user?.photoUrl ? (
+                    <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    user?.name[0].toUpperCase() || '?'
+                  )}
                 </div>
                 <div>
                   <h3 className="text-xl font-black text-white uppercase italic font-sport tracking-tight leading-none mb-1.5">{user?.name}</h3>
@@ -491,6 +497,14 @@ const CheckInPage: React.FC = () => {
         )}
 
         <div className="pt-12 flex flex-col items-center gap-4">
+          <button
+            onClick={() => setShowLocationsModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all group w-full max-w-xs justify-center"
+          >
+            <Map className="w-4 h-4 text-lime-400" />
+            <span className="text-xs font-black uppercase tracking-widest text-zinc-300 group-hover:text-white">Locais de Check-in</span>
+          </button>
+
           <Link to="/admin/login" className="group flex items-center gap-3 px-6 py-3 bg-zinc-900/30 border border-zinc-800/50 rounded-full transition-all hover:bg-lime-400/10 hover:border-lime-400/30">
             <Lock className="w-3 h-3 text-zinc-600 group-hover:text-lime-400 transition-colors" />
             <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 group-hover:text-white transition-colors">ACESSO RESTRITO AO COMANDO</span>
@@ -498,6 +512,148 @@ const CheckInPage: React.FC = () => {
           <p className="text-[8px] text-zinc-800 font-black uppercase tracking-[0.6em]">FitReward Performance V4</p>
         </div>
       </div>
+
+      {/* Locations Modal */}
+      {showLocationsModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+
+            {/* Header */}
+            <div className="p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-950">
+              <h3 className="text-lg font-black italic uppercase font-sport text-white tracking-wider flex items-center gap-2">
+                <Map className="w-5 h-5 text-lime-400" />
+                Locais Disponíveis
+              </h3>
+              <button
+                onClick={() => { setShowLocationsModal(false); setSelectedLocation(null); }}
+                className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-0">
+              {selectedLocation ? (
+                <div className="animate-in slide-in-from-right-4 duration-300">
+                  {/* Location Photo Placeholder */}
+                  <div className="h-48 bg-zinc-800 relative group overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                      <MapPin className="w-12 h-12 text-zinc-700" />
+                    </div>
+                    {/* Map Overlay Gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent"></div>
+
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter leading-none mb-1">
+                        {selectedLocation.locationName}
+                      </h2>
+                      <div className="flex items-center gap-2 text-lime-400">
+                        <Star className="w-3 h-3 fill-lime-400" />
+                        <span className="text-xs font-black uppercase tracking-wider">{selectedLocation.weight * 10} PONTOS</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-6">
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-4 p-4 bg-black/40 rounded-xl border border-zinc-800">
+                        <MapPin className="w-5 h-5 text-zinc-400 mt-1" />
+                        <div>
+                          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Endereço</p>
+                          <p className="text-sm font-bold text-white uppercase leading-snug">
+                            {/* Address fallback since we don't have exact address field yet */}
+                            {selectedLocation.locationName}, Latitude: {selectedLocation.latitude.toFixed(4)}, Longitude: {selectedLocation.longitude.toFixed(4)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-4 p-4 bg-black/40 rounded-xl border border-zinc-800">
+                        <Clock className="w-5 h-5 text-zinc-400 mt-1" />
+                        <div>
+                          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Horário de Check-in</p>
+                          <p className="text-xl font-black text-white font-sport italic">
+                            {selectedLocation.startTime} <span className="text-zinc-600 not-italic mx-1">-</span> {selectedLocation.endTime}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${selectedLocation.latitude},${selectedLocation.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
+                      >
+                        <ExternalLink className="w-5 h-5 mb-1" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Google Maps</span>
+                      </a>
+                      <a
+                        href={`https://waze.com/ul?ll=${selectedLocation.latitude},${selectedLocation.longitude}&navigate=yes`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-4 bg-cyan-500 hover:bg-cyan-400 text-white rounded-xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
+                      >
+                        <Navigation className="w-5 h-5 mb-1" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Waze</span>
+                      </a>
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedLocation(null)}
+                      className="w-full py-4 text-zinc-500 hover:text-white font-black uppercase text-xs tracking-widest transition-colors flex items-center justify-center gap-2"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Voltar para lista
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 space-y-6">
+                  {[1, 2, 3, 4, 5, 6, 0].map(dayIdx => { // Start with Monday(1) ends with Sunday(0)
+                    const daySlots = timeSlots.filter(s => s.days.includes(dayIdx)).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    if (daySlots.length === 0) return null;
+
+                    const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+                    return (
+                      <div key={dayIdx} className="space-y-3">
+                        <div className="flex items-center gap-3 px-2">
+                          <Calendar className="w-4 h-4 text-lime-400" />
+                          <h4 className="text-sm font-black text-white uppercase tracking-widest">{dayNames[dayIdx]}</h4>
+                          <div className="h-px bg-zinc-800 flex-1"></div>
+                        </div>
+
+                        <div className="grid gap-2">
+                          {daySlots.map(slot => (
+                            <button
+                              key={slot.id}
+                              onClick={() => setSelectedLocation(slot)}
+                              className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-lime-400/30 p-4 rounded-xl text-left transition-all active:scale-[0.98] group"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-white font-bold uppercase text-sm truncate pr-2 group-hover:text-lime-400 transition-colors">{slot.locationName}</span>
+                                <span className="bg-lime-400/10 text-lime-400 text-[9px] font-black px-2 py-0.5 rounded border border-lime-400/20 whitespace-nowrap">
+                                  {slot.weight * 10} PTS
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-zinc-500 text-xs">
+                                <Clock className="w-3 h-3" />
+                                <span className="font-mono">{slot.startTime} - {slot.endTime}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
