@@ -32,6 +32,13 @@ export interface TimeSlot {
   latitude: number;
   longitude: number;
   radius: number;
+  categoryId?: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  color?: string;
 }
 
 export interface QRCodeData {

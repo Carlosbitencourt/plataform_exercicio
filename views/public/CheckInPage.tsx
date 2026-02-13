@@ -258,9 +258,9 @@ const CheckInPage: React.FC = () => {
 
     if (distance > targetRadius && !isLocalBypass) {
       setDebugInfo({
-        userLat: latitude, userLng: longitude, targetLat, targetLng, distance, radius: targetRadius, accuracy
+        distance, radius: targetRadius, accuracy
       });
-      throw { message: `VOCÊ ESTÁ FORA DO RAIO PERMITIDO (${Math.round(distance)}m > ${targetRadius}m). APROXIME-SE DA ACADEMIA.` };
+      throw { code: 'DISTANCE_ERROR', message: 'Você está longe da academia.' };
     }
 
     const activeSlotWeight = activeSlot.weight || 1;
@@ -340,18 +340,54 @@ const CheckInPage: React.FC = () => {
         </div>
 
         {error && (
-          <div className="bg-rose-500/10 border border-rose-500/20 p-5 rounded-2xl flex items-start gap-4 animate-in slide-in-from-top-2">
-            <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-1" />
-            <div className="space-y-1">
-              <p className="text-rose-500 font-black text-[10px] uppercase tracking-widest text-left">Aviso de Sistema</p>
-              <p className="text-white text-xs font-bold uppercase tracking-tight leading-snug text-left">{error}</p>
-              {debugInfo && (
-                <div className="mt-2 p-2 bg-black/40 rounded border border-rose-500/30 text-[9px] font-mono text-left space-y-1">
-                  <p className="text-rose-200">DISTÂNCIA: <span className="text-white font-bold">{Math.round(debugInfo.distance)}m</span> / {debugInfo.radius}m</p>
-                  <p className="text-rose-200">PRECISÃO: <span className="text-white">{Math.round(debugInfo.accuracy)}m</span></p>
+          <div className="bg-zinc-900/80 border border-zinc-800 p-6 rounded-2xl animate-in slide-in-from-top-2 backdrop-blur-sm">
+            {debugInfo && error.includes('longe') ? (
+              <div className="space-y-4 text-center">
+                <div className="mx-auto w-12 h-12 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center animate-pulse">
+                  <MapPin className="w-6 h-6" />
                 </div>
-              )}
-            </div>
+                <div className="space-y-1">
+                  <h3 className="text-white font-black italic uppercase font-sport text-lg tracking-wide">Você está fora do local de check-in</h3>
+                  <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">Aproxime-se para realizar o check-in</p>
+                </div>
+
+                <div className="py-4 relative">
+                  {/* Visual Distance Bar */}
+                  <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex items-center relative">
+                    <div className="w-1/2 h-full bg-transparent border-r-2 border-dashed border-zinc-600 absolute left-0 top-0"></div>
+                    {/* Marker for allowed radius */}
+                    <div className="absolute left-[20%] top-1/2 -translate-y-1/2 w-3 h-3 bg-lime-500 rounded-full shadow-[0_0_10px_rgba(163,230,53,0.5)] z-10"></div>
+
+                    {/* Marker for user position (clamped) */}
+                    <div className="absolute right-[20%] top-1/2 -translate-y-1/2 w-3 h-3 bg-rose-500 rounded-full shadow-[0_0_10px_rgba(244,63,94,0.5)] animate-ping opacity-75"></div>
+                    <div className="absolute right-[20%] top-1/2 -translate-y-1/2 w-3 h-3 bg-rose-500 rounded-full z-10"></div>
+
+                    <div className="absolute left-[22%] top-[-10px] text-[8px] font-black text-lime-500">RAIO {debugInfo.radius}m</div>
+                    <div className="absolute right-[22%] top-[-10px] text-[8px] font-black text-rose-500">VOCÊ</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-8 border-t border-zinc-800 pt-4">
+                  <div className="text-center">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Sua Distância</p>
+                    <p className="text-2xl font-black text-rose-500 font-sport italic tracking-tighter">{Math.round(debugInfo.distance)}<span className="text-sm text-zinc-600 not-italic">m</span></p>
+                  </div>
+                  <div className="w-px h-8 bg-zinc-800"></div>
+                  <div className="text-center">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Raio Permitido</p>
+                    <p className="text-2xl font-black text-lime-500 font-sport italic tracking-tighter">{debugInfo.radius}<span className="text-sm text-zinc-600 not-italic">m</span></p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-4">
+                <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-1" />
+                <div className="space-y-1">
+                  <p className="text-rose-500 font-black text-[10px] uppercase tracking-widest text-left">Aviso de Sistema</p>
+                  <p className="text-white text-xs font-bold uppercase tracking-tight leading-snug text-left">{error}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -15,7 +15,7 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { safeAddDoc, safeUpdateDoc } from './firebaseGuard';
-import { User, TimeSlot, CheckIn, Distribution, QRCodeData, UserStatus } from '../types';
+import { User, TimeSlot, CheckIn, Distribution, QRCodeData, UserStatus, Category } from '../types';
 
 // Collections
 const USERS_COLLECTION = 'users';
@@ -23,6 +23,7 @@ const TIMESLOTS_COLLECTION = 'timeSlots';
 const CHECKINS_COLLECTION = 'checkIns';
 const DISTRIBUTIONS_COLLECTION = 'distributions';
 const QRCODES_COLLECTION = 'qrCodes';
+const CATEGORIES_COLLECTION = 'categories';
 
 // --- Users ---
 
@@ -163,4 +164,28 @@ export const createDailyQRCode = async () => {
 
     await addDoc(collection(db, QRCODES_COLLECTION), newQR);
     return newQR;
+
+};
+
+// --- Categories ---
+
+export const subscribeToCategories = (callback: (categories: Category[]) => void) => {
+    const q = query(collection(db, CATEGORIES_COLLECTION), orderBy('name', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+        const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
+        callback(categories);
+    });
+};
+
+export const addCategory = async (categoryData: Omit<Category, 'id'>) => {
+    await safeAddDoc(CATEGORIES_COLLECTION, categoryData);
+};
+
+export const updateCategory = async (category: Category) => {
+    const { id, ...data } = category;
+    await safeUpdateDoc(CATEGORIES_COLLECTION, id, data);
+};
+
+export const deleteCategory = async (id: string) => {
+    await deleteDoc(doc(db, CATEGORIES_COLLECTION, id));
 };
