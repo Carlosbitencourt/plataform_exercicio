@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Plus, Trash2, Shield, Zap, X, Pencil } from 'lucide-react';
+import { Clock, Plus, Trash2, Shield, Zap, X, Pencil, Camera, Upload } from 'lucide-react';
 import { subscribeToTimeSlots, addTimeSlot, deleteTimeSlot, updateTimeSlot, subscribeToCategories, addCategory, deleteCategory, updateCategory } from '../../services/db';
+import { safeUploadFile } from '../../services/firebaseGuard';
 import { TimeSlot, Category } from '../../types';
 import { GYM_LOCATION } from '../../constants';
 
@@ -23,6 +24,11 @@ const TimeSlots: React.FC = () => {
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+
+  // Upload State
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const [formData, setFormData] = useState({
     name: '',
     startTime: '',
@@ -56,6 +62,35 @@ const TimeSlots: React.FC = () => {
     setExpandedCategories(prev =>
       prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]
     );
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Simulating progress since safeUploadFile is a Promise
+      const interval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
+
+      const downloadURL = await safeUploadFile(file);
+
+      clearInterval(interval);
+      setUploadProgress(100);
+      setFormData(prev => ({ ...prev, photoUrl: downloadURL }));
+
+      setTimeout(() => setUploading(false), 500);
+
+    } catch (error: any) {
+      console.error("Error uploading:", error);
+      setUploading(false);
+      setUploadProgress(0);
+      alert(`Erro no Upload: ${error.message}`);
+    }
   };
 
   const handleAddCategory = async (e: React.FormEvent) => {
@@ -501,14 +536,47 @@ const TimeSlots: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">URL da Foto do Local</label>
-                  <input
-                    type="url"
-                    placeholder="HTTPS://..."
-                    className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-[11px]"
-                    value={formData.photoUrl || ''}
-                    onChange={e => setFormData({ ...formData, photoUrl: e.target.value })}
-                  />
+                  <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Foto do Local</label>
+                  <div className="flex flex-col items-center justify-center gap-2 mb-1 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl border-dashed">
+                    <div className="w-20 h-20 bg-white rounded-lg border-2 border-slate-200 flex items-center justify-center overflow-hidden relative group">
+                      {formData.photoUrl ? (
+                        <img src={formData.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Camera className="w-8 h-8 text-slate-300" />
+                      )}
+
+                      {uploading && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center flex-col">
+                          <span className="text-white text-[10px] font-bold">{Math.round(uploadProgress)}%</span>
+                          <div className="w-12 h-1 bg-slate-700 rounded-full mt-1 overflow-hidden">
+                            <div
+                              className="h-full bg-lime-400 transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
+                        <Upload className="w-6 h-6 text-white" />
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          disabled={uploading}
+                        />
+                      </label>
+                    </div>
+
+                    {uploading ? (
+                      <p className="text-[10px] font-bold text-slate-400 animate-pulse uppercase">Enviando...</p>
+                    ) : (
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">
+                        {formData.photoUrl ? 'Alterar Foto' : 'Adicionar Foto'}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
