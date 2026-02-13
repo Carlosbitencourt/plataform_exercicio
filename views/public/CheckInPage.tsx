@@ -439,14 +439,10 @@ const CheckInPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="bg-black/40 p-4 rounded-xl border border-zinc-800/50">
+              <div className="pt-1">
+                <div className="bg-black/40 p-4 rounded-xl border border-zinc-800/50 w-full text-center">
                   <p className="text-[7.5px] font-black text-zinc-600 uppercase tracking-widest mb-1">Saldo Atual</p>
-                  <p className="text-base font-black text-white font-sport italic">R$ {user?.balance.toFixed(2)}</p>
-                </div>
-                <div className="bg-black/40 p-4 rounded-xl border border-zinc-800/50">
-                  <p className="text-[7.5px] font-black text-zinc-600 uppercase tracking-widest mb-1">Aposta Diária</p>
-                  <p className="text-base font-black text-white font-sport italic">R$ {user?.depositedValue.toFixed(2)}</p>
+                  <p className="text-2xl font-black text-white font-sport italic">R$ {user?.balance.toFixed(2)}</p>
                 </div>
               </div>
             </div>
@@ -536,21 +532,30 @@ const CheckInPage: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-0">
               {selectedLocation ? (
                 <div className="animate-in slide-in-from-right-4 duration-300">
-                  {/* Location Photo Placeholder */}
+                  {/* Location Photo */}
                   <div className="h-48 bg-zinc-800 relative group overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
-                      <MapPin className="w-12 h-12 text-zinc-700" />
-                    </div>
+                    {selectedLocation.photoUrl ? (
+                      <img
+                        src={selectedLocation.photoUrl}
+                        alt={selectedLocation.locationName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                        <MapPin className="w-12 h-12 text-zinc-700" />
+                      </div>
+                    )}
+
                     {/* Map Overlay Gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent"></div>
 
                     <div className="absolute bottom-4 left-4 right-4">
-                      <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter leading-none mb-1">
+                      <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter leading-none mb-1 shadow-black drop-shadow-lg">
                         {selectedLocation.locationName}
                       </h2>
                       <div className="flex items-center gap-2 text-lime-400">
                         <Star className="w-3 h-3 fill-lime-400" />
-                        <span className="text-xs font-black uppercase tracking-wider">{selectedLocation.weight * 10} PONTOS</span>
+                        <span className="text-xs font-black uppercase tracking-wider shadow-black drop-shadow-md">{selectedLocation.weight * 10} PONTOS</span>
                       </div>
                     </div>
                   </div>

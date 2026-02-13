@@ -33,7 +33,8 @@ const TimeSlots: React.FC = () => {
     latitude: GYM_LOCATION.lat,
     longitude: GYM_LOCATION.lng,
     radius: GYM_LOCATION.radius,
-    categoryId: ''
+    categoryId: '',
+    photoUrl: ''
   });
 
   useEffect(() => {
@@ -115,7 +116,8 @@ const TimeSlots: React.FC = () => {
         latitude: GYM_LOCATION.lat,
         longitude: GYM_LOCATION.lng,
         radius: GYM_LOCATION.radius,
-        categoryId: ''
+        categoryId: '',
+        photoUrl: ''
       });
       setEditingSlotId(null);
       setIsModalOpen(false);
@@ -141,7 +143,8 @@ const TimeSlots: React.FC = () => {
       latitude: slot.latitude,
       longitude: slot.longitude,
       radius: slot.radius,
-      categoryId: slot.categoryId || ''
+      categoryId: slot.categoryId || '',
+      photoUrl: slot.photoUrl || ''
     });
     setIsModalOpen(true);
   };
@@ -190,7 +193,8 @@ const TimeSlots: React.FC = () => {
                 latitude: GYM_LOCATION.lat,
                 longitude: GYM_LOCATION.lng,
                 radius: GYM_LOCATION.radius,
-                categoryId: ''
+                categoryId: '',
+                photoUrl: ''
               });
               setIsModalOpen(true);
             }}
@@ -493,6 +497,17 @@ const TimeSlots: React.FC = () => {
                     className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase text-[13px]"
                     value={formData.locationName}
                     onChange={e => setFormData({ ...formData, locationName: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">URL da Foto do Local</label>
+                  <input
+                    type="url"
+                    placeholder="HTTPS://..."
+                    className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-[11px]"
+                    value={formData.photoUrl || ''}
+                    onChange={e => setFormData({ ...formData, photoUrl: e.target.value })}
                   />
                 </div>
 

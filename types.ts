@@ -33,6 +33,7 @@ export interface TimeSlot {
   longitude: number;
   radius: number;
   categoryId?: string;
+  photoUrl?: string;
 }
 
 export interface Category {
