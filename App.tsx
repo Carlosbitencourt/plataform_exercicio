@@ -11,6 +11,7 @@ import Login from './views/admin/Login';
 import CheckInPage from './views/public/CheckInPage';
 import Signup from './views/auth/Signup';
 import Dashboard from './views/admin/Dashboard';
+import Profile from './views/admin/Profile';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Componente para proteger rotas administrativas
@@ -42,6 +43,12 @@ const App: React.FC = () => {
             <Route path="/admin" element={
               <ProtectedAdminRoute>
                 <Dashboard />
+              </ProtectedAdminRoute>
+            } />
+
+            <Route path="/admin/perfil" element={
+              <ProtectedAdminRoute>
+                <Profile />
               </ProtectedAdminRoute>
             } />
 

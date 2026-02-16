@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Users, QrCode, ClipboardList, TrendingUp, CheckSquare, LogOut, Activity, Clock, Trophy } from 'lucide-react';
+import { Users, QrCode, ClipboardList, TrendingUp, CheckSquare, LogOut, Activity, Clock, Trophy, User } from 'lucide-react';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -23,6 +23,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { path: '/admin/checkins', icon: ClipboardList, label: 'Registros' },
     { path: '/admin/ranking', icon: Trophy, label: 'Ranking' },
     { path: '/admin/distribuicoes', icon: TrendingUp, label: 'Recompensas' },
+    { path: '/admin/perfil', icon: User, label: 'Meu Perfil' },
   ];
 
   return (

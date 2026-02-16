@@ -211,7 +211,7 @@ const Users: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Aposta: R$ {user.depositedValue?.toFixed(2)}</div>
+                  <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Contribuição: R$ {user.depositedValue?.toFixed(2)}</div>
                   <div className="text-sm font-black text-slate-900 italic font-sport">R$ {user.balance?.toFixed(2)}</div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
@@ -347,7 +347,7 @@ const Users: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Aposta (R$)</label>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Contribuição (R$)</label>
                       <input
                         required
                         type="number"
