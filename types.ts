@@ -1,7 +1,8 @@
 
 export enum UserStatus {
   ACTIVE = 'ativo',
-  ELIMINATED = 'eliminado'
+  ELIMINATED = 'eliminado',
+  PENDING = 'analise'
 }
 
 export interface User {
@@ -19,6 +20,7 @@ export interface User {
   neighborhood?: string;
   city?: string;
   photoUrl?: string;
+  email?: string;
   weeklyMisses?: number;
   weeklyScore?: number;
 }

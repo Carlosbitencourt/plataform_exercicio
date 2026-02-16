@@ -28,18 +28,18 @@ const CATEGORIES_COLLECTION = 'categories';
 // --- Users ---
 
 export const subscribeToUsers = (callback: (users: User[]) => void) => {
-    const q = query(collection(db, USERS_COLLECTION));
+    const q = query(collection(db, USERS_COLLECTION), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snapshot) => {
         const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         callback(users);
     });
 };
 
-export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status' | 'balance'>) => {
+export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status' | 'balance'> & { status?: UserStatus }) => {
     const newUser: Omit<User, 'id'> = {
         ...userData,
         balance: userData.depositedValue,
-        status: UserStatus.ACTIVE,
+        status: userData.status || UserStatus.PENDING,
         createdAt: new Date().toISOString(),
         photoUrl: userData.photoUrl || ''
     };
@@ -50,6 +50,10 @@ export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status'
 export const updateUser = async (user: User) => {
     const { id, ...data } = user;
     await safeUpdateDoc(USERS_COLLECTION, id, data);
+};
+
+export const deleteUser = async (id: string) => {
+    await deleteDoc(doc(db, USERS_COLLECTION, id));
 };
 
 export const getUserById = async (id: string) => {

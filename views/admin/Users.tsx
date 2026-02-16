@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload } from 'lucide-react';
-import { subscribeToUsers, addUser, updateUser } from '../../services/db';
+import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2 } from 'lucide-react';
+import { subscribeToUsers, addUser, updateUser, deleteUser } from '../../services/db';
 import { auth } from '../../services/firebase';
 import { safeUploadFile } from '../../services/firebaseGuard';
 import { User, UserStatus } from '../../types';
@@ -12,6 +12,10 @@ const Users: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [pixCopied, setPixCopied] = useState(false);
+  const [idCopied, setIdCopied] = useState(false);
 
   // ... (existing code)
 
@@ -122,10 +126,43 @@ const Users: React.FC = () => {
 
   const toggleStatus = async (user: User) => {
     try {
-      const newStatus = user.status === UserStatus.ACTIVE ? UserStatus.ELIMINATED : UserStatus.ACTIVE;
+      let newStatus: UserStatus;
+      if (user.status === UserStatus.PENDING) {
+        newStatus = UserStatus.ACTIVE;
+      } else if (user.status === UserStatus.ACTIVE) {
+        newStatus = UserStatus.ELIMINATED;
+      } else {
+        newStatus = UserStatus.ACTIVE;
+      }
       await updateUser({ ...user, status: newStatus });
     } catch (error) {
       console.error("Error updating status:", error);
+    }
+  };
+
+  const handleDelete = async (user: User) => {
+    if (window.confirm(`TEM CERTEZA QUE DESEJA APAGAR O ATLETA ${user.name.toUpperCase()}? ESTA AÇÃO NÃO PODE SER DESFEITA.`)) {
+      try {
+        await deleteUser(user.id);
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        alert("Erro ao apagar atleta.");
+      }
+    }
+  };
+
+  const copyToClipboard = async (text: string, type: 'pix' | 'id') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (type === 'pix') {
+        setPixCopied(true);
+        setTimeout(() => setPixCopied(false), 2000);
+      } else {
+        setIdCopied(true);
+        setTimeout(() => setIdCopied(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy!', err);
     }
   };
 
@@ -150,28 +187,37 @@ const Users: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button
-          onClick={() => {
-            setEditingUser(null);
-            setFormData({
-              name: '',
-              cpf: '',
-              uniqueCode: generateUniqueCode(),
-              phone: '',
-              depositedValue: 0,
-              pixKey: '',
-              street: '',
-              neighborhood: '',
-              city: '',
-              photoUrl: ''
-            });
-            setIsModalOpen(true);
-          }}
-          className="flex items-center px-4 py-2.5 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-2xl active:scale-95 text-[10px]"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Cadastrar Atleta
-        </button>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={() => setIsLinkModalOpen(true)}
+            className="flex items-center px-4 py-2.5 bg-white text-slate-600 border-2 border-slate-200 rounded-xl font-black uppercase italic tracking-tighter hover:bg-slate-50 hover:border-slate-300 transition-all shadow-md active:scale-95 text-[10px]"
+          >
+            <LinkIcon className="w-4 h-4 mr-2" />
+            Link Externo
+          </button>
+          <button
+            onClick={() => {
+              setEditingUser(null);
+              setFormData({
+                name: '',
+                cpf: '',
+                uniqueCode: generateUniqueCode(),
+                phone: '',
+                depositedValue: 0,
+                pixKey: '',
+                street: '',
+                neighborhood: '',
+                city: '',
+                photoUrl: ''
+              });
+              setIsModalOpen(true);
+            }}
+            className="flex items-center px-4 py-2.5 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-2xl active:scale-95 text-[10px]"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Cadastrar Atleta
+          </button>
+        </div>
       </div>
 
       {/* Athletes List - Bordas e Sombras Reforçadas */}
@@ -217,9 +263,11 @@ const Users: React.FC = () => {
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span className={`px-2 py-0.5 inline-flex text-[9px] font-black rounded-full uppercase tracking-widest italic border shadow-sm ${user.status === UserStatus.ACTIVE
                     ? 'bg-lime-400 text-black border-lime-500'
-                    : 'bg-rose-50 text-rose-600 border-rose-200'
+                    : user.status === UserStatus.PENDING
+                      ? 'bg-amber-100 text-amber-700 border-amber-200'
+                      : 'bg-rose-50 text-rose-600 border-rose-200'
                     }`}>
-                    {user.status === UserStatus.ACTIVE ? 'Em Competição' : 'Eliminado'}
+                    {user.status === UserStatus.ACTIVE ? 'Em Competição' : user.status === UserStatus.PENDING ? 'Em Análise' : 'Eliminado'}
                   </span>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-right">
@@ -231,10 +279,20 @@ const Users: React.FC = () => {
                       onClick={() => toggleStatus(user)}
                       className={`p-1.5 rounded-md transition-all border shadow-sm ${user.status === UserStatus.ACTIVE
                         ? 'bg-white text-slate-400 hover:text-rose-600 hover:border-rose-400 border-slate-200'
-                        : 'bg-white text-slate-400 hover:text-lime-600 hover:border-lime-400 border-slate-200'
+                        : user.status === UserStatus.PENDING
+                          ? 'bg-white text-slate-400 hover:text-lime-600 hover:border-lime-400 border-slate-200'
+                          : 'bg-white text-slate-400 hover:text-lime-600 hover:border-lime-400 border-slate-200'
                         }`}
+                      title={user.status === UserStatus.PENDING ? "Aprovar Atleta" : user.status === UserStatus.ACTIVE ? "Eliminar Atleta" : "Reativar Atleta"}
                     >
                       {user.status === UserStatus.ACTIVE ? <ShieldAlert className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(user)}
+                      className="p-1.5 bg-white text-slate-400 hover:text-red-600 hover:border-red-400 rounded-md transition-all border border-slate-200 shadow-sm"
+                      title="Apagar Atleta"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </td>
@@ -327,12 +385,22 @@ const Users: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Tag Única (ID)</label>
-                      <input
-                        readOnly
-                        type="text"
-                        className="w-full px-4 py-3 bg-lime-50/50 border-2 border-lime-200 rounded-xl text-lime-600 font-black font-sport italic transition-all outline-none uppercase cursor-not-allowed opacity-80 text-xs"
-                        value={formData.uniqueCode}
-                      />
+                      <div className="relative group/id">
+                        <input
+                          readOnly
+                          type="text"
+                          className="w-full pl-4 pr-10 py-3 bg-lime-50/50 border-2 border-lime-200 rounded-xl text-lime-600 font-black font-sport italic transition-all outline-none uppercase cursor-not-allowed text-xs"
+                          value={formData.uniqueCode}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(formData.uniqueCode, 'id')}
+                          className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all ${idCopied ? 'bg-lime-400 text-black shadow-sm' : 'text-slate-400 hover:text-lime-600 hover:bg-lime-50'
+                            }`}
+                        >
+                          {idCopied ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
@@ -358,13 +426,23 @@ const Users: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Pix</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-xs"
-                        placeholder="CHAVE"
-                        value={formData.pixKey}
-                        onChange={e => setFormData({ ...formData, pixKey: e.target.value })}
-                      />
+                      <div className="relative group/pix">
+                        <input
+                          type="text"
+                          className="w-full pl-4 pr-10 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-xs"
+                          placeholder="CHAVE"
+                          value={formData.pixKey}
+                          onChange={e => setFormData({ ...formData, pixKey: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(formData.pixKey, 'pix')}
+                          className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all ${pixCopied ? 'bg-lime-400 text-black shadow-sm' : 'text-slate-400 hover:text-lime-600 hover:bg-lime-50'
+                            }`}
+                        >
+                          {pixCopied ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -418,6 +496,54 @@ const Users: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* External Link Modal */}
+      {isLinkModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-[2rem] border-4 border-slate-200 shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-300">
+            <div className="p-6 bg-slate-50 border-b-2 border-slate-100 flex justify-between items-center">
+              <h3 className="text-lg font-black italic uppercase font-sport text-slate-900">Link de Inscrição</h3>
+              <button onClick={() => setIsLinkModalOpen(false)} className="text-slate-400 hover:text-slate-900">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="bg-slate-100 p-6 rounded-2xl border-2 border-slate-200 break-all text-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">URL Púbica</p>
+                <code className="text-xs font-bold text-slate-600">
+                  {window.location.origin}/#/inscrever
+                </code>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/#/inscrever`);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-4 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:scale-[1.02] transition-all"
+                >
+                  {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Copiado!' : 'Copiar Link'}
+                </button>
+                <a
+                  href={`${window.location.origin}/#/inscrever`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-4 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all border-2 border-slate-200"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center leading-relaxed">
+                Envie este link para que os atletas possam se cadastrar diretamente no sistema.
+              </p>
+            </div>
           </div>
         </div>
       )}

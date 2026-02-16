@@ -11,6 +11,7 @@ import CheckInPage from './views/public/CheckInPage';
 import Signup from './views/auth/Signup';
 import Dashboard from './views/admin/Dashboard';
 import Profile from './views/admin/Profile';
+import ExternalSignup from './views/public/ExternalSignup';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Componente para proteger rotas administrativas
@@ -84,6 +85,7 @@ const App: React.FC = () => {
             {/* Public Routes */}
             <Route path="/checkin" element={<CheckInPage />} />
             <Route path="/ranking" element={<Ranking />} />
+            <Route path="/inscrever" element={<ExternalSignup />} />
 
             {/* Default Redirects */}
             <Route path="/" element={<Navigate to="/checkin" replace />} />
