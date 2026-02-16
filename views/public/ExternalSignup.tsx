@@ -150,8 +150,8 @@ const ExternalSignup: React.FC = () => {
                         <button
                             onClick={copyId}
                             className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all ${copied
-                                    ? 'bg-lime-400 text-black shadow-[0_10px_20px_rgba(163,230,53,0.3)]'
-                                    : 'bg-zinc-800 text-white hover:bg-zinc-700 active:scale-95'
+                                ? 'bg-lime-400 text-black shadow-[0_10px_20px_rgba(163,230,53,0.3)]'
+                                : 'bg-zinc-800 text-white hover:bg-zinc-700 active:scale-95'
                                 }`}
                         >
                             {copied ? (
@@ -185,16 +185,15 @@ const ExternalSignup: React.FC = () => {
 
             <div className="max-w-xl mx-auto space-y-8 md:space-y-10 relative z-10">
                 {/* Header */}
-                <div className="text-center space-y-3 pt-6 md:pt-10">
-                    <div className="inline-flex p-3 bg-lime-400 rounded-2xl shadow-lg mb-1">
-                        <Activity className="w-6 h-6 text-black" />
+                <div className="text-center space-y-4 pt-6 md:pt-10">
+                    <div className="flex justify-center">
+                        <img
+                            src="/logo.png"
+                            alt="Impulso Club"
+                            className="h-16 md:h-20 w-auto object-contain animate-in fade-in zoom-in duration-700"
+                        />
                     </div>
-                    <div className="space-y-1">
-                        <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter uppercase font-sport">
-                            Fit<span className="text-lime-400">Reward</span>
-                        </h1>
-                        <p className="text-zinc-500 text-[9px] font-black uppercase tracking-[0.5em]">Inscrição por Etapas</p>
-                    </div>
+                    <p className="text-zinc-500 text-[9px] font-black uppercase tracking-[0.5em]">Inscrição por Etapas</p>
                 </div>
 
                 {/* Step Progress */}
