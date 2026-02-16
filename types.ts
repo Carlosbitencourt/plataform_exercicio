@@ -19,6 +19,8 @@ export interface User {
   neighborhood?: string;
   city?: string;
   photoUrl?: string;
+  weeklyMisses?: number;
+  weeklyScore?: number;
 }
 
 export interface TimeSlot {

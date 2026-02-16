@@ -36,13 +36,8 @@ const Login: React.FC = () => {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl aspect-square bg-lime-500/5 blur-[150px] rounded-full"></div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden relative z-10">
-        <div className="p-8 bg-zinc-800/30 text-center space-y-3 border-b border-zinc-800">
-          <div className="inline-flex p-4 bg-lime-400 rounded-[1.2rem] mb-1 shadow-[0_0_30px_rgba(163,230,53,0.4)] animate-pulse-lime">
-            <Activity className="w-8 h-8 text-black" />
-          </div>
-          <h1 className="text-3xl font-black italic tracking-tighter text-white font-sport uppercase">
-            Fit<span className="text-lime-400">Reward</span>
-          </h1>
+        <div className="p-8 bg-zinc-800/30 text-center space-y-3 border-b border-zinc-800 flex flex-col items-center">
+          <img src="/logo.png" alt="Impulso Club" className="h-20 w-auto object-contain mb-2" />
           <p className="text-zinc-500 text-[9px] font-black uppercase tracking-[0.4em]">Controle Central</p>
         </div>
 

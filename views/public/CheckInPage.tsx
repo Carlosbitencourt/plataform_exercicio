@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { User, UserStatus, TimeSlot, QRCodeData, CheckIn } from '../../types';
-import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, getTodayActiveQRCode, addCheckIn, updateUser } from '../../services/db';
+import { User, UserStatus, TimeSlot, CheckIn } from '../../types';
+import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, addCheckIn, updateUser } from '../../services/db';
 import { calculateCheckInScore } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin, Map, X, ExternalLink, Calendar, Star, Navigation } from 'lucide-react';
@@ -21,7 +21,6 @@ const CheckInPage: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [activeQR, setActiveQR] = useState<QRCodeData | null>(null);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
 
   // Geolocation & UI States
@@ -44,7 +43,6 @@ const CheckInPage: React.FC = () => {
     const unsubUsers = subscribeToUsers(setUsers);
     const unsubSlots = subscribeToTimeSlots(setTimeSlots);
     const unsubCheckIns = subscribeToCheckIns(setCheckIns);
-    const unsubQR = getTodayActiveQRCode(setActiveQR);
 
     // Initial Permission Check
     if (navigator.permissions && navigator.permissions.query) {
@@ -76,7 +74,6 @@ const CheckInPage: React.FC = () => {
       unsubUsers();
       unsubSlots();
       unsubCheckIns();
-      unsubQR();
     };
   }, []);
 
@@ -189,14 +186,6 @@ const CheckInPage: React.FC = () => {
     }
 
     const isLocalBypass = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-    if (!activeQR && !isLocalBypass) {
-      return 'SISTEMA INDISPONÍVEL: QR CODE NÃO FOI ATIVADO HOJE.';
-    }
-
-    if (tokenFromUrl && activeQR && activeQR.token !== tokenFromUrl && !isLocalBypass) {
-      return 'QR CODE INVÁLIDO OU EXPIRADO PARA ESTE ACESSO.';
-    }
 
     const today = getTodayISO();
     const alreadyDidToday = checkIns.some(c => c.userId === user?.id && c.date === today);

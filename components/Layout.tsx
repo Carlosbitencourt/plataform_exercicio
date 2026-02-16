@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Users, QrCode, ClipboardList, TrendingUp, CheckSquare, LogOut, Activity, Clock, Trophy, User } from 'lucide-react';
+import { Users, ClipboardList, TrendingUp, CheckSquare, LogOut, Activity, Clock, Trophy, User } from 'lucide-react';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -18,7 +18,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const menuItems = [
     { path: '/admin', icon: Activity, label: 'Visão Geral' },
     { path: '/admin/usuarios', icon: Users, label: 'Atletas' },
-    { path: '/admin/qrcode', icon: QrCode, label: 'Portal QR' },
     { path: '/admin/horarios', icon: Clock, label: 'Horários' },
     { path: '/admin/checkins', icon: ClipboardList, label: 'Registros' },
     { path: '/admin/ranking', icon: Trophy, label: 'Ranking' },
@@ -31,13 +30,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Sidebar - Preta com contraste Neon */}
       <aside className="w-56 bg-black flex-shrink-0 flex flex-col z-20 shadow-[10px_0_30px_rgba(0,0,0,0.2)]">
         <div className="p-6">
-          <div className="flex items-center gap-2 group cursor-pointer">
-            <div className="p-2 bg-lime-400 rounded-lg text-black shadow-[0_0_15px_rgba(163,230,53,0.4)]">
-              <Activity className="w-5 h-5 font-bold" />
-            </div>
-            <h1 className="text-xl font-black italic tracking-tighter text-white font-sport uppercase">
-              Fit<span className="text-lime-400">Reward</span>
-            </h1>
+          <div className="flex items-center gap-2 group cursor-pointer justify-center w-full">
+            <img src="/logo.png" alt="Impulso Club" className="h-12 w-auto object-contain" />
           </div>
         </div>
 

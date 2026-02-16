@@ -2,7 +2,6 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Users from './views/admin/Users';
-import QRCodeManager from './views/admin/QRCodeManager';
 import CheckIns from './views/admin/CheckIns';
 import Distributions from './views/admin/Distributions';
 import TimeSlots from './views/admin/TimeSlots';
@@ -55,12 +54,6 @@ const App: React.FC = () => {
             <Route path="/admin/usuarios" element={
               <ProtectedAdminRoute>
                 <Users />
-              </ProtectedAdminRoute>
-            } />
-
-            <Route path="/admin/qrcode" element={
-              <ProtectedAdminRoute>
-                <QRCodeManager />
               </ProtectedAdminRoute>
             } />
 
