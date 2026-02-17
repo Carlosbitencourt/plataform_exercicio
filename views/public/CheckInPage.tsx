@@ -489,7 +489,7 @@ const CheckInPage: React.FC = () => {
             <Lock className="w-3 h-3 text-zinc-600 group-hover:text-lime-400 transition-colors" />
             <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 group-hover:text-white transition-colors">ACESSO RESTRITO AO COMANDO</span>
           </Link>
-          <p className="text-[8px] text-zinc-800 font-black uppercase tracking-[0.6em]">FitReward Performance V4</p>
+          <p className="text-[8px] text-zinc-800 font-black uppercase tracking-[0.6em]">Impulso Club Performance V4</p>
         </div>
       </div>
 

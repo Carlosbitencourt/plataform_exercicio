@@ -138,7 +138,7 @@ const ExternalSignup: React.FC = () => {
 
                     <div className="space-y-2">
                         <h2 className="text-3xl font-black italic uppercase font-sport tracking-tighter">Cadastro Realizado!</h2>
-                        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">Bem-vindo ao FitReward</p>
+                        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">Bem-vindo(a) ao Impulso Club</p>
                     </div>
 
                     <div className="bg-black border-2 border-zinc-800 p-8 rounded-[2rem] space-y-4">
