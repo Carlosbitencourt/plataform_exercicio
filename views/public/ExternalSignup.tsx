@@ -238,7 +238,7 @@ const ExternalSignup: React.FC = () => {
                                                     required
                                                     type="text"
                                                     placeholder="COMO QUER SER CHAMADO?"
-                                                    className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-xs"
+                                                    className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-base"
                                                     value={formData.name}
                                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                                                 />
@@ -253,7 +253,7 @@ const ExternalSignup: React.FC = () => {
                                                         required
                                                         type="tel"
                                                         placeholder="(00) 00000-0000"
-                                                        className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-xs"
+                                                        className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-base"
                                                         value={formData.phone}
                                                         onChange={e => setFormData({ ...formData, phone: e.target.value })}
                                                     />
@@ -267,7 +267,7 @@ const ExternalSignup: React.FC = () => {
                                                         required
                                                         type="text"
                                                         placeholder="000.000.000-00"
-                                                        className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-xs"
+                                                        className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-base"
                                                         value={formData.cpf}
                                                         onChange={e => setFormData({ ...formData, cpf: e.target.value })}
                                                     />
@@ -282,7 +282,7 @@ const ExternalSignup: React.FC = () => {
                                                     required
                                                     type="email"
                                                     placeholder="SEU@EMAIL.COM"
-                                                    className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-xs"
+                                                    className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-base"
                                                     value={formData.email}
                                                     onChange={e => setFormData({ ...formData, email: e.target.value })}
                                                 />
@@ -308,7 +308,7 @@ const ExternalSignup: React.FC = () => {
                                                     required
                                                     type="text"
                                                     placeholder="RUA, NÚMERO, APTO..."
-                                                    className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-xs"
+                                                    className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-base"
                                                     value={formData.street}
                                                     onChange={e => setFormData({ ...formData, street: e.target.value })}
                                                 />
@@ -321,7 +321,7 @@ const ExternalSignup: React.FC = () => {
                                                     required
                                                     type="text"
                                                     placeholder="BAIRRO"
-                                                    className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-xs"
+                                                    className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-base"
                                                     value={formData.neighborhood}
                                                     onChange={e => setFormData({ ...formData, neighborhood: e.target.value })}
                                                 />
@@ -332,7 +332,7 @@ const ExternalSignup: React.FC = () => {
                                                     required
                                                     type="text"
                                                     placeholder="CIDADE"
-                                                    className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-xs"
+                                                    className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-base"
                                                     value={formData.city}
                                                     onChange={e => setFormData({ ...formData, city: e.target.value })}
                                                 />
@@ -431,7 +431,7 @@ const ExternalSignup: React.FC = () => {
                                                 required
                                                 type="text"
                                                 placeholder="CPF, EMAIL OU TELEFONE"
-                                                className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-xs"
+                                                className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-base"
                                                 value={formData.pixKey}
                                                 onChange={e => setFormData({ ...formData, pixKey: e.target.value })}
                                             />
