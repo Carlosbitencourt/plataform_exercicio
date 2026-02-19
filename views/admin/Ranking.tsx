@@ -103,19 +103,19 @@ const Ranking: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
       <div className="text-center space-y-4">
-        <div className="inline-flex bg-white p-1 rounded-full border border-slate-200 shadow-sm relative">
+        <div className="inline-flex flex-col sm:flex-row bg-white p-1 rounded-2xl sm:rounded-full border border-slate-200 shadow-sm relative gap-1 sm:gap-0">
           <div
-            className={`absolute top-1 bottom-1 w-[50%] bg-black rounded-full transition-all duration-300 ${view === 'general' ? 'left-[48%] translate-x-1' : 'left-1'}`}
+            className={`hidden sm:block absolute top-1 bottom-1 w-[50%] bg-black rounded-full transition-all duration-300 ${view === 'general' ? 'left-[48%] translate-x-1' : 'left-1'}`}
           ></div>
           <button
             onClick={() => setView('daily')}
-            className={`relative z-10 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${view === 'daily' ? 'text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
+            className={`relative z-10 px-6 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${view === 'daily' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
           >
             Ranking Diário
           </button>
           <button
             onClick={() => setView('general')}
-            className={`relative z-10 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${view === 'general' ? 'text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
+            className={`relative z-10 px-6 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${view === 'general' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
           >
             Ranking Geral
           </button>

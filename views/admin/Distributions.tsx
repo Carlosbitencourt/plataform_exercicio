@@ -182,14 +182,44 @@ const Distributions: React.FC = () => {
       )}
 
       {/* History Table */}
-      <div className="bg-white rounded-[1.5rem] border-2 border-slate-300 overflow-hidden shadow-lg">
-        <div className="px-5 py-3.5 border-b-2 border-slate-200 flex justify-between items-center bg-slate-50">
+      <div className="bg-transparent md:bg-white rounded-[1.5rem] md:border-2 md:border-slate-300 overflow-hidden md:shadow-lg">
+        <div className="px-5 py-3.5 border-b-2 border-slate-200 flex justify-between items-center bg-white md:bg-slate-50 rounded-t-[1.5rem] md:rounded-t-none border-2 md:border-0 md:border-b-2 mb-4 md:mb-0 shadow-sm md:shadow-none">
           <h3 className="text-sm font-black text-slate-900 uppercase italic tracking-widest font-sport">Log de Transações</h3>
           <div className="p-1.5 bg-white border border-slate-100 rounded-lg text-slate-400">
             <TrendingUp className="w-3.5 h-3.5" />
           </div>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* Mobile View - Cards */}
+        <div className="md:hidden space-y-3 mb-4">
+          {distributions.map((dist) => (
+            <div key={dist.id} className="bg-white p-4 rounded-2xl border-2 border-slate-200 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center font-bold tracking-tighter text-[10px] text-slate-500 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                  <Calendar className="w-3 h-3 mr-1.5 text-lime-500" />
+                  {dist.date}
+                </div>
+                <span className={`text-sm font-black font-sport italic tracking-tighter px-2.5 py-0.5 rounded-lg border shadow-sm ${dist.amount >= 0
+                  ? 'text-lime-600 bg-lime-50 border-lime-200'
+                  : 'text-rose-600 bg-rose-50 border-rose-200'
+                  }`}>
+                  {dist.amount > 0 ? '+' : ''} R$ {dist.amount.toFixed(2)}
+                </span>
+              </div>
+              <div className="mb-2">
+                <div className="text-xs font-black text-slate-900 uppercase tracking-tight">
+                  {users.find(u => u.id === dist.userId)?.name || 'DESCONHECIDO'}
+                </div>
+              </div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 p-2 rounded-lg border border-slate-100">
+                {dist.reason}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View - Table */}
+        <div className="overflow-x-auto hidden md:block">
           <table className="min-w-full divide-y-2 divide-slate-200">
             <thead className="bg-slate-50/50">
               <tr>

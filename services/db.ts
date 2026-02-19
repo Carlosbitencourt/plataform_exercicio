@@ -174,7 +174,7 @@ export const createDailyQRCode = async () => {
 // --- Categories ---
 
 export const subscribeToCategories = (callback: (categories: Category[]) => void) => {
-    const q = query(collection(db, CATEGORIES_COLLECTION), orderBy('name', 'asc'));
+    const q = query(collection(db, CATEGORIES_COLLECTION));
     return onSnapshot(q, (snapshot) => {
         const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
         callback(categories);

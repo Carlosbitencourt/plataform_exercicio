@@ -537,9 +537,11 @@ const CheckInPage: React.FC = () => {
                       <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter leading-none mb-1 shadow-black drop-shadow-lg">
                         {selectedLocation.locationName}
                       </h2>
-                      <div className="flex items-center gap-2 text-lime-400">
-                        <Star className="w-3 h-3 fill-lime-400" />
-                        <span className="text-xs font-black uppercase tracking-wider shadow-black drop-shadow-md">{selectedLocation.weight * 10} PONTOS</span>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="bg-lime-400 text-black text-xs font-black px-3 py-1 rounded shadow-[0_0_20px_rgba(163,230,53,0.4)] whitespace-nowrap font-sport italic tracking-tighter flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-black text-black" />
+                          {selectedLocation.weight * 10} PONTOS
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -623,7 +625,7 @@ const CheckInPage: React.FC = () => {
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-white font-bold uppercase text-sm truncate pr-2 group-hover:text-lime-400 transition-colors">{slot.locationName}</span>
-                                <span className="bg-lime-400/10 text-lime-400 text-[9px] font-black px-2 py-0.5 rounded border border-lime-400/20 whitespace-nowrap">
+                                <span className="bg-lime-400 text-black text-[10px] font-black px-2.5 py-1 rounded shadow-[0_0_15px_rgba(163,230,53,0.3)] whitespace-nowrap font-sport italic tracking-tighter transform hover:scale-110 transition-transform duration-300">
                                   {slot.weight * 10} PTS
                                 </span>
                               </div>

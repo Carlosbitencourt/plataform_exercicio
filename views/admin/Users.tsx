@@ -187,10 +187,10 @@ const Users: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
           <button
             onClick={() => setIsLinkModalOpen(true)}
-            className="flex items-center px-4 py-2.5 bg-white text-slate-600 border-2 border-slate-200 rounded-xl font-black uppercase italic tracking-tighter hover:bg-slate-50 hover:border-slate-300 transition-all shadow-md active:scale-95 text-[10px]"
+            className="w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-white text-slate-600 border-2 border-slate-200 rounded-xl font-black uppercase italic tracking-tighter hover:bg-slate-50 hover:border-slate-300 transition-all shadow-md active:scale-95 text-[10px]"
           >
             <LinkIcon className="w-4 h-4 mr-2" />
             Link Externo
@@ -212,7 +212,7 @@ const Users: React.FC = () => {
               });
               setIsModalOpen(true);
             }}
-            className="flex items-center px-4 py-2.5 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-2xl active:scale-95 text-[10px]"
+            className="w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-2xl active:scale-95 text-[10px]"
           >
             <Plus className="w-4 h-4 mr-2" />
             Cadastrar Atleta
@@ -221,8 +221,73 @@ const Users: React.FC = () => {
       </div>
 
       {/* Athletes List - Bordas e Sombras Reforçadas */}
-      <div className="bg-white rounded-[1.25rem] border-2 border-slate-300 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
-        <table className="min-w-full divide-y-2 divide-slate-200">
+      <div className="bg-transparent md:bg-white rounded-[1.25rem] md:border-2 md:border-slate-300 overflow-hidden md:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+
+        {/* Mobile View - Cards */}
+        <div className="md:hidden space-y-4">
+          {filteredUsers.map((user) => (
+            <div key={user.id} className="bg-white rounded-2xl p-4 border-2 border-slate-200 shadow-sm relative overflow-hidden">
+              <div className={`absolute top-0 right-0 px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-bl-xl border-b-2 border-l-2 ${user.status === UserStatus.ACTIVE ? 'bg-lime-400 text-black border-lime-500' :
+                  user.status === UserStatus.PENDING ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                    'bg-rose-50 text-rose-600 border-rose-200'
+                }`}>
+                {user.status === UserStatus.ACTIVE ? 'Em Competição' : user.status === UserStatus.PENDING ? 'Em Análise' : 'Eliminado'}
+              </div>
+
+              <div className="flex items-center gap-4 mt-2">
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-lime-600 font-black text-xl border-2 border-slate-200 shadow-sm overflow-hidden shrink-0">
+                  {user.photoUrl ? (
+                    <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{user.name && user.name[0] ? user.name[0].toUpperCase() : '?'}</span>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-black text-slate-900 uppercase tracking-tight text-sm truncate">{user.name}</h3>
+                  <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mb-1">{user.phone}</p>
+                  <div className="text-xs text-black font-black font-sport bg-lime-400 inline-block px-2 py-0.5 rounded border border-lime-500 uppercase tracking-widest italic shadow-sm">
+                    {user.uniqueCode}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 text-[10px]">
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <span className="block text-slate-400 font-black uppercase tracking-widest text-[8px]">Contribuição</span>
+                  <span className="font-bold text-slate-900">R$ {user.depositedValue?.toFixed(2)}</span>
+                </div>
+                <div className="bg-lime-50 p-2 rounded-lg border border-lime-100">
+                  <span className="block text-lime-600 font-black uppercase tracking-widest text-[8px]">Saldo Atual</span>
+                  <span className="font-black text-slate-900 italic font-sport text-sm">R$ {user.balance?.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <button onClick={() => openEdit(user)} className="flex-1 py-2 bg-slate-50 text-slate-500 font-bold uppercase tracking-widest text-[9px] rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                  Editar
+                </button>
+                <button
+                  onClick={() => toggleStatus(user)}
+                  className={`flex-1 py-2 font-bold uppercase tracking-widest text-[9px] rounded-lg border transition-colors ${user.status === UserStatus.ACTIVE
+                    ? 'bg-rose-50 text-rose-600 border-rose-200'
+                    : 'bg-lime-50 text-lime-600 border-lime-200'
+                    }`}
+                >
+                  {user.status === UserStatus.ACTIVE ? 'Eliminar' : 'Aprovar/Ativar'}
+                </button>
+                <button
+                  onClick={() => handleDelete(user)}
+                  className="w-10 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-red-600 border border-slate-200 rounded-lg"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View - Table */}
+        <table className="min-w-full divide-y-2 divide-slate-200 hidden md:table">
           <thead className="bg-slate-50">
             <tr>
               <th className="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Perfil do Atleta</th>

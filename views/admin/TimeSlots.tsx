@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Plus, Trash2, Shield, Zap, X, Pencil, Camera, Upload } from 'lucide-react';
+import { Clock, Plus, Trash2, Shield, Zap, X, Pencil, Camera, Upload, ChevronUp, ChevronDown, Copy } from 'lucide-react';
 import { subscribeToTimeSlots, addTimeSlot, deleteTimeSlot, updateTimeSlot, subscribeToCategories, addCategory, deleteCategory, updateCategory } from '../../services/db';
 import { safeUploadFile } from '../../services/firebaseGuard';
 import { TimeSlot, Category } from '../../types';
@@ -16,16 +16,22 @@ const DAYS = [
 ];
 
 const TimeSlots: React.FC = () => {
+  // --- State Variables ---
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+
+  // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+
+  // Category Management
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [parentCategoryId, setParentCategoryId] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
 
-  // Upload State
+  // Time Slot Management
+  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -43,14 +49,20 @@ const TimeSlots: React.FC = () => {
     photoUrl: ''
   });
 
+  // --- Effects ---
   useEffect(() => {
     const unsubscribeSlots = subscribeToTimeSlots((data) => {
       setSlots(data);
     });
     const unsubscribeCategories = subscribeToCategories((data) => {
-      setCategories(data);
-      // Auto-expand new categories if needed, or keep all expanded
-      // For now, let's keep it simple.
+      // Sort by order, then by name
+      const sorted = data.sort((a, b) => {
+        const orderA = a.order ?? 9999;
+        const orderB = b.order ?? 9999;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.name.localeCompare(b.name);
+      });
+      setCategories(sorted);
     });
     return () => {
       unsubscribeSlots();
@@ -58,11 +70,122 @@ const TimeSlots: React.FC = () => {
     };
   }, []);
 
+  // --- Category Logic ---
+
+  // Helper to build category tree
+  const buildCategoryTree = (categories: Category[]) => {
+    const categoryMap = new Map<string, Category & { children: any[] }>();
+    const rootCategories: (Category & { children: any[] })[] = [];
+
+    categories.forEach(cat => {
+      categoryMap.set(cat.id, { ...cat, children: [] });
+    });
+
+    categories.forEach(cat => {
+      if (cat.parentId && categoryMap.has(cat.parentId)) {
+        categoryMap.get(cat.parentId)!.children.push(categoryMap.get(cat.id));
+      } else {
+        rootCategories.push(categoryMap.get(cat.id)!);
+      }
+    });
+
+    return rootCategories;
+  };
+
+  const handleCreateSubfolder = (parentId: string) => {
+    setParentCategoryId(parentId);
+    setEditingCategoryId(null);
+    setNewCategoryName('');
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    try {
+      if (editingCategoryId) {
+        await updateCategory({ id: editingCategoryId, name: newCategoryName.trim() });
+      } else {
+        const siblings = categories.filter(c => c.parentId === (parentCategoryId || undefined));
+        const nextOrder = siblings.length > 0 ? (Math.max(...siblings.map(c => c.order || 0)) + 1) : 0;
+
+        await addCategory({
+          name: newCategoryName.trim(),
+          order: nextOrder,
+          ...(parentCategoryId && { parentId: parentCategoryId })
+        });
+      }
+      setNewCategoryName('');
+      setEditingCategoryId(null);
+      setParentCategoryId(null);
+      setIsCategoryModalOpen(false);
+    } catch (error) {
+      console.error("Error saving category:", error);
+      alert("Erro ao salvar categoria.");
+    }
+  };
+
+  const handleEditCategory = (category: Category) => {
+    setEditingCategoryId(category.id);
+    setNewCategoryName(category.name);
+    setParentCategoryId(category.parentId || null);
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (confirm('Tem certeza? Os horários nesta categoria ficarão "Sem Categoria".')) {
+      try {
+        await deleteCategory(id);
+      } catch (error) {
+        console.error("Error deleting category:", error);
+        alert("Erro ao remover categoria.");
+      }
+    }
+  };
+
+  const moveCategory = async (index: number, direction: 'up' | 'down') => {
+    // Note: This logic currently only supports reordering root categories reliably.
+    // Reordering children would require finding the siblings first.
+    // For simplicity, we are keeping the logic for the displayed list, but we should refine this
+    // to handle the tree structure better if needed.
+    // For now, let's just re-implement for the root level as a start or disable for children.
+
+    // Actually, sorting is handled by 'order' field.
+    // To reorder correctly, we need to know the context (siblings).
+    // The previous implementation was list-based.
+    // Let's defer complex tree reordering for now and focus on subfolder creation/rendering.
+
+    const newCategories = [...categories];
+    if (direction === 'up') {
+      if (index === 0) return;
+      [newCategories[index - 1], newCategories[index]] = [newCategories[index], newCategories[index - 1]];
+    } else {
+      if (index === newCategories.length - 1) return;
+      [newCategories[index], newCategories[index + 1]] = [newCategories[index + 1], newCategories[index]];
+    }
+
+    // Optimistic update
+    setCategories(newCategories);
+
+    try {
+      // Update all orders to ensure consistency
+      const updatePromises = newCategories.map((cat, i) =>
+        updateCategory({ ...cat, order: i })
+      );
+      await Promise.all(updatePromises);
+    } catch (e) {
+      console.error("Failed to reorder", e);
+      alert("Erro ao reordenar pastas.");
+    }
+  };
+
   const toggleCategory = (catId: string) => {
     setExpandedCategories(prev =>
       prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId]
     );
   };
+
+  // --- Time Slot Logic ---
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,41 +213,6 @@ const TimeSlots: React.FC = () => {
       setUploading(false);
       setUploadProgress(0);
       alert(`Erro no Upload: ${error.message}`);
-    }
-  };
-
-  const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCategoryName.trim()) return;
-    try {
-      if (editingCategoryId) {
-        await updateCategory({ id: editingCategoryId, name: newCategoryName.trim() });
-      } else {
-        await addCategory({ name: newCategoryName.trim() });
-      }
-      setNewCategoryName('');
-      setEditingCategoryId(null);
-      setIsCategoryModalOpen(false);
-    } catch (error) {
-      console.error("Error saving category:", error);
-      alert("Erro ao salvar categoria.");
-    }
-  };
-
-  const handleEditCategory = (category: Category) => {
-    setEditingCategoryId(category.id);
-    setNewCategoryName(category.name);
-    setIsCategoryModalOpen(true);
-  };
-
-  const handleDeleteCategory = async (id: string) => {
-    if (confirm('Tem certeza? Os horários nesta categoria ficarão "Sem Categoria".')) {
-      try {
-        await deleteCategory(id);
-      } catch (error) {
-        console.error("Error deleting category:", error);
-        alert("Erro ao remover categoria.");
-      }
     }
   };
 
@@ -184,6 +272,23 @@ const TimeSlots: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleDuplicate = (slot: TimeSlot) => {
+    setEditingSlotId(null); // Ensure it's treated as a new slot
+    setFormData({
+      name: `${slot.name} (Cópia)`,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      weight: slot.weight,
+      days: slot.days,
+      locationName: slot.locationName,
+      latitude: slot.latitude,
+      longitude: slot.longitude,
+      radius: slot.radius,
+      categoryId: slot.categoryId || '',
+      photoUrl: slot.photoUrl || ''
+    });
+    setIsModalOpen(true);
+  };
 
   const handleDelete = async (id: string) => {
     if (confirm('REMOVER ESTE BLOCO DE HORÁRIO?')) {
@@ -196,6 +301,133 @@ const TimeSlots: React.FC = () => {
     }
   };
 
+  // --- Recursive Renderer ---
+  const renderCategoryNode = (category: Category & { children: any[] }, depth = 0) => {
+    const categorySlots = slots.filter(s => s.categoryId === category.id);
+    const isExpanded = expandedCategories.includes(category.id);
+    const hasChildren = category.children.length > 0;
+
+    return (
+      <div key={category.id} className={`border-2 border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50 mb-4 ${depth > 0 ? 'ml-6 border-l-4 border-l-slate-300' : ''}`} style={{ marginLeft: depth * 20 }}>
+        <div
+          className="flex items-center justify-between p-4 bg-white cursor-pointer hover:bg-slate-50 transition-colors"
+          onClick={() => toggleCategory(category.id)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg transition-transform duration-300 ${isExpanded ? 'rotate-90 bg-lime-100 text-lime-600' : 'bg-slate-100 text-slate-400'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6" /></svg>
+            </div>
+            <h4 className="text-lg font-black italic uppercase font-sport text-slate-900 tracking-widest">{category.name}</h4>
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{categorySlots.length}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); handleCreateSubfolder(category.id); }}
+              className="p-2 text-slate-300 hover:text-lime-500 hover:bg-lime-50 rounded-lg transition-all"
+              title="Nova Subpasta"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleEditCategory(category); }}
+              className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleDeleteCategory(category.id); }}
+              className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {isExpanded && (
+          <div className="p-4 border-t-2 border-slate-100 animate-in slide-in-from-top-2 duration-300">
+            {/* Render Children Categories First */}
+            {hasChildren && (
+              <div className="mb-4 space-y-4">
+                {category.children.map((child: any) => renderCategoryNode(child, depth + 1))}
+              </div>
+            )}
+
+            {/* Render Time Slots */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {categorySlots.length > 0 ? categorySlots.map(slot => (
+                <div key={slot.id} className="bg-white rounded-xl border-2 border-slate-300 overflow-hidden shadow-md group relative transition-all hover:border-lime-500 hover:-translate-y-1">
+                  <div className="p-5 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="p-2 bg-slate-50 border-2 border-slate-100 rounded-lg text-slate-900 shadow-inner group-hover:border-lime-200 transition-colors">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDuplicate(slot)}
+                          className="p-1.5 bg-white text-slate-300 hover:text-lime-500 border border-slate-100 rounded-md transition-all hover:border-lime-200"
+                          title="Duplicar"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(slot)}
+                          className="p-1.5 bg-white text-slate-300 hover:text-blue-500 border border-slate-100 rounded-md transition-all hover:border-blue-200"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(slot.id)}
+                          className="p-1.5 bg-white text-slate-300 hover:text-rose-600 border border-slate-100 rounded-md transition-all hover:border-rose-200"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-lg font-black text-slate-900 uppercase italic font-sport tracking-widest">{slot.name}</h4>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        <span className="px-2.5 py-0.5 bg-black text-white text-[10px] font-black rounded-md uppercase tracking-widest">
+                          {slot.startTime} - {slot.endTime}
+                        </span>
+                        <div className="flex gap-1">
+                          {DAYS.filter(d => slot.days?.includes(d.id)).map(d => (
+                            <span key={d.id} className="text-[8px] font-black text-lime-600 bg-lime-50 px-1.5 py-0.5 rounded border border-lime-100 uppercase">
+                              {d.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-2.5 flex items-center gap-1.5 text-slate-400 group-hover:text-slate-600 transition-colors">
+                        <Shield className="w-3 h-3" />
+                        <span className="text-[9px] font-black uppercase tracking-widest">{slot.locationName || 'LOCAL PADRÃO'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 bg-lime-400 rounded-md shadow-sm">
+                          <Zap className="w-3 h-3 text-black fill-current" />
+                        </div>
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Peso Recompensa</span>
+                      </div>
+                      <span className="text-2xl font-black text-slate-900 font-sport italic tracking-tighter">
+                        x{slot.weight}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 group-hover:bg-lime-400 transition-colors"></div>
+                </div>
+              )) : (
+                <p className="col-span-full text-center py-8 text-slate-400 text-xs font-bold uppercase tracking-widest">Nenhum horário nesta pasta</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -203,14 +435,15 @@ const TimeSlots: React.FC = () => {
           <h3 className="text-2xl font-black italic uppercase font-sport text-slate-900 tracking-widest leading-none">Células de Treino</h3>
           <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Configuração de Janelas de Check-in</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <button
             onClick={() => {
               setEditingCategoryId(null);
+              setParentCategoryId(null);
               setNewCategoryName('');
               setIsCategoryModalOpen(true);
             }}
-            className="flex items-center px-4 py-2.5 bg-white text-slate-900 border-2 border-slate-200 rounded-xl font-black uppercase italic tracking-tighter hover:bg-slate-50 hover:scale-[1.05] transition-all shadow-sm active:scale-95 text-[10px]"
+            className="flex items-center justify-center px-4 py-2.5 bg-white text-slate-900 border-2 border-slate-200 rounded-xl font-black uppercase italic tracking-tighter hover:bg-slate-50 hover:scale-[1.05] transition-all shadow-sm active:scale-95 text-[10px] w-full sm:w-auto"
           >
             <Plus className="w-4 h-4 mr-1.5" />
             Nova Pasta
@@ -233,7 +466,7 @@ const TimeSlots: React.FC = () => {
               });
               setIsModalOpen(true);
             }}
-            className="flex items-center px-4 py-2.5 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-xl active:scale-95 text-[10px]"
+            className="flex items-center justify-center px-4 py-2.5 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-xl active:scale-95 text-[10px] w-full sm:w-auto"
           >
             <Plus className="w-4 h-4 mr-1.5" />
             Novo Horário
@@ -242,107 +475,8 @@ const TimeSlots: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        {/* Render Categories */}
-        {categories.map(category => {
-          const categorySlots = slots.filter(s => s.categoryId === category.id);
-          const isExpanded = expandedCategories.includes(category.id);
-
-          return (
-            <div key={category.id} className="border-2 border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50">
-              <div
-                className="flex items-center justify-between p-4 bg-white cursor-pointer hover:bg-slate-50 transition-colors"
-                onClick={() => toggleCategory(category.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg transition-transform duration-300 ${isExpanded ? 'rotate-90 bg-lime-100 text-lime-600' : 'bg-slate-100 text-slate-400'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6" /></svg>
-                  </div>
-                  <h4 className="text-lg font-black italic uppercase font-sport text-slate-900 tracking-widest">{category.name}</h4>
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{categorySlots.length}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleEditCategory(category); }}
-                    className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteCategory(category.id); }}
-                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {isExpanded && (
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 border-t-2 border-slate-100 animate-in slide-in-from-top-2 duration-300">
-                  {categorySlots.length > 0 ? categorySlots.map(slot => (
-                    <div key={slot.id} className="bg-white rounded-xl border-2 border-slate-300 overflow-hidden shadow-md group relative transition-all hover:border-lime-500 hover:-translate-y-1">
-                      <div className="p-5 space-y-3">
-                        <div className="flex justify-between items-start">
-                          <div className="p-2 bg-slate-50 border-2 border-slate-100 rounded-lg text-slate-900 shadow-inner group-hover:border-lime-200 transition-colors">
-                            <Clock className="w-5 h-5" />
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEdit(slot)}
-                              className="p-1.5 bg-white text-slate-300 hover:text-blue-500 border border-slate-100 rounded-md transition-all hover:border-blue-200"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(slot.id)}
-                              className="p-1.5 bg-white text-slate-300 hover:text-rose-600 border border-slate-100 rounded-md transition-all hover:border-rose-200"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <h4 className="text-lg font-black text-slate-900 uppercase italic font-sport tracking-widest">{slot.name}</h4>
-                          <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                            <span className="px-2.5 py-0.5 bg-black text-white text-[10px] font-black rounded-md uppercase tracking-widest">
-                              {slot.startTime} - {slot.endTime}
-                            </span>
-                            <div className="flex gap-1">
-                              {DAYS.filter(d => slot.days?.includes(d.id)).map(d => (
-                                <span key={d.id} className="text-[8px] font-black text-lime-600 bg-lime-50 px-1.5 py-0.5 rounded border border-lime-100 uppercase">
-                                  {d.label}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="mt-2.5 flex items-center gap-1.5 text-slate-400 group-hover:text-slate-600 transition-colors">
-                            <Shield className="w-3 h-3" />
-                            <span className="text-[9px] font-black uppercase tracking-widest">{slot.locationName || 'LOCAL PADRÃO'}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
-                          <div className="flex items-center gap-2">
-                            <div className="p-1 bg-lime-400 rounded-md shadow-sm">
-                              <Zap className="w-3 h-3 text-black fill-current" />
-                            </div>
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Peso Recompensa</span>
-                          </div>
-                          <span className="text-2xl font-black text-slate-900 font-sport italic tracking-tighter">
-                            x{slot.weight}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 group-hover:bg-lime-400 transition-colors"></div>
-                    </div>
-                  )) : (
-                    <p className="col-span-full text-center py-8 text-slate-400 text-xs font-bold uppercase tracking-widest">Nenhum horário nesta pasta</p>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {/* Render Recursive Categories */}
+        {buildCategoryTree(categories).map(rootCategory => renderCategoryNode(rootCategory))}
 
         {/* Uncategorized Slots */}
         <div className="border-2 border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50">
@@ -369,6 +503,13 @@ const TimeSlots: React.FC = () => {
                         <Clock className="w-5 h-5" />
                       </div>
                       <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDuplicate(slot)}
+                          className="p-1.5 bg-white text-slate-300 hover:text-lime-500 border border-slate-100 rounded-md transition-all hover:border-lime-200"
+                          title="Duplicar"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => handleEdit(slot)}
                           className="p-1.5 bg-white text-slate-300 hover:text-blue-500 border border-slate-100 rounded-md transition-all hover:border-blue-200"
@@ -472,9 +613,26 @@ const TimeSlots: React.FC = () => {
                     onChange={e => setFormData({ ...formData, categoryId: e.target.value })}
                   >
                     <option value="">Sem Categoria (Raiz)</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
+                    {/* Helper to flatten tree for dropdown */}
+                    {(() => {
+                      const getFlattenedCategories = (nodes: (Category & { children: any[] })[], depth = 0): (Category & { depth: number })[] => {
+                        return nodes.reduce((acc, node) => {
+                          acc.push({ ...node, depth });
+                          if (node.children && node.children.length > 0) {
+                            acc.push(...getFlattenedCategories(node.children, depth + 1));
+                          }
+                          return acc;
+                        }, [] as (Category & { depth: number })[]);
+                      };
+
+                      const flattened = getFlattenedCategories(buildCategoryTree(categories));
+
+                      return flattened.map(cat => (
+                        <option key={cat.id} value={cat.id}>
+                          {'\u00A0'.repeat(cat.depth * 4) + (cat.depth > 0 ? '↳ ' : '') + cat.name}
+                        </option>
+                      ));
+                    })()}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -647,7 +805,7 @@ const TimeSlots: React.FC = () => {
           <div className="bg-white rounded-[1.5rem] border-4 border-slate-200 shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-300">
             <div className="p-4 bg-slate-50 flex justify-between items-center border-b border-slate-100">
               <h3 className="text-base font-black italic uppercase font-sport text-slate-900 tracking-widest leading-none">
-                {editingCategoryId ? 'Editar Pasta' : 'Nova Pasta'}
+                {editingCategoryId ? 'Editar Pasta' : (parentCategoryId ? 'Nova Subpasta' : 'Nova Pasta')}
               </h3>
               <button onClick={() => setIsCategoryModalOpen(false)} className="text-slate-400 hover:text-slate-900 p-1 bg-white rounded-md border border-slate-200">
                 <X className="w-3.5 h-3.5" />
