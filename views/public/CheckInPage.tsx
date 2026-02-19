@@ -472,18 +472,21 @@ const CheckInPage: React.FC = () => {
                   Localização obrigatória para validar presença na academia.
                 </p>
               )}
+              <div className="pt-4 flex flex-col items-center gap-4 border-t border-zinc-800/50 mt-4">
+                <button
+                  onClick={() => setShowLocationsModal(true)}
+                  className="flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all group w-full max-w-xs justify-center"
+                >
+                  <Map className="w-4 h-4 text-lime-400" />
+                  <span className="text-xs font-black uppercase tracking-widest text-zinc-300 group-hover:text-white">Locais de Check-in</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         <div className="pt-12 flex flex-col items-center gap-4">
-          <button
-            onClick={() => setShowLocationsModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all group w-full max-w-xs justify-center"
-          >
-            <Map className="w-4 h-4 text-lime-400" />
-            <span className="text-xs font-black uppercase tracking-widest text-zinc-300 group-hover:text-white">Locais de Check-in</span>
-          </button>
+
 
           <Link to="/admin/login" className="group flex items-center gap-3 px-6 py-3 bg-zinc-900/30 border border-zinc-800/50 rounded-full transition-all hover:bg-lime-400/10 hover:border-lime-400/30">
             <Lock className="w-3 h-3 text-zinc-600 group-hover:text-lime-400 transition-colors" />
@@ -603,7 +606,20 @@ const CheckInPage: React.FC = () => {
               ) : (
                 <div className="p-4 space-y-6">
                   {[1, 2, 3, 4, 5, 6, 0].map(dayIdx => { // Start with Monday(1) ends with Sunday(0)
-                    const daySlots = timeSlots.filter(s => s.days.includes(dayIdx)).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const daySlots = timeSlots.filter(s => {
+                      // 1. Filter by Day
+                      if (!s.days.includes(dayIdx)) return false;
+
+                      // 2. Strict City Filter
+                      if (!user?.city) return false; // User without city sees nothing (or only global? Assume strict for now based on request)
+                      if (!s.city) return false; // Slot without city does not match user with city
+
+                      const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                      const userCity = normalize(user.city);
+                      const slotCity = normalize(s.city);
+
+                      return userCity === slotCity;
+                    }).sort((a, b) => a.startTime.localeCompare(b.startTime));
                     if (daySlots.length === 0) return null;
 
                     const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];

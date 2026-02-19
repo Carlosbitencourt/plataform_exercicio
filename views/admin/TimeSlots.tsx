@@ -240,7 +240,8 @@ const TimeSlots: React.FC = () => {
         longitude: GYM_LOCATION.lng,
         radius: GYM_LOCATION.radius,
         categoryId: '',
-        photoUrl: ''
+        photoUrl: '',
+        city: ''
       });
       setEditingSlotId(null);
       setIsModalOpen(false);
@@ -267,7 +268,8 @@ const TimeSlots: React.FC = () => {
       longitude: slot.longitude,
       radius: slot.radius,
       categoryId: slot.categoryId || '',
-      photoUrl: slot.photoUrl || ''
+      photoUrl: slot.photoUrl || '',
+      city: slot.city || ''
     });
     setIsModalOpen(true);
   };
@@ -285,7 +287,8 @@ const TimeSlots: React.FC = () => {
       longitude: slot.longitude,
       radius: slot.radius,
       categoryId: slot.categoryId || '',
-      photoUrl: slot.photoUrl || ''
+      photoUrl: slot.photoUrl || '',
+      city: slot.city || ''
     });
     setIsModalOpen(true);
   };
@@ -300,6 +303,33 @@ const TimeSlots: React.FC = () => {
       }
     }
   };
+
+  // ... (rest of the file until the button)
+
+  <button
+    onClick={() => {
+      setEditingSlotId(null);
+      setFormData({
+        name: '',
+        startTime: '',
+        endTime: '',
+        weight: 1,
+        days: [1, 2, 3, 4, 5],
+        locationName: 'ACADEMIA SEDE',
+        latitude: GYM_LOCATION.lat,
+        longitude: GYM_LOCATION.lng,
+        radius: GYM_LOCATION.radius,
+        categoryId: '',
+        photoUrl: '',
+        city: ''
+      });
+      setIsModalOpen(true);
+    }}
+    className="flex items-center justify-center px-4 py-2.5 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-xl active:scale-95 text-[10px] w-full sm:w-auto"
+  >
+    <Plus className="w-4 h-4 mr-1.5" />
+    Novo Horário
+  </button>
 
   // --- Recursive Renderer ---
   const renderCategoryNode = (category: Category & { children: any[] }, depth = 0) => {
@@ -372,12 +402,14 @@ const TimeSlots: React.FC = () => {
                         <button
                           onClick={() => handleEdit(slot)}
                           className="p-1.5 bg-white text-slate-300 hover:text-blue-500 border border-slate-100 rounded-md transition-all hover:border-blue-200"
+                          title="Editar"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(slot.id)}
                           className="p-1.5 bg-white text-slate-300 hover:text-rose-600 border border-slate-100 rounded-md transition-all hover:border-rose-200"
+                          title="Remover"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -690,6 +722,17 @@ const TimeSlots: React.FC = () => {
                     className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase text-[13px]"
                     value={formData.locationName}
                     onChange={e => setFormData({ ...formData, locationName: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Cidade / Localidade</label>
+                  <input
+                    type="text"
+                    placeholder="EX: RECIFE"
+                    className="w-full px-3 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none uppercase text-[13px]"
+                    value={formData.city || ''}
+                    onChange={e => setFormData({ ...formData, city: e.target.value })}
                   />
                 </div>
 

@@ -38,6 +38,7 @@ export interface TimeSlot {
   radius: number;
   categoryId?: string;
   photoUrl?: string;
+  city?: string;
 }
 
 export interface Category {
