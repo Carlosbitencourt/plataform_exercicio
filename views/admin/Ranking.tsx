@@ -10,10 +10,11 @@ interface RankedUser {
 }
 
 const Ranking: React.FC = () => {
-  const [view, setView] = useState<'daily' | 'general'>('daily');
+  const [view, setView] = useState<'daily' | 'weekly' | 'general'>('daily');
   const [users, setUsers] = useState<UserType[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [rankedUsers, setRankedUsers] = useState<RankedUser[]>([]);
+  const [weeklyRanking, setWeeklyRanking] = useState<UserType[]>([]);
   const [generalRanking, setGeneralRanking] = useState<(UserType & { totalScore: number })[]>([]);
 
   useEffect(() => {
@@ -69,6 +70,17 @@ const Ranking: React.FC = () => {
   useEffect(() => {
     if (users.length === 0) return;
 
+    // Weekly Ranking: Sort by weeklyScore
+    const weeklyUsers = users
+      .filter(u => u.status === 'ativo' && (u.weeklyScore || 0) > 0)
+      .sort((a, b) => (b.weeklyScore || 0) - (a.weeklyScore || 0));
+
+    setWeeklyRanking(weeklyUsers);
+  }, [users]);
+
+  useEffect(() => {
+    if (users.length === 0) return;
+
     // General Ranking: Calculate total score from check-ins
     const usersWithScores = users
       .filter(u => u.status === 'ativo')
@@ -103,21 +115,30 @@ const Ranking: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
       <div className="text-center space-y-4">
-        <div className="inline-flex flex-col sm:flex-row bg-white p-1 rounded-2xl sm:rounded-full border border-slate-200 shadow-sm relative gap-1 sm:gap-0">
+        <div className="inline-flex flex-col sm:flex-row bg-white p-1 rounded-2xl sm:rounded-full border border-slate-200 shadow-sm relative gap-1 sm:gap-0 w-full sm:w-auto">
           <div
-            className={`hidden sm:block absolute top-1 bottom-1 w-[50%] bg-black rounded-full transition-all duration-300 ${view === 'general' ? 'left-[48%] translate-x-1' : 'left-1'}`}
+            className={`hidden sm:block absolute top-1 bottom-1 w-[33.33%] bg-black rounded-full transition-all duration-300 ${view === 'daily' ? 'left-1' :
+                view === 'weekly' ? 'left-[33.33%]' :
+                  'left-[66.66%] -translate-x-1'
+              }`}
           ></div>
           <button
             onClick={() => setView('daily')}
-            className={`relative z-10 px-6 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${view === 'daily' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
+            className={`relative z-10 px-4 sm:px-8 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors flex-1 sm:flex-none ${view === 'daily' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
           >
-            Ranking Diário
+            Diário
+          </button>
+          <button
+            onClick={() => setView('weekly')}
+            className={`relative z-10 px-4 sm:px-8 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors flex-1 sm:flex-none ${view === 'weekly' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            Semanal
           </button>
           <button
             onClick={() => setView('general')}
-            className={`relative z-10 px-6 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${view === 'general' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
+            className={`relative z-10 px-4 sm:px-8 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors flex-1 sm:flex-none ${view === 'general' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
           >
-            Ranking Geral
+            Geral
           </button>
         </div>
 
@@ -128,13 +149,15 @@ const Ranking: React.FC = () => {
           <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">
             {view === 'daily'
               ? new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-              : 'Classificação Geral por Pontuação'
+              : view === 'weekly'
+                ? 'Melhores pontuadores da semana'
+                : 'Classificação Geral por Pontuação'
             }
           </p>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
         <div className="bg-white rounded-[2rem] border-2 border-slate-200 overflow-hidden shadow-xl">
           <div className="grid grid-cols-1 divide-y-2 divide-slate-100">
             {view === 'daily' ? (
@@ -274,6 +297,69 @@ const Ranking: React.FC = () => {
                 </div>
               )
             )}
+            {view === 'weekly' && (
+              weeklyRanking.length > 0 ? weeklyRanking.map((user, index) => (
+                <div key={user.id} className="flex items-center p-3 sm:p-4 hover:bg-slate-50 transition-colors group">
+                  <div className="mr-3 sm:mr-5 relative">
+                    {user.photoUrl ? (
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center border-4 shadow-lg transition-transform group-hover:scale-110 overflow-hidden relative bg-white ${getBorderColor(index)}`}>
+                        <img
+                          src={user.photoUrl}
+                          alt={user.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            const parent = (e.target as HTMLImageElement).parentElement;
+                            if (parent) {
+                              parent.classList.remove('rounded-xl', 'border-4', 'bg-white', 'w-12', 'h-12');
+                              parent.classList.add('w-10', 'h-10', 'rounded-lg', 'font-black', 'text-lg', 'italic', 'font-sport', 'border-2');
+                              parent.className = `w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`;
+                              parent.innerHTML = `#${index + 1}`;
+                            }
+                          }}
+                        />
+                        <div className="absolute -bottom-1 -right-1 bg-slate-900 text-white text-[9px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm z-10">
+                          {index + 1}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center font-black text-lg italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`}>
+                        #{index + 1}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <h3 className="text-sm sm:text-lg font-black italic uppercase font-sport text-slate-900 truncate">
+                        {user.name}
+                      </h3>
+                      {index === 0 && (
+                        <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-[9px] font-black uppercase tracking-widest rounded border border-yellow-200 flex items-center gap-1">
+                          <Trophy className="w-2.5 h-2.5" /> Líder Semanal
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      ID: {user.uniqueCode}
+                      <span className="mx-1">•</span>
+                      <span className="text-slate-500">Saldo: <span className="text-slate-900">R$ {user.balance.toFixed(2)}</span></span>
+                    </div>
+                  </div>
+
+                  <div className="text-right pl-3">
+                    <p className="text-[9px] font-black text-lime-500 uppercase tracking-widest mb-0.5">Pontos na Semana</p>
+                    <p className="font-black font-sport italic text-slate-900 text-lg sm:text-3xl leading-none">
+                      {(user.weeklyScore || 0).toFixed(0)} <span className="text-[10px] uppercase not-italic font-sans tracking-tighter">pts</span>
+                    </p>
+                  </div>
+                </div>
+              )) : (
+                <div className="py-32 text-center space-y-6">
+                  <p className="text-slate-400 font-black uppercase tracking-[0.2em]">Nenhum atleta pontuou esta semana</p>
+                </div>
+              )
+            )}
           </div>
 
           <div className="bg-slate-50 px-8 py-4 border-t-2 border-slate-100 flex justify-center">
@@ -281,7 +367,9 @@ const Ranking: React.FC = () => {
               <AlertCircle className="w-3 h-3" />
               {view === 'daily'
                 ? 'Critério de Desempate: Horário do Check-in (Mais cedo = Melhor posição)'
-                : 'Ranking baseado no saldo total acumulado na temporada.'
+                : view === 'weekly'
+                  ? 'Ranking baseado na pontuação acumulada na semana atual.'
+                  : 'Ranking baseado no saldo total acumulado na temporada.'
               }
             </p>
           </div>
