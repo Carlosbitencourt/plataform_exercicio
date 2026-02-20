@@ -313,8 +313,6 @@ const Ranking: React.FC = () => {
                       )}
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      ID: {user.uniqueCode}
-                      <span className="mx-1">•</span>
                       <span className="text-slate-500">Saldo: <span className="text-slate-900">R$ {user.balance.toFixed(2)}</span></span>
                     </div>
                   </div>
@@ -376,8 +374,6 @@ const Ranking: React.FC = () => {
                       )}
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      ID: {user.uniqueCode}
-                      <span className="mx-1">•</span>
                       <span className="text-slate-500">Saldo: <span className="text-slate-900">R$ {(user.balance || 0).toFixed(2)}</span></span>
                     </div>
                   </div>

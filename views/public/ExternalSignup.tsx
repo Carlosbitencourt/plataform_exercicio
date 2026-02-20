@@ -12,6 +12,24 @@ const ExternalSignup: React.FC = () => {
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const maskPhone = (value: string) => {
+        return value
+            .replace(/\D/g, '')
+            .replace(/(\d{2})(\d)/, '($1) $2')
+            .replace(/(\d{5})(\d)/, '$1-$2')
+            .replace(/(-\d{4})\d+?$/, '$1');
+    };
+
+    const maskCPF = (value: string) => {
+        return value
+            .replace(/\D/g, '')
+            .replace(/(\d{3})(\d)/, '$1.$2')
+            .replace(/(\d{3})(\d)/, '$1.$2')
+            .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+            .replace(/(-\d{2})\d+?$/, '$1');
+    };
 
     const [formData, setFormData] = useState({
         name: '',
@@ -71,7 +89,23 @@ const ExternalSignup: React.FC = () => {
 
     const validateStep = (s: number) => {
         if (s === 1) {
-            return formData.name && formData.phone && formData.email && formData.cpf;
+            const isNameValid = formData.name.trim().length > 0;
+            const isPhoneValid = formData.phone.replace(/\D/g, '').length === 11;
+            const isCpfValid = formData.cpf.replace(/\D/g, '').length === 11;
+            const isEmailValid = formData.email.includes('@');
+
+            if (!isNameValid || !isPhoneValid || !isCpfValid || !isEmailValid) {
+                if (!isCpfValid && formData.cpf.replace(/\D/g, '').length > 0) {
+                    setError("O CPF DEVE TER EXATAMENTE 11 NÚMEROS.");
+                } else if (!isPhoneValid && formData.phone.replace(/\D/g, '').length > 0) {
+                    setError("O WHATSAPP DEVE TER O DDD E O NÚMERO COMPLETO.");
+                } else {
+                    setError("PREENCHA TODOS OS CAMPOS CORRETAMENTE.");
+                }
+                return false;
+            }
+            setError(null);
+            return true;
         }
         if (s === 2) {
             return formData.street && formData.neighborhood && formData.city;
@@ -222,6 +256,14 @@ const ExternalSignup: React.FC = () => {
                     <div className="p-6 md:p-10">
                         <form onSubmit={handleSubmit} className="space-y-8">
 
+                            {error && (
+                                <div className="p-4 bg-rose-500/10 border border-rose-500/50 rounded-2xl animate-in fade-in zoom-in duration-300">
+                                    <p className="text-rose-500 text-[10px] font-black uppercase tracking-widest text-center flex items-center justify-center gap-2">
+                                        <Loader2 className="w-3 h-3 animate-spin" /> {error}
+                                    </p>
+                                </div>
+                            )}
+
                             {/* STEP 1: DADOS PESSOAIS */}
                             {currentSubStep === 1 && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
@@ -253,9 +295,14 @@ const ExternalSignup: React.FC = () => {
                                                         required
                                                         type="tel"
                                                         placeholder="(00) 00000-0000"
+                                                        maxLength={15}
                                                         className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-base"
                                                         value={formData.phone}
-                                                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                                        onChange={e => {
+                                                            const maskedValue = maskPhone(e.target.value);
+                                                            setFormData({ ...formData, phone: maskedValue });
+                                                            if (error) setError(null);
+                                                        }}
                                                     />
                                                 </div>
                                             </div>
@@ -267,9 +314,14 @@ const ExternalSignup: React.FC = () => {
                                                         required
                                                         type="text"
                                                         placeholder="000.000.000-00"
+                                                        maxLength={14}
                                                         className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-base"
                                                         value={formData.cpf}
-                                                        onChange={e => setFormData({ ...formData, cpf: e.target.value })}
+                                                        onChange={e => {
+                                                            const maskedValue = maskCPF(e.target.value);
+                                                            setFormData({ ...formData, cpf: maskedValue });
+                                                            if (error) setError(null);
+                                                        }}
                                                     />
                                                 </div>
                                             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, User, Trophy, Search, Filter, ClipboardList, Activity, Trash2, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Trophy, Search, Filter, ClipboardList, Activity, Trash2, X, Image as ImageIcon, Maximize2 } from 'lucide-react';
 import { subscribeToCheckIns, subscribeToUsers, subscribeToTimeSlots, deleteCheckIn } from '../../services/db';
 import { CheckIn, User as UserType, TimeSlot } from '../../types';
 
@@ -7,6 +7,7 @@ const CheckIns: React.FC = () => {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   // Default to today in YYYY-MM-DD format
   const getTodayStart = () => {
@@ -240,6 +241,31 @@ const CheckIns: React.FC = () => {
                         </div>
                       </div>
                     </div>
+
+                    {ci.photoUrl && (
+                      <div className="pt-2">
+                        <div className="relative group/photo rounded-xl overflow-hidden border border-slate-200 bg-slate-50 aspect-video">
+                          <img
+                            src={ci.photoUrl}
+                            alt="Evidência do exercício"
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover/photo:scale-110"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                            <button
+                              onClick={() => setSelectedPhoto(ci.photoUrl!)}
+                              className="bg-white text-black px-4 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-xl transform translate-y-4 group-hover/photo:translate-y-0 transition-all duration-300"
+                            >
+                              <Maximize2 className="w-3.5 h-3.5" />
+                              VER FOTO
+                            </button>
+                          </div>
+                          <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-white text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-white/10">
+                            <ImageIcon className="w-2.5 h-2.5 text-lime-400" />
+                            EVIDÊNCIA ANEXADA
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -248,14 +274,29 @@ const CheckIns: React.FC = () => {
         ))}
       </div>
 
-      {
-        filteredCheckIns.length === 0 && (
-          <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-            <ClipboardList className="w-20 h-20 text-slate-100 mx-auto mb-6" />
-            <p className="text-slate-300 font-black uppercase tracking-[0.5em] italic">Zero Atletas Registrados no Período</p>
+      {/* Modal de Foto em Tela Cheia */}
+      {selectedPhoto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 sm:p-10 animate-in fade-in duration-300"
+          onClick={() => setSelectedPhoto(null)}
+        >
+          <button
+            className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-[60]"
+            onClick={() => setSelectedPhoto(null)}
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          <div className="relative max-w-5xl w-full h-full flex items-center justify-center animate-in zoom-in-95 duration-300">
+            <img
+              src={selectedPhoto}
+              alt="Foto em tamanho real"
+              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
-        )
-      }
+        </div>
+      )}
     </div >
   );
 };
