@@ -34,8 +34,15 @@ const Dashboard: React.FC = () => {
     }, []);
 
     // Metrics Calculation
-    const activeUsers = users.filter(u => u.status === UserStatus.ACTIVE).length;
-    const totalBalance = users.reduce((acc, curr) => acc + curr.balance, 0);
+    // Metrics Calculation
+    // Relaxed active status check to catch all variations
+    const activeUsers = users.filter(u =>
+        u.status === UserStatus.ACTIVE ||
+        u.status === 'ativo' ||
+        u.status === 'active'
+    ).length;
+
+    const totalBalance = users.reduce((acc, curr) => acc + (curr.balance || 0), 0);
     const totalDistributed = distributions.reduce((acc, curr) => acc + (curr.amount > 0 ? curr.amount : 0), 0);
 
     const getTodayISO = () => {
@@ -43,7 +50,13 @@ const Dashboard: React.FC = () => {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
     const today = getTodayISO();
-    const checkInsToday = checkIns.filter(c => c.date === today).length;
+
+    // Robust date check: handle potential time components or ISO strings
+    const checkInsToday = checkIns.filter(c =>
+        c.date === today ||
+        c.date.startsWith(today) ||
+        c.date.split('T')[0] === today
+    ).length;
 
     // Recent Activity (Top 5 Check-ins)
     const recentCheckIns = [...checkIns].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 5); // Simple sort by string time for "today", ideally meaningful timestamp sort if cross-day

@@ -82,6 +82,31 @@ const CheckIns: React.FC = () => {
     }
   };
 
+  const handleClearToday = async () => {
+    const today = getTodayStart();
+    const todayCheckIns = checkIns.filter(c => c.date === today);
+
+    if (todayCheckIns.length === 0) {
+      alert("Nenhum check-in encontrado para hoje.");
+      return;
+    }
+
+    if (confirm(`TEM CERTEZA? ISSO APAGARÁ ${todayCheckIns.length} CHECK-INS DE HOJE (${today})\nE DESCONTARÁ OS PONTOS DOS ATLETAS.\n\nESTA AÇÃO NÃO PODE SER DESFEITA.`)) {
+      try {
+        // Delete sequentially to avoid potential race conditions on updating same user? 
+        // Actually Promise.all is fine usually, but let's be safe if multiple checkins for same user exist (unlikely but possible).
+        // Since deleteCheckIn updates user doc, concurrent updates to same user doc might conflict without transactions.
+        // For safety, we can process them.
+        const deletionPromises = todayCheckIns.map(c => deleteCheckIn(c.id));
+        await Promise.all(deletionPromises);
+        alert("Check-ins de hoje removidos com sucesso!");
+      } catch (error) {
+        console.error("Error clearing today:", error);
+        alert("Erro ao limpar dados de hoje.");
+      }
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Filtros de Comando - Tema Claro */}
@@ -127,6 +152,14 @@ const CheckIns: React.FC = () => {
         >
           <Filter className="w-3 h-3 mr-1.5" />
           Resetar
+        </button>
+
+        <button
+          onClick={handleClearToday}
+          className="px-5 py-2.5 bg-rose-100 text-rose-600 rounded-xl font-black uppercase tracking-[0.2em] text-[8px] hover:bg-rose-500 hover:text-white border border-rose-200 transition-all flex items-center shadow-sm"
+        >
+          <Trash2 className="w-3 h-3 mr-1.5" />
+          LIMPAR HOJE
         </button>
       </div>
 
@@ -215,13 +248,15 @@ const CheckIns: React.FC = () => {
         ))}
       </div>
 
-      {filteredCheckIns.length === 0 && (
-        <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-          <ClipboardList className="w-20 h-20 text-slate-100 mx-auto mb-6" />
-          <p className="text-slate-300 font-black uppercase tracking-[0.5em] italic">Zero Atletas Registrados no Período</p>
-        </div>
-      )}
-    </div>
+      {
+        filteredCheckIns.length === 0 && (
+          <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
+            <ClipboardList className="w-20 h-20 text-slate-100 mx-auto mb-6" />
+            <p className="text-slate-300 font-black uppercase tracking-[0.5em] italic">Zero Atletas Registrados no Período</p>
+          </div>
+        )
+      }
+    </div >
   );
 };
 

@@ -3,6 +3,7 @@ import {
     collection,
     doc,
     getDocs,
+    getDoc,
     setDoc,
     updateDoc,
     deleteDoc,
@@ -114,7 +115,28 @@ export const addCheckIn = async (checkInData: Omit<CheckIn, 'id'>) => {
 };
 
 export const deleteCheckIn = async (id: string) => {
-    await deleteDoc(doc(db, CHECKINS_COLLECTION, id));
+    const checkInRef = doc(db, CHECKINS_COLLECTION, id);
+    const checkInSnap = await getDoc(checkInRef);
+
+    if (checkInSnap.exists()) {
+        const data = checkInSnap.data() as CheckIn;
+        const scoreToRemove = data.score || 0;
+        const userId = data.userId;
+
+        // Update user score safely
+        const userRef = doc(db, USERS_COLLECTION, userId);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+            const userData = userSnap.data() as User;
+            await updateDoc(userRef, {
+                totalScore: Math.max(0, (userData.totalScore || 0) - scoreToRemove),
+                weeklyScore: Math.max(0, (userData.weeklyScore || 0) - scoreToRemove)
+            });
+        }
+
+        await deleteDoc(checkInRef);
+    }
 };
 
 // --- Distributions ---
