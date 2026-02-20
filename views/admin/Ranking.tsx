@@ -114,9 +114,9 @@ const Ranking: React.FC = () => {
         if ((user.totalScore || 0) === 0) {
           const userCheckIns = checkIns.filter(c => c.userId === user.id);
           const calculatedTotal = userCheckIns.reduce((acc, c) => acc + (c.score || 0), 0);
-          return { ...user, totalScore: calculatedTotal > 0 ? calculatedTotal : user.totalScore };
+          return { ...user, totalScore: calculatedTotal > 0 ? calculatedTotal : (user.totalScore || 0) };
         }
-        return user;
+        return { ...user, totalScore: user.totalScore || 0 };
       })
       .filter(u => {
         const hasScore = (u.totalScore || 0) > 0;
@@ -243,7 +243,7 @@ const Ranking: React.FC = () => {
                         Check-in: <span className="text-slate-900 font-sport italic text-xs">{item.checkInTime}</span>
                       </span>
                       <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 flex items-center gap-1">
-                        Saldo: <span className="text-slate-900 font-bold tracking-tight">R$ {item.user.balance.toFixed(2)}</span>
+                        Saldo: <span className="text-slate-900 font-bold tracking-tight">R$ {(item.user.balance || 0).toFixed(2)}</span>
                       </span>
                     </div>
                   </div>
@@ -322,7 +322,7 @@ const Ranking: React.FC = () => {
                   <div className="text-right pl-3">
                     <p className="text-[9px] font-black text-lime-500 uppercase tracking-widest mb-0.5">Total de Pontos</p>
                     <p className="font-black font-sport italic text-slate-900 text-lg sm:text-3xl leading-none">
-                      {user.totalScore.toFixed(0)} <span className="text-[10px] uppercase not-italic font-sans tracking-tighter">pts</span>
+                      {(user.totalScore || 0).toFixed(0)} <span className="text-[10px] uppercase not-italic font-sans tracking-tighter">pts</span>
                     </p>
                   </div>
                 </div>
@@ -378,7 +378,7 @@ const Ranking: React.FC = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       ID: {user.uniqueCode}
                       <span className="mx-1">•</span>
-                      <span className="text-slate-500">Saldo: <span className="text-slate-900">R$ {user.balance.toFixed(2)}</span></span>
+                      <span className="text-slate-500">Saldo: <span className="text-slate-900">R$ {(user.balance || 0).toFixed(2)}</span></span>
                     </div>
                   </div>
 

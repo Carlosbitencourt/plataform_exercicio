@@ -97,11 +97,11 @@ const Login: React.FC = () => {
           </button>
         </form>
 
-        <div className="p-5 bg-black text-center">
+        {/* <div className="p-5 bg-black text-center">
           <Link to="/signup" className="text-[10px] text-zinc-500 hover:text-lime-400 uppercase tracking-[0.2em] font-black transition-colors">
             CRIAR NOVA CONTA
           </Link>
-        </div>
+        </div> */}
       </div>
     </div>
   );

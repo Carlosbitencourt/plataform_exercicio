@@ -373,7 +373,7 @@ const CheckInPage: React.FC = () => {
                   )}
                 </label>
                 <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest mt-2 text-center">
-                  Envie uma foto para validar seu treino
+                  O ENVIO DA FOTO É OPCIONAL
                 </p>
               </div>
             ) : (
