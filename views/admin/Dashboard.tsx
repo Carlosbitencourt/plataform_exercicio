@@ -14,6 +14,7 @@ import {
 import { Link } from 'react-router-dom';
 import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
 import { User, CheckIn, Distribution, UserStatus } from '../../types';
+import { runWeeklyPenaltyCheck, runWeeklyDistribution } from '../../services/rewardSystem';
 
 const Dashboard: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);

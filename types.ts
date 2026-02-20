@@ -23,6 +23,7 @@ export interface User {
   email?: string;
   weeklyMisses?: number;
   weeklyScore?: number;
+  totalScore?: number;
 }
 
 export interface TimeSlot {

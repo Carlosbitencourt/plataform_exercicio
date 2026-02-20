@@ -29,6 +29,7 @@ const CheckInPage: React.FC = () => {
   const [permissionStatus, setPermissionStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [checkInAddress, setCheckInAddress] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [earnedPoints, setEarnedPoints] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showLocationsModal, setShowLocationsModal] = useState(false);
@@ -257,6 +258,7 @@ const CheckInPage: React.FC = () => {
     const activeSlotWeight = activeSlot.weight || 1;
     const basePoints = 10;
     const score = basePoints * activeSlotWeight;
+    setEarnedPoints(score);
     const today = getTodayISO();
 
     // Use Safe Guard for Firestore Writes
@@ -269,12 +271,15 @@ const CheckInPage: React.FC = () => {
       timeSlotId: activeSlot.id,
       score,
       address: addressStr,
-      // Ensure strict structure
       accuracy: accuracy || 0,
       createdAt: new Date().toISOString()
     });
 
-    const updatedUser = { ...user!, balance: user!.balance + score };
+    const updatedUser = {
+      ...user!,
+      weeklyScore: (user!.weeklyScore || 0) + score,
+      totalScore: (user!.totalScore || 0) + score
+    };
     // We update the user stats using safeUpdateDoc
     await safeUpdateDoc('users', user!.id, updatedUser);
     setSuccess(true);
@@ -283,7 +288,7 @@ const CheckInPage: React.FC = () => {
   if (success) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-6 font-sans">
-        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] text-center space-y-6 max-w-sm w-full shadow-[0_0_80px_rgba(163,230,53,0.1)]">
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] text-center space-y-6 max-w-sm w-full shadow-[0_0_80px_rgba(163,230,53,0.1)] animate-in zoom-in-95 duration-500">
           <div className="inline-flex p-5 bg-lime-400 rounded-full shadow-[0_0_30px_rgba(163,230,53,0.3)] animate-bounce">
             <CheckCircle className="w-10 h-10 text-black" />
           </div>
@@ -297,9 +302,19 @@ const CheckInPage: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="bg-black p-5 rounded-xl border border-zinc-800 space-y-1">
-            <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest">Atleta: {user?.name}</p>
-            <p className="text-lime-400 text-xl font-black font-sport italic tracking-tighter">RECOMPENSA CREDITADA</p>
+
+          {/* Animated Reward Section */}
+          <div className="bg-black p-6 rounded-2xl border border-zinc-800 space-y-3 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-lime-500/10 blur-[40px] rounded-full pointer-events-none group-hover:bg-lime-500/20 transition-all duration-500"></div>
+
+            <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest relative z-10">Atleta: {user?.name}</p>
+
+            <div className="relative z-10 flex flex-col items-center gap-1">
+              <p className="text-lime-400 text-xs font-black font-sport italic tracking-wider uppercase animate-pulse">RECOMPENSA CREDITADA</p>
+              <div className="text-5xl font-black text-white font-sport italic tracking-tighter drop-shadow-[0_0_15px_rgba(163,230,53,0.5)] animate-in slide-in-from-bottom-4 fade-in duration-700 delay-200">
+                +{earnedPoints} <span className="text-lg text-zinc-500 not-italic">PTS</span>
+              </div>
+            </div>
           </div>
           <button onClick={() => window.location.reload()} className="w-full py-4 bg-white text-black rounded-xl font-black uppercase italic tracking-tighter hover:bg-lime-400 transition-all text-lg">
             Novo Registro

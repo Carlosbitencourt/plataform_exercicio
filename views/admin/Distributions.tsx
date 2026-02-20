@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Users, DollarSign, Calendar, Play, CheckCircle2, Zap, AlertTriangle } from 'lucide-react';
 import { subscribeToDistributions, subscribeToUsers, subscribeToCheckIns } from '../../services/db';
-import { runDailyPenaltyCheck, runWeeklyDistribution } from '../../services/rewardSystem';
+import { runWeeklyPenaltyCheck, runWeeklyDistribution } from '../../services/rewardSystem';
 import { Distribution, User, CheckIn, UserStatus } from '../../types';
 
 const Distributions: React.FC = () => {
@@ -20,16 +20,16 @@ const Distributions: React.FC = () => {
     };
   }, []);
 
-  const handleDailyCheck = async () => {
-    if (!window.confirm("Confirmar verificação diária de penalidades? Isso irá descontar saldo dos faltantes.")) return;
+  const handleWeeklyCheck = async () => {
+    if (!window.confirm("Confirmar verificação SEMANAL de penalidades? Isso irá descontar R$ 10,00 por dia perdido de Seg-Sex.")) return;
 
     setIsProcessing(true);
     setLastResult(null);
     try {
-      const result = runDailyPenaltyCheck();
+      const result = runWeeklyPenaltyCheck();
       setLastResult({ type: 'penalty', ...result });
     } catch (error: any) {
-      console.error("Daily check failed:", error);
+      console.error("Weekly check failed:", error);
       alert(`Erro: ${error.message}`);
     } finally {
       setIsProcessing(false);
@@ -102,12 +102,12 @@ const Distributions: React.FC = () => {
         <div className="bg-white rounded-[1.5rem] border-2 border-slate-200 p-6 flex flex-col justify-between shadow-lg relative overflow-hidden">
           <div className="z-10 relative">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black uppercase tracking-widest rounded-full italic mb-3">
-              <AlertTriangle className="w-2 h-2 fill-current" /> Ação Diária
+              <AlertTriangle className="w-2 h-2 fill-current" /> Ação Semanal
             </div>
             <h3 className="text-2xl font-black text-slate-900 italic uppercase font-sport tracking-widest leading-none mb-2">Processar Faltas</h3>
-            <p className="text-slate-500 text-xs font-medium mb-6">Verifica quem não fez check-in hoje e aplica a penalidade proporcional. O valor descontado vai para o Pool.</p>
+            <p className="text-slate-500 text-xs font-medium mb-6">Verifica check-ins de Seg-Sex e aplica R$ 10,00 de multa por dia perdido. Valor vai para o Pool.</p>
             <button
-              onClick={handleDailyCheck}
+              onClick={handleWeeklyCheck}
               disabled={isProcessing}
               className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-black text-sm uppercase italic tracking-tighter hover:bg-black hover:scale-[1.02] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
             >

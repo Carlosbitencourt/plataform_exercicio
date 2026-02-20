@@ -16,64 +16,100 @@ export const calculateCheckInScore = (timeSlotId: string, depositedValue: number
 // --- New Progressive Penalty System ---
 
 export const calculatePenalty = (user: User): number => {
-  // Regra 1: Valor investido dividido por metas da semana
-  const penaltyPerMiss = user.depositedValue / WEEKLY_GOAL;
+  // Regra 1: Valor fixo de R$ 10,00 por falta
+  const fixedPenalty = 10.0;
 
-  // Regra 5: Se faltar 4 vezes (cumprir apenas 1 ou 0), perde tudo.
-  // weeklyMisses é incrementado ANTES de chamar esta função no check diário
+  // Kill Switch: Se faltar 4 vezes, perde tudo (mantido da regra original se desejado, ou simplificado?)
+  // O prompt diz: "Toda vez que o usuário não fazer check in em um dia ele perde R$ 10,00 d valor dele"
+  // Não mencionou explicitamente o Kill Switch de 4 faltas aqui, mas é feature existente.
+  // Vou MANTER o Kill Switch por segurança/regra anterior, mas a penalidade base é 10.
+
   if ((user.weeklyMisses || 0) >= 4) {
     return user.balance; // Perde o que restou (Kill Switch)
   }
 
-  // Regra 2: Desconto proporcional
-  return penaltyPerMiss;
+  return fixedPenalty;
 };
 
-export const runDailyPenaltyCheck = () => {
+// Helper to get Mon-Fri dates of current week
+const getWeekDays = () => {
+  const curr = new Date();
+  const day = curr.getDay() || 7; // Sun=7, Mon=1...
+  const mon = new Date(curr);
+  mon.setDate(curr.getDate() - day + 1);
+
+  const days = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    days.push(d.toISOString().split('T')[0]);
+  }
+  return days;
+};
+
+export const runWeeklyPenaltyCheck = () => {
   const db = getDB();
   const today = getLocalDate();
 
   const activeUsers = db.users.filter(u => u.status === UserStatus.ACTIVE);
-  const checkInsToday = db.checkIns.filter(c => c.date === today);
-  const presentUserIds = new Set(checkInsToday.map(c => c.userId));
+  const weekDays = getWeekDays();
 
-  const absentUsers = activeUsers.filter(u => !presentUserIds.has(u.id));
+  // Filter only days up to today (inclusive) to avoid future penalties if run mid-week
+  // User asked for "Weekly", usually run on Sunday, but safe to check range.
+  const daysToCheck = weekDays.filter(d => d <= today);
 
-  if (absentUsers.length === 0) return { message: "Ninguém faltou hoje. Nenhuma penalidade aplicada." };
+  if (daysToCheck.length === 0) return { message: "Sem dias para verificar na semana.", absentCount: 0, totalPenalized: 0, penalizedUsers: [] };
 
   let totalPenalized = 0;
+  const penalizedUsers: string[] = [];
 
-  absentUsers.forEach(user => {
-    // Inicializa contador se não existir
-    if (user.weeklyMisses === undefined) user.weeklyMisses = 0;
+  activeUsers.forEach(user => {
+    // Get user check-ins for the week
+    const userCheckIns = db.checkIns.filter(c => c.userId === user.id && daysToCheck.includes(c.date));
+    const presentDays = new Set(userCheckIns.map(c => c.date));
 
-    user.weeklyMisses += 1;
+    // Misses = Expected - Present
+    const misses = daysToCheck.length - presentDays.size;
 
-    const penaltyAmount = calculatePenalty(user);
-    // Garante que não negative além do zero (embora calculatePenalty cuide do Kill Switch, no proporcional precisa cuidar)
-    const actualPenalty = Math.min(user.balance, penaltyAmount);
+    // Update weeklyMisses for record
+    user.weeklyMisses = misses;
 
-    if (actualPenalty > 0) {
-      user.balance -= actualPenalty;
-      totalPenalized += actualPenalty;
+    if (misses > 0) {
+      const penalty = misses * 10.0;
+      // Kill Switch Logic from previous: If misses >= 4, lose everything?
+      // Prompt says: "Toda vez... perde R$ 10,00".
+      // Example found in code: "If misses >= 4, return user.balance".
+      // User didn't revoke Kill Switch, but explicitly asked for R$ 10 logic.
+      // I will apply R$ 10 per miss.
+      // AND Keep Kill Switch if 4 misses?
+      // Let's stick to the EXPLICIT request: R$ 10 per miss. 
+      // If misses >= 4, penalty is 40.0. User might have 50. Total loss?
+      // I'll stick to 10 * misses. simple.
 
-      // Registra a perda (mas não redistribui ainda - vai pro "Pool da Semana")
-      addDistribution({
-        userId: user.id,
-        amount: -actualPenalty,
-        date: today,
-        reason: `FALTA DIÁRIA (${user.weeklyMisses}/${WEEKLY_GOAL} não cumpridas)`
-      });
+      const actualPenalty = Math.min(user.balance, penalty);
+
+      if (actualPenalty > 0) {
+        user.balance -= actualPenalty;
+        totalPenalized += actualPenalty;
+        penalizedUsers.push(user.name);
+
+        addDistribution({
+          userId: user.id,
+          amount: -actualPenalty,
+          date: today,
+          reason: `FALTAS SEMANA (${misses} dias)`
+        });
+      }
     }
   });
 
   saveDB(db);
 
   return {
-    message: "Verificação diária concluída.",
-    absentCount: absentUsers.length,
+    message: "Verificação Semanal Concluída.",
+    absentCount: penalizedUsers.length,
     totalPenalized,
-    penalizedUsers: absentUsers.map(u => u.name)
+    penalizedUsers
   };
 };
 
@@ -86,59 +122,58 @@ export const runWeeklyDistribution = () => {
   // Calcular o Pool da Semana
   // Pool = Soma(Depositos) - Soma(Saldos Atuais)
   // Isso assume que o balance só diminui por penalidade.
-  // Se houver outras transações, essa lógica precisa ser mais robusta somando as penalidades da semana.
-  // Para simplificar e ser robusto: O Pool é a soma de tudo que foi perdido.
-  // Mas como não temos histórico fácil de "perdas da semana", vamos pelo diferencial.
-
   const totalDeposited = activeUsers.reduce((acc, u) => acc + u.depositedValue, 0);
   const currentTotalBalance = activeUsers.reduce((acc, u) => acc + u.balance, 0);
 
   const weeklyPool = totalDeposited - currentTotalBalance;
 
   if (weeklyPool <= 0.01) { // Margem de erro float
-    // Resetar misses para nova semana mesmo sem pool
-    activeUsers.forEach(u => u.weeklyMisses = 0);
+    // Resetar misses e scores para nova semana
+    activeUsers.forEach(u => {
+      u.weeklyMisses = 0;
+      u.weeklyScore = 0;
+    });
     saveDB(db);
     return { message: "Sem valor no pool para distribuir. Semana reiniciada." };
   }
 
-  // Quem recebe? "Proporcional ao desempenho"
-  // Vamos usar o checkIns count da semana se tivessemos, ou weeklyScore (se implementado).
-  // Como não estamos trackeando weeklyScore dia a dia no DB ainda (só no CheckIn avulso), 
-  // vamos usar a regra: Quem tem saldo > 0 (não foi eliminado pelo Kill Switch) e tem pelo menos 1 checkin?
-  // Ou melhor: Todos os ativos que não zeraram?
-  // User Prompt: "Continua elegível para receber parte do pool, proporcionalmente ao desempenho"
-  // Vamos simplificar: Distribuição igual para quem não zerou saldo? Ou baseado no saldo restante (investidor maior ganha mais)?
-  // Vamos assumir "Proporcional ao Saldo Restante" (Skin in the game) é uma métrica justa de desempenho financeiro + presença.
-
-  const eligibleUsers = activeUsers.filter(u => u.balance > 0);
+  // Distribuição baseada em WEEKLY SCORE
+  // Quem tem mais pontos recebe mais.
+  const eligibleUsers = activeUsers.filter(u => (u.weeklyScore || 0) > 0 && u.balance > 0);
 
   if (eligibleUsers.length === 0) {
-    return { message: "Ninguém elegível para receber o pool. A Casa venceu." };
+    // Ninguém pontuou? Pool acumula ou casa vence?
+    // Vamos deixar acumular (não distribuir) ou zerar score?
+    // Se ninguém pontuou, ninguém treinou. Pool fica lá (balance reduzido).
+    activeUsers.forEach(u => {
+      u.weeklyMisses = 0;
+      u.weeklyScore = 0;
+    });
+    saveDB(db);
+    return { message: "Ninguém pontuou na semana. Pool retido." };
   }
 
-  const totalEligibleBalance = eligibleUsers.reduce((acc, u) => acc + u.balance, 0);
+  const totalWeeklyScore = eligibleUsers.reduce((acc, u) => acc + (u.weeklyScore || 0), 0);
 
   eligibleUsers.forEach(user => {
-    const share = (user.balance / totalEligibleBalance) * weeklyPool;
+    const userScore = user.weeklyScore || 0;
+    const share = (userScore / totalWeeklyScore) * weeklyPool;
+
     user.balance += share;
 
     addDistribution({
       userId: user.id,
       amount: share,
       date: today,
-      reason: `DISTRIBUIÇÃO SEMANAL (Pool: R$ ${weeklyPool.toFixed(2)})`
+      reason: `DISTRIBUIÇÃO SEMANAL (Sua Pontuação: ${userScore}pts)`
     });
-
-    // Reset para nova semana
-    user.weeklyMisses = 0;
   });
 
-  // Resetar misses dos que zeraram também (para recomeçar? Ou eles estão eliminados?)
-  // Se "Perde 100%", normalmente é Game Over. Mas o prompt não diz "Eliminado do jogo", só perde o valor.
-  // Se ele depositar de novo, volta. Se não, balance 0.
-  const zeroedUsers = activeUsers.filter(u => u.balance === 0);
-  zeroedUsers.forEach(u => u.weeklyMisses = 0);
+  // Reset Geral para nova semana
+  activeUsers.forEach(u => {
+    u.weeklyMisses = 0;
+    u.weeklyScore = 0; // Resetar pontuação semanal
+  });
 
   saveDB(db);
 
