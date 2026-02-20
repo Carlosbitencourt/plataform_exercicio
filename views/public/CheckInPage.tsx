@@ -100,7 +100,7 @@ const CheckInPage: React.FC = () => {
 
     setTimeout(() => {
       if (foundUser) {
-        if (foundUser.status === UserStatus.ELIMINATED) {
+        if (foundUser.status === UserStatus.ELIMINATED || foundUser.status === 'eliminado') {
           setError('CONTA BLOQUEADA. PROCURE O ADMINISTRADOR.');
         } else {
           setUser(foundUser);

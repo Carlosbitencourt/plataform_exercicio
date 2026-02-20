@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Clock, Search, Timer, CheckCircle2, AlertCircle } from 'lucide-react';
 import { subscribeToUsers, subscribeToCheckIns } from '../../services/db';
-import { User as UserType, CheckIn } from '../../types';
+import { User as UserType, CheckIn, UserStatus } from '../../types';
 
 interface RankedUser {
   user: UserType;
@@ -70,24 +70,63 @@ const Ranking: React.FC = () => {
   useEffect(() => {
     if (users.length === 0) return;
 
-    // Weekly Ranking: Sort by weeklyScore
+    // Weekly Ranking: Calculate strictly from check-ins for the current week
+    // This ensures it resets automatically on Sunday without needing a database update
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Go back to Sunday
+    startOfWeek.setHours(0, 0, 0, 0);
+
     const weeklyUsers = users
-      .filter(u => u.status === 'ativo' && (u.weeklyScore || 0) > 0)
-      .sort((a, b) => (b.weeklyScore || 0) - (a.weeklyScore || 0));
+      .map(user => {
+        // STRICT CALCULATION: Ignore user.weeklyScore from DB
+        const userCheckIns = checkIns.filter(c => c.userId === user.id);
+
+        const weeklyScore = userCheckIns.reduce((acc, c) => {
+          // Parse check-in date (YYYY-MM-DD)
+          const [year, month, day] = c.date.split('-').map(Number);
+          const cDate = new Date(year, month - 1, day);
+          cDate.setHours(12, 0, 0, 0); // Avoid timezone boundary issues
+
+          return cDate >= startOfWeek ? acc + (c.score || 0) : acc;
+        }, 0);
+
+        return { ...user, weeklyScore };
+      })
+      .filter(u => {
+        // Show if they have score OR are active (but 0 score will be at bottom)
+        const hasScore = u.weeklyScore > 0;
+        if (hasScore) return true;
+        return u.status === 'ativo' || u.status === UserStatus.ACTIVE || u.status === 'active';
+      })
+      .sort((a, b) => b.weeklyScore - a.weeklyScore);
 
     setWeeklyRanking(weeklyUsers);
-  }, [users]);
+  }, [users, checkIns]);
 
   useEffect(() => {
     if (users.length === 0) return;
 
     // General Ranking: Use totalScore directly from user document
+    // Fallback: Calculate if missing
     const usersWithScores = users
-      .filter(u => u.status === 'ativo' && (u.totalScore || 0) > 0)
+      .map(user => {
+        if ((user.totalScore || 0) === 0) {
+          const userCheckIns = checkIns.filter(c => c.userId === user.id);
+          const calculatedTotal = userCheckIns.reduce((acc, c) => acc + (c.score || 0), 0);
+          return { ...user, totalScore: calculatedTotal > 0 ? calculatedTotal : user.totalScore };
+        }
+        return user;
+      })
+      .filter(u => {
+        const hasScore = (u.totalScore || 0) > 0;
+        if (hasScore) return true;
+        return u.status === 'ativo' || u.status === UserStatus.ACTIVE || u.status === 'active';
+      })
       .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 
     setGeneralRanking(usersWithScores as (UserType & { totalScore: number })[]);
-  }, [users]);
+  }, [users, checkIns]);
 
   const getMedalColor = (index: number) => {
     switch (index) {
@@ -110,28 +149,28 @@ const Ranking: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
       <div className="text-center space-y-4">
-        <div className="inline-flex flex-col sm:flex-row bg-white p-1 rounded-2xl sm:rounded-full border border-slate-200 shadow-sm relative gap-1 sm:gap-0 w-full sm:w-auto">
+        <div className="bg-white p-1 rounded-full border border-slate-200 shadow-sm relative w-full mx-auto max-w-sm grid grid-cols-3">
           <div
-            className={`hidden sm:block absolute top-1 bottom-1 w-[33.33%] bg-black rounded-full transition-all duration-300 ${view === 'daily' ? 'left-1' :
-              view === 'weekly' ? 'left-[33.33%]' :
-                'left-[66.66%] -translate-x-1'
+            className={`absolute top-1 bottom-1 w-[32%] bg-black rounded-full transition-all duration-300 ${view === 'daily' ? 'left-1' :
+              view === 'weekly' ? 'left-[34%]' :
+                'left-[67%] -translate-x-[2px]'
               }`}
           ></div>
           <button
             onClick={() => setView('daily')}
-            className={`relative z-10 px-4 sm:px-8 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors flex-1 sm:flex-none ${view === 'daily' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
+            className={`relative z-10 py-2.5 sm:py-2 rounded-full text-[10px] flex items-center justify-center font-black uppercase tracking-widest transition-colors ${view === 'daily' ? 'text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
           >
             Diário
           </button>
           <button
             onClick={() => setView('weekly')}
-            className={`relative z-10 px-4 sm:px-8 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors flex-1 sm:flex-none ${view === 'weekly' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
+            className={`relative z-10 py-2.5 sm:py-2 rounded-full text-[10px] flex items-center justify-center font-black uppercase tracking-widest transition-colors ${view === 'weekly' ? 'text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
           >
             Semanal
           </button>
           <button
             onClick={() => setView('general')}
-            className={`relative z-10 px-4 sm:px-8 py-2 rounded-xl sm:rounded-full text-[10px] font-black uppercase tracking-widest transition-colors flex-1 sm:flex-none ${view === 'general' ? 'bg-black text-lime-400 sm:bg-transparent sm:text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
+            className={`relative z-10 py-2.5 sm:py-2 rounded-full text-[10px] flex items-center justify-center font-black uppercase tracking-widest transition-colors ${view === 'general' ? 'text-lime-400' : 'text-slate-500 hover:text-slate-900'}`}
           >
             Geral
           </button>
@@ -155,7 +194,7 @@ const Ranking: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         <div className="bg-white rounded-[2rem] border-2 border-slate-200 overflow-hidden shadow-xl">
           <div className="grid grid-cols-1 divide-y-2 divide-slate-100">
-            {view === 'daily' ? (
+            {view === 'daily' && (
               rankedUsers.length > 0 ? rankedUsers.map((item, index) => (
                 <div key={item.user.id} className="flex items-center p-3 sm:p-4 hover:bg-slate-50 transition-colors group">
                   <div className="mr-3 sm:mr-5 relative">
@@ -229,7 +268,8 @@ const Ranking: React.FC = () => {
                   </div>
                 </div>
               )
-            ) : (
+            )}
+            {view === 'general' && (
               generalRanking.length > 0 ? generalRanking.map((user, index) => (
                 <div key={user.id} className="flex items-center p-3 sm:p-4 hover:bg-slate-50 transition-colors group">
                   <div className="mr-3 sm:mr-5 relative">

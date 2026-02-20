@@ -53,6 +53,19 @@ export const updateUser = async (user: User) => {
 };
 
 export const deleteUser = async (id: string) => {
+    // 1. Delete all check-ins for this user
+    const checkInsQuery = query(collection(db, CHECKINS_COLLECTION), where("userId", "==", id));
+    const checkInsSnapshot = await getDocs(checkInsQuery);
+    const checkInDeletions = checkInsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(checkInDeletions);
+
+    // 2. Delete all distributions for this user
+    const distributionsQuery = query(collection(db, DISTRIBUTIONS_COLLECTION), where("userId", "==", id));
+    const distributionsSnapshot = await getDocs(distributionsQuery);
+    const distributionDeletions = distributionsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(distributionDeletions);
+
+    // 3. Finally, delete the user
     await deleteDoc(doc(db, USERS_COLLECTION, id));
 };
 
