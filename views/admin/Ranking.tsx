@@ -139,10 +139,10 @@ const Ranking: React.FC = () => {
           <div className="grid grid-cols-1 divide-y-2 divide-slate-100">
             {view === 'daily' ? (
               rankedUsers.length > 0 ? rankedUsers.map((item, index) => (
-                <div key={item.user.id} className="flex items-center p-4 hover:bg-slate-50 transition-colors group">
-                  <div className="mr-5 relative">
+                <div key={item.user.id} className="flex items-center p-3 sm:p-4 hover:bg-slate-50 transition-colors group">
+                  <div className="mr-3 sm:mr-5 relative">
                     {item.user.photoUrl ? (
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center border-4 shadow-lg transition-transform group-hover:scale-110 overflow-hidden relative bg-white ${getBorderColor(index)}`}>
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center border-4 shadow-lg transition-transform group-hover:scale-110 overflow-hidden relative bg-white ${getBorderColor(index)}`}>
                         <img
                           src={item.user.photoUrl}
                           alt={item.user.name}
@@ -163,7 +163,7 @@ const Ranking: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`}>
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center font-black text-lg italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`}>
                         #{index + 1}
                       </div>
                     )}
@@ -171,7 +171,7 @@ const Ranking: React.FC = () => {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="text-lg font-black italic uppercase font-sport text-slate-900 truncate">
+                      <h3 className="text-sm sm:text-lg font-black italic uppercase font-sport text-slate-900 truncate">
                         {item.user.name}
                       </h3>
                       {index === 0 && (
@@ -180,7 +180,7 @@ const Ranking: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       <span className="flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-lime-500" />
                         Check-in: <span className="text-slate-900 font-sport italic text-xs">{item.checkInTime}</span>
@@ -193,7 +193,7 @@ const Ranking: React.FC = () => {
 
                   <div className="text-right pl-3">
                     <p className="text-[9px] font-black text-lime-500 uppercase tracking-widest mb-0.5">Pontos Ganhos</p>
-                    <p className="font-black font-sport italic text-slate-900 text-2xl leading-none">
+                    <p className="font-black font-sport italic text-slate-900 text-lg sm:text-2xl leading-none">
                       +{item.checkIn.score.toFixed(0)} <span className="text-[10px] uppercase not-italic font-sans tracking-tighter">pts</span>
                     </p>
                   </div>
@@ -213,10 +213,10 @@ const Ranking: React.FC = () => {
               )
             ) : (
               generalRanking.length > 0 ? generalRanking.map((user, index) => (
-                <div key={user.id} className="flex items-center p-4 hover:bg-slate-50 transition-colors group">
-                  <div className="mr-5 relative">
+                <div key={user.id} className="flex items-center p-3 sm:p-4 hover:bg-slate-50 transition-colors group">
+                  <div className="mr-3 sm:mr-5 relative">
                     {user.photoUrl ? (
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center border-4 shadow-lg transition-transform group-hover:scale-110 overflow-hidden relative bg-white ${getBorderColor(index)}`}>
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center border-4 shadow-lg transition-transform group-hover:scale-110 overflow-hidden relative bg-white ${getBorderColor(index)}`}>
                         <img
                           src={user.photoUrl}
                           alt={user.name}
@@ -237,7 +237,7 @@ const Ranking: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`}>
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center font-black text-lg italic font-sport border-2 shadow-lg transition-transform group-hover:scale-110 ${getMedalColor(index)}`}>
                         #{index + 1}
                       </div>
                     )}
@@ -245,7 +245,7 @@ const Ranking: React.FC = () => {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="text-lg font-black italic uppercase font-sport text-slate-900 truncate">
+                      <h3 className="text-sm sm:text-lg font-black italic uppercase font-sport text-slate-900 truncate">
                         {user.name}
                       </h3>
                       {index === 0 && (
@@ -254,7 +254,7 @@ const Ranking: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       ID: {user.uniqueCode}
                       <span className="mx-1">•</span>
                       <span className="text-slate-500">Saldo: <span className="text-slate-900">R$ {user.balance.toFixed(2)}</span></span>
@@ -263,7 +263,7 @@ const Ranking: React.FC = () => {
 
                   <div className="text-right pl-3">
                     <p className="text-[9px] font-black text-lime-500 uppercase tracking-widest mb-0.5">Total de Pontos</p>
-                    <p className="font-black font-sport italic text-slate-900 text-3xl leading-none">
+                    <p className="font-black font-sport italic text-slate-900 text-lg sm:text-3xl leading-none">
                       {user.totalScore.toFixed(0)} <span className="text-[10px] uppercase not-italic font-sans tracking-tighter">pts</span>
                     </p>
                   </div>
