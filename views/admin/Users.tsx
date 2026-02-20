@@ -228,14 +228,14 @@ const Users: React.FC = () => {
           {filteredUsers.map((user) => (
             <div key={user.id} className="bg-white rounded-2xl p-4 border-2 border-slate-200 shadow-sm relative overflow-hidden">
               <div className={`absolute top-0 right-0 px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-bl-xl border-b-2 border-l-2 ${user.status === UserStatus.ACTIVE ? 'bg-lime-400 text-black border-lime-500' :
-                  user.status === UserStatus.PENDING ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                    'bg-rose-50 text-rose-600 border-rose-200'
+                user.status === UserStatus.PENDING ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                  'bg-rose-50 text-rose-600 border-rose-200'
                 }`}>
                 {user.status === UserStatus.ACTIVE ? 'Em Competição' : user.status === UserStatus.PENDING ? 'Em Análise' : 'Eliminado'}
               </div>
 
               <div className="flex items-center gap-4 mt-2">
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-lime-600 font-black text-xl border-2 border-slate-200 shadow-sm overflow-hidden shrink-0">
+                <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center text-lime-600 font-black text-2xl border-2 border-slate-200 shadow-sm overflow-hidden shrink-0">
                   {user.photoUrl ? (
                     <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
                   ) : (
@@ -301,8 +301,8 @@ const Users: React.FC = () => {
             {filteredUsers.map((user) => (
               <tr key={user.id} className="hover:bg-slate-50/80 transition-colors group">
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-lime-600 font-black text-base border-2 border-slate-200 shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center text-lime-600 font-black text-2xl border-2 border-slate-200 shadow-sm overflow-hidden">
                       {user.photoUrl ? (
                         <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
                       ) : (
