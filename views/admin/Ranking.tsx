@@ -81,18 +81,13 @@ const Ranking: React.FC = () => {
   useEffect(() => {
     if (users.length === 0) return;
 
-    // General Ranking: Calculate total score from check-ins
+    // General Ranking: Use totalScore directly from user document
     const usersWithScores = users
-      .filter(u => u.status === 'ativo')
-      .map(user => {
-        const userCheckIns = checkIns.filter(c => c.userId === user.id);
-        const totalScore = userCheckIns.reduce((acc, c) => acc + (c.score || 0), 0);
-        return { ...user, totalScore };
-      })
-      .sort((a, b) => b.totalScore - a.totalScore);
+      .filter(u => u.status === 'ativo' && (u.totalScore || 0) > 0)
+      .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 
-    setGeneralRanking(usersWithScores);
-  }, [users, checkIns]);
+    setGeneralRanking(usersWithScores as (UserType & { totalScore: number })[]);
+  }, [users]);
 
   const getMedalColor = (index: number) => {
     switch (index) {
@@ -118,8 +113,8 @@ const Ranking: React.FC = () => {
         <div className="inline-flex flex-col sm:flex-row bg-white p-1 rounded-2xl sm:rounded-full border border-slate-200 shadow-sm relative gap-1 sm:gap-0 w-full sm:w-auto">
           <div
             className={`hidden sm:block absolute top-1 bottom-1 w-[33.33%] bg-black rounded-full transition-all duration-300 ${view === 'daily' ? 'left-1' :
-                view === 'weekly' ? 'left-[33.33%]' :
-                  'left-[66.66%] -translate-x-1'
+              view === 'weekly' ? 'left-[33.33%]' :
+                'left-[66.66%] -translate-x-1'
               }`}
           ></div>
           <button
