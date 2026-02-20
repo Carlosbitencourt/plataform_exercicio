@@ -44,7 +44,8 @@ service cloud.firestore {
       // but restricted by logic in Cloud Functions or refined here.
       // For simplicity in this "integration" phase without backend functions:
       allow create: if true; 
-      allow update, delete: if isAdmin();
+      allow update: if true; // Allowed for photo upload after check-in
+      allow delete: if isAdmin();
     }
 
     // Distributions collection

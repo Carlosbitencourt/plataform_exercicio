@@ -68,6 +68,7 @@ export interface CheckIn {
   timeSlotId: string;
   score: number;
   address?: string;
+  photoUrl?: string;
 }
 
 export interface Distribution {

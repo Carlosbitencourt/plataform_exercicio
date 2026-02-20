@@ -4,12 +4,13 @@ import { User, UserStatus, TimeSlot, CheckIn } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, addCheckIn, updateUser } from '../../services/db';
 import { calculateCheckInScore } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
-import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin, Map, X, ExternalLink, Calendar, Star, Navigation } from 'lucide-react';
+import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin, Map, X, ExternalLink, Calendar, Star, Navigation, Camera, Loader2, Image as ImageIcon } from 'lucide-react';
 import {
   ensureAuth,
   getUserLocation,
   safeAddDoc,
-  safeUpdateDoc
+  safeUpdateDoc,
+  safeUploadFile
 } from '../../services/firebaseGuard';
 import { LocationResult } from '../../services/geolocation';
 
@@ -34,6 +35,9 @@ const CheckInPage: React.FC = () => {
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<TimeSlot | null>(null);
+  const [lastCheckInId, setLastCheckInId] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
 
   // iOS Detection for specific instructions
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
@@ -262,7 +266,7 @@ const CheckInPage: React.FC = () => {
     const today = getTodayISO();
 
     // Use Safe Guard for Firestore Writes
-    await safeAddDoc('checkIns', {
+    const checkInRef = await safeAddDoc('checkIns', {
       userId: user!.id,
       date: today,
       time: nowStr,
@@ -275,6 +279,8 @@ const CheckInPage: React.FC = () => {
       createdAt: new Date().toISOString()
     });
 
+    setLastCheckInId(checkInRef.id);
+
     const updatedUser = {
       ...user!,
       weeklyScore: (user!.weeklyScore || 0) + score,
@@ -283,6 +289,25 @@ const CheckInPage: React.FC = () => {
     // We update the user stats using safeUpdateDoc
     await safeUpdateDoc('users', user!.id, updatedUser);
     setSuccess(true);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !lastCheckInId) return;
+
+    setUploadingPhoto(true);
+    setError(null);
+
+    try {
+      const url = await safeUploadFile(file, `checkins/${lastCheckInId}/${Date.now()}_${file.name}`);
+      await safeUpdateDoc('checkIns', lastCheckInId, { photoUrl: url });
+      setUploadedPhotoUrl(url);
+    } catch (err: any) {
+      console.error('Photo upload error:', err);
+      setError(err.message || 'Erro ao enviar foto.');
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   if (success) {
@@ -316,12 +341,65 @@ const CheckInPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <button onClick={() => window.location.reload()} className="w-full py-4 bg-white text-black rounded-xl font-black uppercase italic tracking-tighter hover:bg-lime-400 transition-all text-lg">
-            Novo Registro
-          </button>
-          <Link to="/ranking" className="block w-full py-4 bg-transparent border-2 border-zinc-700 text-zinc-400 rounded-xl font-black uppercase italic tracking-tighter hover:border-lime-400 hover:text-lime-400 transition-all text-lg pt-3">
-            Ver Ranking do Dia
-          </Link>
+          <div className="space-y-4">
+            {!uploadedPhotoUrl ? (
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  id="photo-upload"
+                  onChange={handlePhotoUpload}
+                  disabled={uploadingPhoto}
+                />
+                <label
+                  htmlFor="photo-upload"
+                  className={`w-full py-4 rounded-xl font-black uppercase italic tracking-tighter transition-all text-lg flex items-center justify-center gap-2 cursor-pointer ${uploadingPhoto
+                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                    : 'bg-lime-400 text-black hover:bg-white shadow-[0_0_20px_rgba(163,230,53,0.3)]'
+                    }`}
+                >
+                  {uploadingPhoto ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      ENVIANDO...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5" />
+                      REGISTRAR EXERCÍCIO
+                    </>
+                  )}
+                </label>
+                <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest mt-2 text-center">
+                  Envie uma foto para validar seu treino
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 animate-in fade-in zoom-in-95 duration-500">
+                <div className="relative group aspect-square max-w-[200px] mx-auto rounded-2xl overflow-hidden border-2 border-lime-400/50 shadow-[0_0_30px_rgba(163,230,53,0.2)]">
+                  <img src={uploadedPhotoUrl} alt="Check-in" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                  <div className="absolute bottom-3 left-0 right-0 flex justify-center">
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-lime-400 text-black text-[9px] font-black uppercase rounded-lg shadow-lg">
+                      <CheckCircle className="w-3 h-3" />
+                      FOTO ENVIADA
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 pt-2">
+              <button onClick={() => window.location.reload()} className="w-full py-4 bg-white text-black rounded-xl font-black uppercase italic tracking-tighter hover:bg-lime-400 transition-all text-lg pt-3">
+                Novo Registro
+              </button>
+              <Link to="/ranking" className="block w-full py-4 bg-transparent border-2 border-zinc-700 text-zinc-400 rounded-xl font-black uppercase italic tracking-tighter hover:border-lime-400 hover:text-lime-400 transition-all text-lg pt-3">
+                Ver Ranking do Dia
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
