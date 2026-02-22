@@ -224,10 +224,19 @@ const TimeSlots: React.FC = () => {
       return;
     }
     try {
+      // Ensure intervals[0] matches principal times and filter out empty ones
+      const firstInterval = { startTime: formData.startTime, endTime: formData.endTime };
+      const extraIntervals = formData.intervals.slice(1);
+      const cleanedIntervals = [firstInterval, ...extraIntervals].filter(
+        inv => inv.startTime.trim() !== '' && inv.endTime.trim() !== ''
+      );
+
+      const dataToSave = { ...formData, intervals: cleanedIntervals };
+
       if (editingSlotId) {
-        await updateTimeSlot({ id: editingSlotId, ...formData });
+        await updateTimeSlot({ id: editingSlotId, ...dataToSave });
       } else {
-        await addTimeSlot(formData);
+        await addTimeSlot(dataToSave);
       }
 
       setFormData({
@@ -576,9 +585,19 @@ const TimeSlots: React.FC = () => {
                     <div>
                       <h4 className="text-lg font-black text-slate-900 uppercase italic font-sport tracking-widest">{slot.name}</h4>
                       <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                        <span className="px-2.5 py-0.5 bg-black text-white text-[10px] font-black rounded-md uppercase tracking-widest">
-                          {slot.startTime} - {slot.endTime}
-                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {slot.intervals && slot.intervals.length > 0 ? (
+                            slot.intervals.map((interval, i) => (
+                              <span key={i} className="px-2.5 py-0.5 bg-black text-white text-[10px] font-black rounded-md uppercase tracking-widest whitespace-nowrap">
+                                {interval.startTime} - {interval.endTime}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="px-2.5 py-0.5 bg-black text-white text-[10px] font-black rounded-md uppercase tracking-widest">
+                              {slot.startTime} - {slot.endTime}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex gap-1">
                           {DAYS.filter(d => slot.days?.includes(d.id)).map(d => (
                             <span key={d.id} className="text-[8px] font-black text-lime-600 bg-lime-50 px-1.5 py-0.5 rounded border border-lime-100 uppercase">

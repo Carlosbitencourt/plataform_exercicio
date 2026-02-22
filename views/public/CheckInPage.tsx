@@ -688,15 +688,17 @@ const CheckInPage: React.FC = () => {
                         <div>
                           <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Horários de Check-in</p>
                           <div className="flex flex-wrap gap-2">
-                            {selectedLocation.intervals && selectedLocation.intervals.length > 0 ? (
-                              selectedLocation.intervals.map((interval, i) => (
-                                <p key={i} className="text-xl font-black text-white font-sport italic whitespace-nowrap">
-                                  {interval.startTime} <span className="text-zinc-600 not-italic mx-0.5">-</span> {interval.endTime}
-                                </p>
-                              ))
+                            {selectedLocation.intervals && selectedLocation.intervals.filter(inv => inv.startTime.trim() !== '' || inv.endTime.trim() !== '').length > 0 ? (
+                              selectedLocation.intervals
+                                .filter(inv => inv.startTime.trim() !== '' || inv.endTime.trim() !== '')
+                                .map((interval, i) => (
+                                  <p key={i} className="text-2xl font-black text-lime-400 font-sport italic whitespace-nowrap bg-lime-400/10 px-3 py-1 rounded-xl border border-lime-400/20 shadow-[0_0_20px_rgba(163,230,53,0.1)]">
+                                    {interval.startTime} <span className="text-lime-400/40 not-italic mx-1">-</span> {interval.endTime}
+                                  </p>
+                                ))
                             ) : (
-                              <p className="text-xl font-black text-white font-sport italic">
-                                {selectedLocation.startTime} <span className="text-zinc-600 not-italic mx-1">-</span> {selectedLocation.endTime}
+                              <p className="text-2xl font-black text-lime-400 font-sport italic bg-lime-400/10 px-3 py-1 rounded-xl border border-lime-400/20 shadow-[0_0_20px_rgba(163,230,53,0.1)]">
+                                {selectedLocation.startTime} <span className="text-lime-400/40 not-italic mx-1">-</span> {selectedLocation.endTime}
                               </p>
                             )}
                           </div>
@@ -776,17 +778,21 @@ const CheckInPage: React.FC = () => {
                                   {slot.weight * 10} PTS
                                 </span>
                               </div>
-                              <div className="flex flex-wrap gap-2 text-zinc-500 text-xs mt-1">
-                                <Clock className="w-3 h-3 mt-0.5" />
+                              <div className="flex flex-wrap items-center gap-2 mt-2">
+                                <Clock className="w-3 h-3 text-lime-400" />
                                 <div className="flex flex-wrap gap-1.5">
-                                  {slot.intervals && slot.intervals.length > 0 ? (
-                                    slot.intervals.map((interval, i) => (
-                                      <span key={i} className="font-mono bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded text-[10px]">
-                                        {interval.startTime} - {interval.endTime}
-                                      </span>
-                                    ))
+                                  {slot.intervals && slot.intervals.filter(inv => inv.startTime.trim() !== '' || inv.endTime.trim() !== '').length > 0 ? (
+                                    slot.intervals
+                                      .filter(inv => inv.startTime.trim() !== '' || inv.endTime.trim() !== '')
+                                      .map((interval, i) => (
+                                        <span key={i} className="text-[10px] font-black font-mono bg-lime-400/10 text-lime-400 border border-lime-400/20 px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-[0_0_15px_rgba(163,230,53,0.1)]">
+                                          {interval.startTime} <span className="opacity-40 font-sans">-</span> {interval.endTime}
+                                        </span>
+                                      ))
                                   ) : (
-                                    <span className="font-mono">{slot.startTime} - {slot.endTime}</span>
+                                    <span className="text-[10px] font-black font-mono bg-lime-400/10 text-lime-400 border border-lime-400/20 px-2 py-0.5 rounded-lg">
+                                      {slot.startTime} <span className="opacity-40 font-sans">-</span> {slot.endTime}
+                                    </span>
                                   )}
                                 </div>
                               </div>
