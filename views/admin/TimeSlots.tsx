@@ -39,6 +39,7 @@ const TimeSlots: React.FC = () => {
     name: '',
     startTime: '',
     endTime: '',
+    intervals: [] as { startTime: string; endTime: string }[],
     weight: 1,
     days: [1, 2, 3, 4, 5], // Default SEG-SEX
     locationName: 'ACADEMIA SEDE',
@@ -241,7 +242,8 @@ const TimeSlots: React.FC = () => {
         radius: GYM_LOCATION.radius,
         categoryId: '',
         photoUrl: '',
-        city: ''
+        city: '',
+        intervals: []
       });
       setEditingSlotId(null);
       setIsModalOpen(false);
@@ -269,7 +271,8 @@ const TimeSlots: React.FC = () => {
       radius: slot.radius,
       categoryId: slot.categoryId || '',
       photoUrl: slot.photoUrl || '',
-      city: slot.city || ''
+      city: slot.city || '',
+      intervals: slot.intervals || []
     });
     setIsModalOpen(true);
   };
@@ -288,7 +291,8 @@ const TimeSlots: React.FC = () => {
       radius: slot.radius,
       categoryId: slot.categoryId || '',
       photoUrl: slot.photoUrl || '',
-      city: slot.city || ''
+      city: slot.city || '',
+      intervals: slot.intervals || []
     });
     setIsModalOpen(true);
   };
@@ -321,7 +325,8 @@ const TimeSlots: React.FC = () => {
         radius: GYM_LOCATION.radius,
         categoryId: '',
         photoUrl: '',
-        city: ''
+        city: '',
+        intervals: []
       });
       setIsModalOpen(true);
     }}
@@ -419,9 +424,19 @@ const TimeSlots: React.FC = () => {
                     <div>
                       <h4 className="text-lg font-black text-slate-900 uppercase italic font-sport tracking-widest">{slot.name}</h4>
                       <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                        <span className="px-2.5 py-0.5 bg-black text-white text-[10px] font-black rounded-md uppercase tracking-widest">
-                          {slot.startTime} - {slot.endTime}
-                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {slot.intervals && slot.intervals.length > 0 ? (
+                            slot.intervals.map((interval, i) => (
+                              <span key={i} className="px-2.5 py-0.5 bg-black text-white text-[10px] font-black rounded-md uppercase tracking-widest whitespace-nowrap">
+                                {interval.startTime} - {interval.endTime}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="px-2.5 py-0.5 bg-black text-white text-[10px] font-black rounded-md uppercase tracking-widest">
+                              {slot.startTime} - {slot.endTime}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex gap-1">
                           {DAYS.filter(d => slot.days?.includes(d.id)).map(d => (
                             <span key={d.id} className="text-[8px] font-black text-lime-600 bg-lime-50 px-1.5 py-0.5 rounded border border-lime-100 uppercase">
@@ -494,7 +509,8 @@ const TimeSlots: React.FC = () => {
                 longitude: GYM_LOCATION.lng,
                 radius: GYM_LOCATION.radius,
                 categoryId: '',
-                photoUrl: ''
+                photoUrl: '',
+                intervals: []
               });
               setIsModalOpen(true);
             }}
@@ -667,27 +683,108 @@ const TimeSlots: React.FC = () => {
                     })()}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Abertura</label>
-                    <input
-                      required
-                      type="time"
-                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs"
-                      value={formData.startTime}
-                      onChange={e => setFormData({ ...formData, startTime: e.target.value })}
-                    />
+                <div className="space-y-3 bg-slate-50 p-3 rounded-xl border-2 border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Horários Disponíveis</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newIntervals = [...formData.intervals, { startTime: '', endTime: '' }];
+                        setFormData({ ...formData, intervals: newIntervals });
+                      }}
+                      className="p-1 bg-black text-lime-400 rounded-md hover:bg-zinc-800 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Fechamento</label>
-                    <input
-                      required
-                      type="time"
-                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs"
-                      value={formData.endTime}
-                      onChange={e => setFormData({ ...formData, endTime: e.target.value })}
-                    />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Abertura Principal</label>
+                      <input
+                        required
+                        type="time"
+                        className="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:ring-2 focus:ring-lime-400 transition-all outline-none"
+                        value={formData.startTime}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setFormData(prev => {
+                            const newIntervals = [...prev.intervals];
+                            if (newIntervals.length === 0) {
+                              newIntervals.push({ startTime: val, endTime: prev.endTime });
+                            } else {
+                              newIntervals[0].startTime = val;
+                            }
+                            return { ...prev, startTime: val, intervals: newIntervals };
+                          });
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Fechamento Principal</label>
+                      <input
+                        required
+                        type="time"
+                        className="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:ring-2 focus:ring-lime-400 transition-all outline-none"
+                        value={formData.endTime}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setFormData(prev => {
+                            const newIntervals = [...prev.intervals];
+                            if (newIntervals.length === 0) {
+                              newIntervals.push({ startTime: prev.startTime, endTime: val });
+                            } else {
+                              newIntervals[0].endTime = val;
+                            }
+                            return { ...prev, endTime: val, intervals: newIntervals };
+                          });
+                        }}
+                      />
+                    </div>
                   </div>
+
+                  {formData.intervals.slice(1).map((interval, index) => (
+                    <div key={index + 1} className="grid grid-cols-[1fr_1fr_40px] gap-2 items-end animate-in slide-in-from-top-1 duration-200">
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Abertura Extra</label>
+                        <input
+                          required
+                          type="time"
+                          className="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:ring-2 focus:ring-lime-400 transition-all outline-none"
+                          value={interval.startTime}
+                          onChange={e => {
+                            const newIntervals = [...formData.intervals];
+                            newIntervals[index + 1].startTime = e.target.value;
+                            setFormData({ ...formData, intervals: newIntervals });
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Fechamento Extra</label>
+                        <input
+                          required
+                          type="time"
+                          className="w-full px-3 py-2 bg-white border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:ring-2 focus:ring-lime-400 transition-all outline-none"
+                          value={interval.endTime}
+                          onChange={e => {
+                            const newIntervals = [...formData.intervals];
+                            newIntervals[index + 1].endTime = e.target.value;
+                            setFormData({ ...formData, intervals: newIntervals });
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newIntervals = formData.intervals.filter((_, i) => i !== index + 1);
+                          setFormData({ ...formData, intervals: newIntervals });
+                        }}
+                        className="h-9 flex items-center justify-center bg-rose-50 text-rose-500 border-2 border-rose-100 rounded-lg hover:bg-rose-100 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2">Dias de Ativação</label>

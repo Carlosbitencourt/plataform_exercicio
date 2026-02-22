@@ -177,6 +177,21 @@ const CheckInPage: React.FC = () => {
 
     const activeSlot = timeSlots.find(slot => {
       if (slot.days && !slot.days.includes(dayOfWeek)) return false;
+
+      // Check multiple intervals if they exist
+      if (slot.intervals && slot.intervals.length > 0) {
+        return slot.intervals.some(interval => {
+          const startMin = timeToMinutes(interval.startTime);
+          let endMin = timeToMinutes(interval.endTime);
+          if (endMin === 0) endMin = 1440;
+          if (endMin < startMin) {
+            return currentMinutes >= startMin || currentMinutes < endMin;
+          }
+          return currentMinutes >= startMin && currentMinutes < endMin;
+        });
+      }
+
+      // Fallback to legacy single interval
       const startMin = timeToMinutes(slot.startTime);
       let endMin = timeToMinutes(slot.endTime);
       if (endMin === 0) endMin = 1440;
@@ -228,6 +243,19 @@ const CheckInPage: React.FC = () => {
     const activeSlot = timeSlots.find(slot => {
       // Re-find active slot (safe to assume exists as verified in preCheck)
       if (slot.days && !slot.days.includes(dayOfWeek)) return false;
+
+      // Check multiple intervals if they exist
+      if (slot.intervals && slot.intervals.length > 0) {
+        return slot.intervals.some(interval => {
+          const startMin = timeToMinutes(interval.startTime);
+          let endMin = timeToMinutes(interval.endTime);
+          if (endMin === 0) endMin = 1440;
+          if (endMin < startMin) return currentMinutes >= startMin || currentMinutes < endMin;
+          return currentMinutes >= startMin && currentMinutes < endMin;
+        });
+      }
+
+      // Fallback to legacy single interval
       const startMin = timeToMinutes(slot.startTime);
       let endMin = timeToMinutes(slot.endTime);
       if (endMin === 0) endMin = 1440;
@@ -658,10 +686,20 @@ const CheckInPage: React.FC = () => {
                       <div className="flex items-start gap-4 p-4 bg-black/40 rounded-xl border border-zinc-800">
                         <Clock className="w-5 h-5 text-zinc-400 mt-1" />
                         <div>
-                          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Horário de Check-in</p>
-                          <p className="text-xl font-black text-white font-sport italic">
-                            {selectedLocation.startTime} <span className="text-zinc-600 not-italic mx-1">-</span> {selectedLocation.endTime}
-                          </p>
+                          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Horários de Check-in</p>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedLocation.intervals && selectedLocation.intervals.length > 0 ? (
+                              selectedLocation.intervals.map((interval, i) => (
+                                <p key={i} className="text-xl font-black text-white font-sport italic whitespace-nowrap">
+                                  {interval.startTime} <span className="text-zinc-600 not-italic mx-0.5">-</span> {interval.endTime}
+                                </p>
+                              ))
+                            ) : (
+                              <p className="text-xl font-black text-white font-sport italic">
+                                {selectedLocation.startTime} <span className="text-zinc-600 not-italic mx-1">-</span> {selectedLocation.endTime}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -738,9 +776,19 @@ const CheckInPage: React.FC = () => {
                                   {slot.weight * 10} PTS
                                 </span>
                               </div>
-                              <div className="flex items-center gap-2 text-zinc-500 text-xs">
-                                <Clock className="w-3 h-3" />
-                                <span className="font-mono">{slot.startTime} - {slot.endTime}</span>
+                              <div className="flex flex-wrap gap-2 text-zinc-500 text-xs mt-1">
+                                <Clock className="w-3 h-3 mt-0.5" />
+                                <div className="flex flex-wrap gap-1.5">
+                                  {slot.intervals && slot.intervals.length > 0 ? (
+                                    slot.intervals.map((interval, i) => (
+                                      <span key={i} className="font-mono bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded text-[10px]">
+                                        {interval.startTime} - {interval.endTime}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="font-mono">{slot.startTime} - {slot.endTime}</span>
+                                  )}
+                                </div>
                               </div>
                             </button>
                           ))}

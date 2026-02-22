@@ -29,8 +29,9 @@ export interface User {
 export interface TimeSlot {
   id: string;
   name: string;
-  startTime: string; // HH:mm
-  endTime: string;   // HH:mm
+  startTime: string; // HH:mm (Legacy/Primary)
+  endTime: string;   // HH:mm (Legacy/Primary)
+  intervals?: { startTime: string; endTime: string }[];
   weight: number;
   days: number[];    // 0 = Sunday, 1 = Monday, etc.
   locationName: string;
@@ -41,6 +42,7 @@ export interface TimeSlot {
   photoUrl?: string;
   city?: string;
 }
+
 
 export interface Category {
   id: string;
