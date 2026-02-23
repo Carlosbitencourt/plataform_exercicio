@@ -175,7 +175,7 @@ const CheckInPage: React.FC = () => {
 
     const currentMinutes = timeToMinutes(nowStr);
 
-    const activeSlot = timeSlots.find(slot => {
+    const hasActiveSlot = timeSlots.some(slot => {
       if (slot.days && !slot.days.includes(dayOfWeek)) return false;
 
       // Check multiple intervals if they exist
@@ -201,11 +201,9 @@ const CheckInPage: React.FC = () => {
       return currentMinutes >= startMin && currentMinutes < endMin;
     });
 
-    if (!activeSlot) {
+    if (!hasActiveSlot) {
       return `JANELA FECHADA AGORA (${nowStr}).`;
     }
-
-    const isLocalBypass = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
     const today = getTodayISO();
     const alreadyDidToday = checkIns.some(c => c.userId === user?.id && c.date === today);
@@ -240,8 +238,7 @@ const CheckInPage: React.FC = () => {
     const timeToMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
     const currentMinutes = timeToMinutes(nowStr);
 
-    const activeSlot = timeSlots.find(slot => {
-      // Re-find active slot (safe to assume exists as verified in preCheck)
+    const activeSlots = timeSlots.filter(slot => {
       if (slot.days && !slot.days.includes(dayOfWeek)) return false;
 
       // Check multiple intervals if they exist
@@ -263,31 +260,60 @@ const CheckInPage: React.FC = () => {
       return currentMinutes >= startMin && currentMinutes < endMin;
     });
 
-    if (!activeSlot) throw { message: 'Erro interno: Horário não encontrado.' };
+    if (activeSlots.length === 0) throw { message: 'Erro interno: Horário não encontrado.' };
 
-    const targetLat = activeSlot.latitude || GYM_LOCATION.lat;
-    const targetLng = activeSlot.longitude || GYM_LOCATION.lng;
-    const targetRadius = activeSlot.radius || GYM_LOCATION.radius;
+    // Find the closest active slot that is within radius
+    let selectedSlot: TimeSlot | null = null;
+    let minDistance = Infinity;
+    let bestRadius = 0;
 
-    const R = 6371e3;
-    const φ1 = latitude * Math.PI / 180;
-    const φ2 = targetLat * Math.PI / 180;
-    const Δφ = (targetLat - latitude) * Math.PI / 180;
-    const Δλ = (targetLng - longitude) * Math.PI / 180;
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
+    activeSlots.forEach(slot => {
+      const targetLat = slot.latitude || GYM_LOCATION.lat;
+      const targetLng = slot.longitude || GYM_LOCATION.lng;
+      const targetRadius = slot.radius || GYM_LOCATION.radius;
+
+      const R = 6371e3;
+      const φ1 = latitude * Math.PI / 180;
+      const φ2 = targetLat * Math.PI / 180;
+      const Δφ = (targetLat - latitude) * Math.PI / 180;
+      const Δλ = (targetLng - longitude) * Math.PI / 180;
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+
+      if (distance <= targetRadius) {
+        if (!selectedSlot || distance < minDistance) {
+          selectedSlot = slot;
+          minDistance = distance;
+          bestRadius = targetRadius;
+        }
+      } else {
+        // Keep track of the closest one even if outside radius for debug info if none match
+        if (distance < minDistance) {
+          minDistance = distance;
+          bestRadius = targetRadius;
+        }
+      }
+    });
 
     const isLocalBypass = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-    if (distance > targetRadius && !isLocalBypass) {
+    if (!selectedSlot && !isLocalBypass) {
       setDebugInfo({
-        distance, radius: targetRadius, accuracy
+        distance: minDistance, radius: bestRadius, accuracy
       });
-      throw { code: 'DISTANCE_ERROR', message: 'Você está longe da academia.' };
+      throw { code: 'DISTANCE_ERROR', message: 'Você está longe de qualquer local de check-in ativo.' };
     }
 
-    const activeSlotWeight = activeSlot.weight || 1;
+    // Fallback for bypass if no slot was selected but bypass is active
+    if (!selectedSlot && isLocalBypass) {
+      selectedSlot = activeSlots[0];
+      minDistance = 0;
+    }
+
+    if (!selectedSlot) throw { message: 'Erro interno: Local não identificado.' };
+
+    const activeSlotWeight = selectedSlot.weight || 1;
     const basePoints = 10;
     const score = basePoints * activeSlotWeight;
     setEarnedPoints(score);
@@ -300,7 +326,7 @@ const CheckInPage: React.FC = () => {
       time: nowStr,
       latitude,
       longitude,
-      timeSlotId: activeSlot.id,
+      timeSlotId: selectedSlot.id,
       score,
       address: addressStr,
       accuracy: accuracy || 0,
