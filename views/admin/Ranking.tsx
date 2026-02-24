@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Clock, Search, Timer, CheckCircle2, AlertCircle } from 'lucide-react';
-import { subscribeToUsers, subscribeToCheckIns } from '../../services/db';
+import { subscribeToUsers, subscribeToCheckIns, updateUser, addCheckIn } from '../../services/db';
 import { User as UserType, CheckIn, UserStatus } from '../../types';
 
 interface RankedUser {
@@ -406,7 +406,7 @@ const Ranking: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 
