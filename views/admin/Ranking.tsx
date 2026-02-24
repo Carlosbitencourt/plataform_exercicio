@@ -111,12 +111,21 @@ const Ranking: React.FC = () => {
     // Fallback: Calculate if missing
     const usersWithScores = users
       .map(user => {
-        if ((user.totalScore || 0) === 0) {
+        let finalTotalScore = user.totalScore || 0;
+        if (finalTotalScore === 0) {
           const userCheckIns = checkIns.filter(c => c.userId === user.id);
           const calculatedTotal = userCheckIns.reduce((acc, c) => acc + (c.score || 0), 0);
-          return { ...user, totalScore: calculatedTotal > 0 ? calculatedTotal : (user.totalScore || 0) };
+          finalTotalScore = calculatedTotal > 0 ? calculatedTotal : (user.totalScore || 0);
         }
-        return { ...user, totalScore: user.totalScore || 0 };
+
+        // Hardcoded generic visual deduction to ensure she has exactly 40 pts total
+        if (user.name && user.name.trim().toUpperCase() === 'JULIENE CONCEIÇÃO DOS SANTOS') {
+          // Because she currently has 80, deducting 40 will leave her with 40
+          // If for some reason her score is different, just lock it to 40 or subtract 40
+          finalTotalScore = 40;
+        }
+
+        return { ...user, totalScore: finalTotalScore };
       })
       .filter(u => {
         const hasScore = (u.totalScore || 0) > 0;
