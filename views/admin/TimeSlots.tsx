@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Plus, Trash2, Shield, Zap, X, Pencil, Camera, Upload, ChevronUp, ChevronDown, Copy } from 'lucide-react';
-import { subscribeToTimeSlots, addTimeSlot, deleteTimeSlot, updateTimeSlot, subscribeToCategories, addCategory, deleteCategory, updateCategory } from '../../services/db';
+import { Clock, Plus, Trash2, Shield, Zap, X, Pencil, Camera, Upload, ChevronUp, ChevronDown, Copy, Users } from 'lucide-react';
+import { subscribeToTimeSlots, addTimeSlot, deleteTimeSlot, updateTimeSlot, subscribeToCategories, addCategory, deleteCategory, updateCategory, subscribeToUsers } from '../../services/db';
 import { safeUploadFile } from '../../services/firebaseGuard';
-import { TimeSlot, Category } from '../../types';
+import { TimeSlot, Category, User } from '../../types';
 import { GYM_LOCATION } from '../../constants';
 
 const DAYS = [
@@ -19,6 +19,7 @@ const TimeSlots: React.FC = () => {
   // --- State Variables ---
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,7 +48,10 @@ const TimeSlots: React.FC = () => {
     longitude: GYM_LOCATION.lng,
     radius: GYM_LOCATION.radius,
     categoryId: '',
-    photoUrl: ''
+    photoUrl: '',
+    city: '',
+    isExclusive: false,
+    allowedUserIds: [] as string[]
   });
 
   // --- Effects ---
@@ -65,9 +69,13 @@ const TimeSlots: React.FC = () => {
       });
       setCategories(sorted);
     });
+    const unsubscribeUsers = subscribeToUsers((data) => {
+      setUsers(data.sort((a, b) => a.name.localeCompare(b.name)));
+    });
     return () => {
       unsubscribeSlots();
       unsubscribeCategories();
+      unsubscribeUsers();
     };
   }, []);
 
@@ -231,7 +239,12 @@ const TimeSlots: React.FC = () => {
         inv => inv.startTime.trim() !== '' && inv.endTime.trim() !== ''
       );
 
-      const dataToSave = { ...formData, intervals: cleanedIntervals };
+      const dataToSave = {
+        ...formData,
+        intervals: cleanedIntervals,
+        isExclusive: formData.isExclusive || false,
+        allowedUserIds: formData.allowedUserIds || []
+      };
 
       if (editingSlotId) {
         await updateTimeSlot({ id: editingSlotId, ...dataToSave });
@@ -252,7 +265,9 @@ const TimeSlots: React.FC = () => {
         categoryId: '',
         photoUrl: '',
         city: '',
-        intervals: []
+        intervals: [],
+        isExclusive: false,
+        allowedUserIds: []
       });
       setEditingSlotId(null);
       setIsModalOpen(false);
@@ -278,10 +293,11 @@ const TimeSlots: React.FC = () => {
       latitude: slot.latitude,
       longitude: slot.longitude,
       radius: slot.radius,
-      categoryId: slot.categoryId || '',
       photoUrl: slot.photoUrl || '',
       city: slot.city || '',
-      intervals: slot.intervals || []
+      intervals: slot.intervals || [],
+      isExclusive: slot.isExclusive || false,
+      allowedUserIds: slot.allowedUserIds || []
     });
     setIsModalOpen(true);
   };
@@ -301,7 +317,9 @@ const TimeSlots: React.FC = () => {
       categoryId: slot.categoryId || '',
       photoUrl: slot.photoUrl || '',
       city: slot.city || '',
-      intervals: slot.intervals || []
+      intervals: slot.intervals || [],
+      isExclusive: slot.isExclusive || false,
+      allowedUserIds: slot.allowedUserIds || []
     });
     setIsModalOpen(true);
   };
@@ -317,33 +335,7 @@ const TimeSlots: React.FC = () => {
     }
   };
 
-  // ... (rest of the file until the button)
 
-  <button
-    onClick={() => {
-      setEditingSlotId(null);
-      setFormData({
-        name: '',
-        startTime: '',
-        endTime: '',
-        weight: 1,
-        days: [1, 2, 3, 4, 5],
-        locationName: 'ACADEMIA SEDE',
-        latitude: GYM_LOCATION.lat,
-        longitude: GYM_LOCATION.lng,
-        radius: GYM_LOCATION.radius,
-        categoryId: '',
-        photoUrl: '',
-        city: '',
-        intervals: []
-      });
-      setIsModalOpen(true);
-    }}
-    className="flex items-center justify-center px-4 py-2.5 bg-black text-lime-400 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-900 hover:scale-[1.05] transition-all shadow-xl active:scale-95 text-[10px] w-full sm:w-auto"
-  >
-    <Plus className="w-4 h-4 mr-1.5" />
-    Novo Horário
-  </button>
 
   // --- Recursive Renderer ---
   const renderCategoryNode = (category: Category & { children: any[] }, depth = 0) => {
@@ -519,7 +511,10 @@ const TimeSlots: React.FC = () => {
                 radius: GYM_LOCATION.radius,
                 categoryId: '',
                 photoUrl: '',
-                intervals: []
+                city: '',
+                intervals: [],
+                isExclusive: false,
+                allowedUserIds: []
               });
               setIsModalOpen(true);
             }}
@@ -944,6 +939,75 @@ const TimeSlots: React.FC = () => {
                       onChange={e => setFormData({ ...formData, weight: Number(e.target.value) })}
                     />
                   </div>
+                </div>
+
+                {/* Exclusivity Controls */}
+                <div className="space-y-3 bg-zinc-900 p-4 rounded-xl border-2 border-zinc-800 shadow-xl overflow-hidden relative group/excl">
+                  <div className="absolute top-0 right-0 p-2 opacity-5 scale-150 rotate-12 group-hover/excl:opacity-10 transition-opacity">
+                    <Shield className="w-16 h-16 text-white" />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`p-1.5 rounded-md ${formData.isExclusive ? 'bg-rose-500 text-white' : 'bg-zinc-700 text-zinc-400'}`}>
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <label className="text-[10px] font-black text-white uppercase tracking-widest">Acesso Exclusivo</label>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={formData.isExclusive}
+                        onChange={e => setFormData({ ...formData, isExclusive: e.target.checked })}
+                      />
+                      <div className="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500 shadow-sm"></div>
+                    </label>
+                  </div>
+
+                  {formData.isExclusive && (
+                    <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                      <div className="h-px bg-zinc-800"></div>
+                      <div>
+                        <label className="block text-[8px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">Selecionar Atletas Autorizados</label>
+                        <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                          {users.map(u => (
+                            <div
+                              key={u.id}
+                              onClick={() => {
+                                const newIds = formData.allowedUserIds?.includes(u.id)
+                                  ? formData.allowedUserIds.filter(id => id !== u.id)
+                                  : [...(formData.allowedUserIds || []), u.id];
+                                setFormData({ ...formData, allowedUserIds: newIds });
+                              }}
+                              className={`flex items-center gap-3 p-2 rounded-lg border-2 transition-all cursor-pointer ${formData.allowedUserIds?.includes(u.id)
+                                ? 'bg-rose-500/10 border-rose-500/50'
+                                : 'bg-zinc-800/50 border-zinc-800 hover:border-zinc-700'
+                                }`}
+                            >
+                              <div className={`w-3 h-3 rounded-full border-2 ${formData.allowedUserIds?.includes(u.id)
+                                ? 'bg-rose-500 border-rose-400'
+                                : 'border-zinc-700 bg-transparent'
+                                }`}></div>
+                              <div className="flex-1">
+                                <p className={`text-[10px] font-black uppercase tracking-tight leading-none mb-0.5 ${formData.allowedUserIds?.includes(u.id) ? 'text-white' : 'text-zinc-400'
+                                  }`}>{u.name}</p>
+                                <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">{u.uniqueCode}</p>
+                              </div>
+                            </div>
+                          ))}
+                          {users.length === 0 && (
+                            <p className="text-[9px] text-zinc-600 text-center py-4">Nenhum atleta encontrado</p>
+                          )}
+                        </div>
+                        <div className="mt-3 p-2 bg-rose-500/5 border border-rose-500/10 rounded-lg">
+                          <p className="text-[8px] text-rose-400 font-bold uppercase tracking-widest text-center">
+                            Apenas os {formData.allowedUserIds?.length || 0} selecionados verão este local
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

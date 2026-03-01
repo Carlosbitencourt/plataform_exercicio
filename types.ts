@@ -41,6 +41,8 @@ export interface TimeSlot {
   categoryId?: string;
   photoUrl?: string;
   city?: string;
+  isExclusive?: boolean;
+  allowedUserIds?: string[];
 }
 
 

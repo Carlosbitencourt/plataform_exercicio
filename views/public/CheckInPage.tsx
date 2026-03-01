@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { User, UserStatus, TimeSlot, CheckIn } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, addCheckIn, updateUser } from '../../services/db';
-import { calculateCheckInScore } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin, Map, X, ExternalLink, Calendar, Star, Navigation, Camera, Loader2, Image as ImageIcon } from 'lucide-react';
 import {
@@ -777,7 +776,14 @@ const CheckInPage: React.FC = () => {
                       const userCity = normalize(user.city);
                       const slotCity = normalize(s.city);
 
-                      return userCity === slotCity;
+                      if (userCity !== slotCity) return false;
+
+                      // 3. Exclusivity Filter
+                      if (s.isExclusive) {
+                        return s.allowedUserIds?.includes(user!.id);
+                      }
+
+                      return true;
                     }).sort((a, b) => a.startTime.localeCompare(b.startTime));
                     if (daySlots.length === 0) return null;
 

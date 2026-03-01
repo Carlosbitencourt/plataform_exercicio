@@ -13,11 +13,11 @@ export const getLocalDate = () => {
 };
 
 const defaultTimeSlots: TimeSlot[] = [
-  { id: 't1', name: 'Madrugada 1', startTime: '04:30', endTime: '05:30', weight: 5 },
-  { id: 't2', name: 'Madrugada 2', startTime: '05:30', endTime: '06:30', weight: 4 },
-  { id: 't3', name: 'Manhã', startTime: '06:30', endTime: '07:30', weight: 3 },
-  { id: 't4', name: 'Tarde', startTime: '17:00', endTime: '18:00', weight: 2 },
-  { id: 't5', name: 'Noite', startTime: '18:00', endTime: '19:00', weight: 1 },
+  { id: 't1', name: 'Madrugada 1', startTime: '04:30', endTime: '05:30', weight: 5, days: [1, 2, 3, 4, 5], locationName: 'Default', latitude: 0, longitude: 0, radius: 100 },
+  { id: 't2', name: 'Madrugada 2', startTime: '05:30', endTime: '06:30', weight: 4, days: [1, 2, 3, 4, 5], locationName: 'Default', latitude: 0, longitude: 0, radius: 100 },
+  { id: 't3', name: 'Manhã', startTime: '06:30', endTime: '07:30', weight: 3, days: [1, 2, 3, 4, 5], locationName: 'Default', latitude: 0, longitude: 0, radius: 100 },
+  { id: 't4', name: 'Tarde', startTime: '17:00', endTime: '18:00', weight: 2, days: [1, 2, 3, 4, 5], locationName: 'Default', latitude: 0, longitude: 0, radius: 100 },
+  { id: 't5', name: 'Noite', startTime: '18:00', endTime: '19:00', weight: 1, days: [1, 2, 3, 4, 5], locationName: 'Default', latitude: 0, longitude: 0, radius: 100 },
 ];
 
 const initialData: Database = {
@@ -75,7 +75,7 @@ export const updateUser = (updatedUser: User) => {
 export const addQRCode = () => {
   const db = getDB();
   const today = getLocalDate();
-  
+
   // Desativa QRs antigos do mesmo dia para manter apenas um único token válido
   db.qrCodes = db.qrCodes.map(qr => qr.date === today ? { ...qr, active: false } : qr);
 

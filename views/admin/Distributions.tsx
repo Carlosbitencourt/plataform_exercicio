@@ -26,7 +26,7 @@ const Distributions: React.FC = () => {
     setIsProcessing(true);
     setLastResult(null);
     try {
-      const result = runWeeklyPenaltyCheck();
+      const result = await runWeeklyPenaltyCheck();
       setLastResult({ type: 'penalty', ...result });
     } catch (error: any) {
       console.error("Weekly check failed:", error);
@@ -42,7 +42,7 @@ const Distributions: React.FC = () => {
     setIsProcessing(true);
     setLastResult(null);
     try {
-      const result = runWeeklyDistribution();
+      const result = await runWeeklyDistribution();
       setLastResult({ type: 'distribution', ...result });
     } catch (error: any) {
       console.error("Weekly distribution failed:", error);
