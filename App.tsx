@@ -14,6 +14,10 @@ import Profile from './views/admin/Profile';
 import ExternalSignup from './views/public/ExternalSignup';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ADMIN_EMAILS } from './constants';
+import AppShell from './components/AppShell';
+import AthleteLocations from './views/public/AthleteLocations';
+import AthleteProfile from './views/public/AthleteProfile';
+import AthleteRanking from './views/public/AthleteRanking';
 
 // Componente para proteger rotas administrativas
 const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -90,9 +94,12 @@ const App: React.FC = () => {
               </ProtectedAdminRoute>
             } />
 
-            {/* Public Routes */}
-            <Route path="/checkin" element={<CheckInPage />} />
-            <Route path="/ranking" element={<Ranking />} />
+            {/* Athlete App Shell Routes */}
+            <Route path="/checkin" element={<AppShell><CheckInPage /></AppShell>} />
+            <Route path="/ranking" element={<AppShell><AthleteRanking /></AppShell>} />
+            <Route path="/locais" element={<AppShell><AthleteLocations /></AppShell>} />
+            <Route path="/perfil/atleta" element={<AppShell><AthleteProfile /></AppShell>} />
+
             <Route path="/inscrever" element={<ExternalSignup />} />
 
             {/* Default Redirects */}

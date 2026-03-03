@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
 import { User, UserStatus, TimeSlot, CheckIn } from '../../types';
-import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, addCheckIn, updateUser } from '../../services/db';
+import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns } from '../../services/db';
 import { GYM_LOCATION } from '../../constants';
-import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin, Map, X, ExternalLink, Calendar, Star, Navigation, Camera, Loader2, Image as ImageIcon, LogOut } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { auth as firebaseAuth } from '../../services/firebase';
 import {
   ensureAuth,
   getUserLocation,
@@ -17,10 +15,6 @@ import { LocationResult } from '../../services/geolocation';
 
 const CheckInPage: React.FC = () => {
   const { currentUser } = useAuth();
-  const [searchParams] = useSearchParams();
-  const tokenFromUrl = searchParams.get('token');
-  const [step, setStep] = useState(1);
-  const [identifier, setIdentifier] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
@@ -35,8 +29,6 @@ const CheckInPage: React.FC = () => {
   const [earnedPoints, setEarnedPoints] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [showLocationsModal, setShowLocationsModal] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<TimeSlot | null>(null);
   const [lastCheckInId, setLastCheckInId] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
@@ -46,7 +38,6 @@ const CheckInPage: React.FC = () => {
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-
     const unsubUsers = subscribeToUsers(setUsers);
     const unsubSlots = subscribeToTimeSlots(setTimeSlots);
     const unsubCheckIns = subscribeToCheckIns(setCheckIns);
@@ -58,22 +49,7 @@ const CheckInPage: React.FC = () => {
           setPermissionStatus(result.state as any);
           result.onchange = () => setPermissionStatus(result.state as any);
         })
-        .catch(() => {
-          // Fallback if query fails, assume prompt
-          setPermissionStatus('prompt');
-        });
-    }
-
-    // Initial Permission Check
-    if (navigator.permissions && navigator.permissions.query) {
-      navigator.permissions.query({ name: 'geolocation' as PermissionName })
-        .then(result => {
-          setPermissionStatus(result.state as any);
-          result.onchange = () => setPermissionStatus(result.state as any);
-        })
-        .catch(() => {
-          setPermissionStatus('prompt');
-        });
+        .catch(() => setPermissionStatus('prompt'));
     }
 
     return () => {
@@ -84,27 +60,17 @@ const CheckInPage: React.FC = () => {
     };
   }, []);
 
-  // Auto-identify user if logged in via Google
+  // Auto-identify user
   useEffect(() => {
-    if (currentUser?.email && users.length > 0 && !user) {
+    if (currentUser?.email && users.length > 0) {
       const foundUser = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
       if (foundUser) {
         if (foundUser.status !== UserStatus.ELIMINATED && foundUser.status !== 'eliminado') {
           setUser(foundUser);
-          setStep(2);
         }
       }
     }
-  }, [currentUser, users, user]);
-
-  const handleLogout = async () => {
-    try {
-      await firebaseAuth.signOut();
-      window.location.href = '#/admin/login';
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
-  };
+  }, [currentUser, users]);
 
   const getNowStr = () => {
     const hh = currentTime.getHours().toString().padStart(2, '0');
@@ -117,30 +83,6 @@ const CheckInPage: React.FC = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setLoading(true);
-    setError(null);
-
-    const cleanId = identifier.trim();
-    const foundUser = users.find(u => u.cpf === cleanId || u.uniqueCode.toUpperCase() === cleanId.toUpperCase());
-
-    setTimeout(() => {
-      if (foundUser) {
-        if (foundUser.status === UserStatus.ELIMINATED || foundUser.status === 'eliminado') {
-          setError('CONTA BLOQUEADA. PROCURE O ADMINISTRADOR.');
-        } else {
-          setUser(foundUser);
-          setStep(2);
-        }
-      } else {
-        setError('ATLETA NÃO IDENTIFICADO.');
-      }
-      setLoading(false);
-    }, 600);
-  };
-
   const handleRequestLocation = async () => {
     setLoading(true);
     setError(null);
@@ -148,40 +90,18 @@ const CheckInPage: React.FC = () => {
     setDebugInfo(null);
 
     try {
-      // 0. PRE-FLIGHT AUTH CHECK (Invisible)
       await ensureAuth();
-
-      // 1. Validate Time/QR first
       const validationError = validatePreConditions();
-      if (validationError) {
-        throw { message: validationError, isSystemError: false };
-      }
-
-      // 2. Get Location (Guard handles permissions internally/robustly)
-      // Note: getUserLocation from guard calls the robust geolocation service
+      if (validationError) throw { message: validationError, isSystemError: false };
       const location = await getUserLocation();
-
-      // 3. Process Check-in with location
       await processCheckIn(location);
-
-
     } catch (err: any) {
       console.error('Check-in Error:', err);
       let msg = err.message || 'Erro desconhecido ao realizar check-in.';
-
       if (err.code === 'PERMISSION_DENIED') {
         setPermissionStatus('denied');
-        if (isIOS) {
-          msg = 'ACESSO À LOCALIZAÇÃO NEGADO. VÁ EM AJUSTES > PRIVACIDADE > SERVIÇOS DE LOCALIZAÇÃO E HABILITE PARA O SAFARI.';
-        } else {
-          msg = 'PERMISSÃO DE LOCALIZAÇÃO NEGADA. POR FAVOR, HABILITE NAS CONFIGURAÇÕES DO SITE.';
-        }
-      } else if (err.code === 'POSITION_UNAVAILABLE') {
-        msg = 'SINAL DE GPS NÃO ENCONTRADO. TENTE EM ÁREA ABERTA.';
-      } else if (err.code === 'TIMEOUT') {
-        msg = 'DEMORA AO OBTER LOCALIZAÇÃO. TENTE NOVAMENTE.';
+        msg = isIOS ? 'ACESSO À LOCALIZAÇÃO NEGADO. VÁ EM AJUSTES > PRIVACIDADE.' : 'PERMISSÃO DE LOCALIZAÇÃO NEGADA.';
       }
-
       setError(msg);
     } finally {
       setLoading(false);
@@ -191,72 +111,41 @@ const CheckInPage: React.FC = () => {
   const validatePreConditions = (): string | null => {
     const nowStr = getNowStr();
     const dayOfWeek = currentTime.getDay();
-
     const timeToMinutes = (timeStr: string) => {
       const [h, m] = timeStr.split(':').map(Number);
       return h * 60 + m;
     };
-
     const currentMinutes = timeToMinutes(nowStr);
 
     const hasActiveSlot = timeSlots.some(slot => {
       if (slot.days && !slot.days.includes(dayOfWeek)) return false;
-
-      // Check multiple intervals if they exist
-      if (slot.intervals && slot.intervals.length > 0) {
-        return slot.intervals.some(interval => {
-          const startMin = timeToMinutes(interval.startTime);
-          let endMin = timeToMinutes(interval.endTime);
-          if (endMin === 0) endMin = 1440;
-          if (endMin < startMin) {
-            return currentMinutes >= startMin || currentMinutes < endMin;
-          }
-          return currentMinutes >= startMin && currentMinutes < endMin;
-        });
-      }
-
-      // Fallback to legacy single interval
-      const startMin = timeToMinutes(slot.startTime);
-      let endMin = timeToMinutes(slot.endTime);
-      if (endMin === 0) endMin = 1440;
-      if (endMin < startMin) {
-        return currentMinutes >= startMin || currentMinutes < endMin;
-      }
-      return currentMinutes >= startMin && currentMinutes < endMin;
+      const intervals = slot.intervals && slot.intervals.length > 0 ? slot.intervals : [{ startTime: slot.startTime, endTime: slot.endTime }];
+      return intervals.some(interval => {
+        const startMin = timeToMinutes(interval.startTime);
+        let endMin = timeToMinutes(interval.endTime);
+        if (endMin === 0) endMin = 1440;
+        return endMin < startMin ? (currentMinutes >= startMin || currentMinutes < endMin) : (currentMinutes >= startMin && currentMinutes < endMin);
+      });
     });
 
-    if (!hasActiveSlot) {
-      return `JANELA FECHADA AGORA (${nowStr}).`;
-    }
-
+    if (!hasActiveSlot) return `JANELA FECHADA AGORA (${nowStr}).`;
     const today = getTodayISO();
-    const alreadyDidToday = checkIns.some(c => c.userId === user?.id && c.date === today);
-    if (alreadyDidToday) {
-      return 'CHECK-IN JÁ REALIZADO HOJE.';
-    }
-
+    if (checkIns.some(c => c.userId === user?.id && c.date === today)) return 'CHECK-IN JÁ REALIZADO HOJE.';
     return null;
   };
 
   const processCheckIn = async (location: LocationResult) => {
     const { latitude, longitude, accuracy } = location;
-
-    // Reverse Geocoding
-    let addressStr = '';
+    let addressStr = 'Localização Detectada';
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`);
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`);
       const data = await response.json();
-      if (data && data.address) {
-        // Simplificado para display_name ou componentes principais
-        addressStr = data.display_name ? data.display_name.split(',').slice(0, 3).join(',') : 'Localização Detectada';
-      }
+      if (data?.display_name) addressStr = data.display_name.split(',').slice(0, 3).join(',');
     } catch (e) {
-      console.warn('Geocoding failed', e);
-      addressStr = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      addressStr = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
     }
     setCheckInAddress(addressStr);
 
-    // Validate Radius
     const nowStr = getNowStr();
     const dayOfWeek = currentTime.getDay();
     const timeToMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -264,29 +153,17 @@ const CheckInPage: React.FC = () => {
 
     const activeSlots = timeSlots.filter(slot => {
       if (slot.days && !slot.days.includes(dayOfWeek)) return false;
-
-      // Check multiple intervals if they exist
-      if (slot.intervals && slot.intervals.length > 0) {
-        return slot.intervals.some(interval => {
-          const startMin = timeToMinutes(interval.startTime);
-          let endMin = timeToMinutes(interval.endTime);
-          if (endMin === 0) endMin = 1440;
-          if (endMin < startMin) return currentMinutes >= startMin || currentMinutes < endMin;
-          return currentMinutes >= startMin && currentMinutes < endMin;
-        });
-      }
-
-      // Fallback to legacy single interval
-      const startMin = timeToMinutes(slot.startTime);
-      let endMin = timeToMinutes(slot.endTime);
-      if (endMin === 0) endMin = 1440;
-      if (endMin < startMin) return currentMinutes >= startMin || currentMinutes < endMin;
-      return currentMinutes >= startMin && currentMinutes < endMin;
+      const intervals = slot.intervals && slot.intervals.length > 0 ? slot.intervals : [{ startTime: slot.startTime, endTime: slot.endTime }];
+      return intervals.some(interval => {
+        const startMin = timeToMinutes(interval.startTime);
+        let endMin = timeToMinutes(interval.endTime);
+        if (endMin === 0) endMin = 1440;
+        return endMin < startMin ? (currentMinutes >= startMin || currentMinutes < endMin) : (currentMinutes >= startMin && currentMinutes < endMin);
+      });
     });
 
     if (activeSlots.length === 0) throw { message: 'Erro interno: Horário não encontrado.' };
 
-    // Find the closest active slot that is within radius
     let selectedSlot: TimeSlot | null = null;
     let minDistance = Infinity;
     let bestRadius = 0;
@@ -311,39 +188,23 @@ const CheckInPage: React.FC = () => {
           minDistance = distance;
           bestRadius = targetRadius;
         }
-      } else {
-        // Keep track of the closest one even if outside radius for debug info if none match
-        if (distance < minDistance) {
-          minDistance = distance;
-          bestRadius = targetRadius;
-        }
+      } else if (distance < minDistance) {
+        minDistance = distance;
+        bestRadius = targetRadius;
       }
     });
 
-    const isLocalBypass = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-    if (!selectedSlot && !isLocalBypass) {
-      setDebugInfo({
-        distance: minDistance, radius: bestRadius, accuracy
-      });
-      throw { code: 'DISTANCE_ERROR', message: 'Você está longe de qualquer local de check-in ativo.' };
+    if (!selectedSlot && window.location.hostname !== 'localhost') {
+      setDebugInfo({ distance: minDistance, radius: bestRadius, accuracy });
+      throw { code: 'DISTANCE_ERROR', message: 'Você está fora do raio permitido.' };
     }
 
-    // Fallback for bypass if no slot was selected but bypass is active
-    if (!selectedSlot && isLocalBypass) {
-      selectedSlot = activeSlots[0];
-      minDistance = 0;
-    }
+    if (!selectedSlot) selectedSlot = activeSlots[0];
 
-    if (!selectedSlot) throw { message: 'Erro interno: Local não identificado.' };
-
-    const activeSlotWeight = selectedSlot.weight || 1;
-    const basePoints = 10;
-    const score = basePoints * activeSlotWeight;
+    const score = 10 * (selectedSlot.weight || 1);
     setEarnedPoints(score);
     const today = getTodayISO();
 
-    // Use Safe Guard for Firestore Writes
     const checkInRef = await safeAddDoc('checkIns', {
       userId: user!.id,
       date: today,
@@ -358,125 +219,65 @@ const CheckInPage: React.FC = () => {
     });
 
     setLastCheckInId(checkInRef.id);
-
-    const updatedUser = {
-      ...user!,
+    await safeUpdateDoc('users', user!.id, {
       weeklyScore: (user!.weeklyScore || 0) + score,
       totalScore: (user!.totalScore || 0) + score
-    };
-    // We update the user stats using safeUpdateDoc
-    await safeUpdateDoc('users', user!.id, updatedUser);
+    });
     setSuccess(true);
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !lastCheckInId) return;
-
     setUploadingPhoto(true);
-    setError(null);
-
     try {
       const url = await safeUploadFile(file, `checkins/${lastCheckInId}/${Date.now()}_${file.name}`);
       await safeUpdateDoc('checkIns', lastCheckInId, { photoUrl: url });
       setUploadedPhotoUrl(url);
     } catch (err: any) {
-      console.error('Photo upload error:', err);
       setError(err.message || 'Erro ao enviar foto.');
     } finally {
       setUploadingPhoto(false);
     }
   };
 
+  const userCheckIns = checkIns.filter(c => c.userId === user?.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const todayChecked = checkIns.some(c => c.userId === user?.id && c.date === getTodayISO());
+
   if (success) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-6 font-sans">
-        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] text-center space-y-6 max-w-sm w-full shadow-[0_0_80px_rgba(163,230,53,0.1)] animate-in zoom-in-95 duration-500">
-          <div className="inline-flex p-5 bg-lime-400 rounded-full shadow-[0_0_30px_rgba(163,230,53,0.3)] animate-bounce">
-            <CheckCircle className="w-10 h-10 text-black" />
+      <div className="p-6 space-y-8 animate-in zoom-in-95 duration-500">
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] text-center space-y-6 shadow-[0_0_80px_rgba(163,230,53,0.1)]">
+          <div className="inline-flex p-5 bg-lime-400 rounded-full shadow-[0_0_30px_rgba(163,230,53,0.3)] animate-bounce text-black">
+            <CheckCircle className="w-10 h-10" />
           </div>
-          <div className="space-y-1.5">
-            <h2 className="text-3xl font-black italic font-sport text-white uppercase tracking-tighter">Missão Cumprida!</h2>
-            <p className="text-zinc-500 font-black uppercase text-[9px] tracking-[0.4em]">Check-in Validado com Sucesso</p>
-            {checkInAddress && (
-              <div className="flex items-center justify-center gap-2 mt-2 text-zinc-600">
-                <div className="w-1 h-1 bg-lime-500 rounded-full"></div>
-                <p className="text-[9px] font-bold uppercase tracking-wider max-w-[200px] truncate">{checkInAddress}</p>
-              </div>
-            )}
+          <div className="space-y-1">
+            <h2 className="text-3xl font-black italic font-sport text-white uppercase tracking-tighter">Concluído!</h2>
+            <p className="text-zinc-500 font-black uppercase text-[9px] tracking-[0.4em]">Seu esforço foi recompensado</p>
           </div>
 
-          {/* Animated Reward Section */}
-          <div className="bg-black p-6 rounded-2xl border border-zinc-800 space-y-3 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-lime-500/10 blur-[40px] rounded-full pointer-events-none group-hover:bg-lime-500/20 transition-all duration-500"></div>
-
-            <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest relative z-10">Atleta: {user?.name}</p>
-
-            <div className="relative z-10 flex flex-col items-center gap-1">
-              <p className="text-lime-400 text-xs font-black font-sport italic tracking-wider uppercase animate-pulse">RECOMPENSA CREDITADA</p>
-              <div className="text-5xl font-black text-white font-sport italic tracking-tighter drop-shadow-[0_0_15px_rgba(163,230,53,0.5)] animate-in slide-in-from-bottom-4 fade-in duration-700 delay-200">
-                +{earnedPoints} <span className="text-lg text-zinc-500 not-italic">PTS</span>
-              </div>
+          <div className="bg-black/50 p-6 rounded-3xl border border-zinc-800 relative overflow-hidden group">
+            <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest mb-4">Recompensa</p>
+            <div className="text-5xl font-black text-white font-sport italic tracking-tighter drop-shadow-[0_0_15px_rgba(163,230,53,0.5)]">
+              +{earnedPoints} <span className="text-lg text-zinc-500 not-italic">PTS</span>
             </div>
           </div>
+
           <div className="space-y-4">
             {!uploadedPhotoUrl ? (
-              <div className="relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  id="photo-upload"
-                  onChange={handlePhotoUpload}
-                  disabled={uploadingPhoto}
-                />
-                <label
-                  htmlFor="photo-upload"
-                  className={`w-full py-4 rounded-xl font-black uppercase italic tracking-tighter transition-all text-lg flex items-center justify-center gap-2 cursor-pointer ${uploadingPhoto
-                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                    : 'bg-lime-400 text-black hover:bg-white shadow-[0_0_20px_rgba(163,230,53,0.3)]'
-                    }`}
-                >
-                  {uploadingPhoto ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      ENVIANDO...
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-5 h-5" />
-                      REGISTRAR EXERCÍCIO
-                    </>
-                  )}
-                </label>
-                <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest mt-2 text-center">
-                  O ENVIO DA FOTO É OPCIONAL
-                </p>
-              </div>
+              <label className="w-full py-5 bg-lime-400 text-black rounded-2xl font-black uppercase italic tracking-tighter flex items-center justify-center gap-2 cursor-pointer hover:bg-white transition-all">
+                {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                {uploadingPhoto ? 'ENVIANDO...' : 'REGISTRAR EXERCÍCIO'}
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} disabled={uploadingPhoto} />
+              </label>
             ) : (
-              <div className="space-y-3 animate-in fade-in zoom-in-95 duration-500">
-                <div className="relative group aspect-square max-w-[200px] mx-auto rounded-2xl overflow-hidden border-2 border-lime-400/50 shadow-[0_0_30px_rgba(163,230,53,0.2)]">
-                  <img src={uploadedPhotoUrl} alt="Check-in" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                  <div className="absolute bottom-3 left-0 right-0 flex justify-center">
-                    <span className="flex items-center gap-1.5 px-3 py-1 bg-lime-400 text-black text-[9px] font-black uppercase rounded-lg shadow-lg">
-                      <CheckCircle className="w-3 h-3" />
-                      FOTO ENVIADA
-                    </span>
-                  </div>
-                </div>
+              <div className="aspect-square max-w-[180px] mx-auto rounded-2xl overflow-hidden border-2 border-lime-400/50 shadow-xl">
+                <img src={uploadedPhotoUrl} className="w-full h-full object-cover" />
               </div>
             )}
-
-            <div className="grid grid-cols-1 gap-3 pt-2">
-              <button onClick={() => window.location.reload()} className="w-full py-4 bg-white text-black rounded-xl font-black uppercase italic tracking-tighter hover:bg-lime-400 transition-all text-lg pt-3">
-                Novo Registro
-              </button>
-              <Link to="/ranking" className="block w-full py-4 bg-transparent border-2 border-zinc-700 text-zinc-400 rounded-xl font-black uppercase italic tracking-tighter hover:border-lime-400 hover:text-lime-400 transition-all text-lg pt-3">
-                Ver Ranking do Dia
-              </Link>
-            </div>
+            <button onClick={() => window.location.reload()} className="w-full py-5 bg-zinc-800 text-white rounded-2xl font-black uppercase italic tracking-tighter hover:bg-zinc-700 transition-all font-sport">
+              Voltar ao Início
+            </button>
           </div>
         </div>
       </div>
@@ -484,418 +285,150 @@ const CheckInPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6 flex flex-col items-center justify-center relative overflow-hidden font-sans">
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-lime-500/50 to-transparent"></div>
-
-      <div className="w-full max-w-md space-y-10 relative z-10">
-        <div className="text-center space-y-3 flex flex-col items-center">
-          <img src="/logo.png" alt="Impulso Club" className="h-24 w-auto object-contain mb-2" />
-          <div className="flex items-center justify-center gap-3 text-zinc-500 font-black uppercase text-[9px] tracking-[0.4em]">
-            <Clock className="w-2.5 h-2.5 text-lime-500" />
-            {currentTime.toLocaleTimeString('pt-BR')}
+    <div className="p-6 space-y-8 animate-in fade-in duration-500 pb-20">
+      {/* Featured Balance Card */}
+      <section className="relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-br from-lime-500/20 via-transparent to-transparent rounded-[2.5rem] blur-3xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
+        <div className="relative bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/50 p-6 rounded-[2.5rem] space-y-6 shadow-2xl">
+          <div className="flex items-center justify-between">
+            <div className="bg-lime-400/10 p-3 rounded-2xl border border-lime-400/20">
+              <Zap className="w-6 h-6 text-lime-400" />
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-black/40 rounded-full border border-zinc-800">
+              <div className="w-1.5 h-1.5 bg-lime-500 rounded-full animate-pulse"></div>
+              <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">Saldo Atualizado</span>
+            </div>
           </div>
 
-          {currentUser && (
-            <div className="flex items-center gap-4 bg-zinc-900/50 border border-zinc-800/80 px-4 py-2 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-500 mt-2">
-              <div className="relative group">
-                <div className="w-8 h-8 rounded-lg overflow-hidden border border-zinc-700 bg-zinc-800">
-                  {currentUser.photoURL ? (
-                    <img src={currentUser.photoURL} alt={currentUser.displayName || ''} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-lime-400 font-black text-xs">
-                      {currentUser.displayName?.[0] || currentUser.email?.[0].toUpperCase()}
-                    </div>
-                  )}
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Ganhos Acumulados</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-black text-white font-sport italic tracking-tighter">
+                R$ {user?.balance.toFixed(2) || '0.00'}
+              </span>
+              <span className="text-lime-400 text-xs font-black uppercase">V4.0</span>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-zinc-800/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
+                <Clock className="w-4 h-4 text-zinc-500" />
+              </div>
+              <div>
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Sessão</p>
+                <p className="text-[10px] font-black text-zinc-300 uppercase italic font-sport tracking-tight">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-black text-lime-400 uppercase italic font-sport tracking-tight">Level 12</p>
+              <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="w-2/3 h-full bg-lime-400 rounded-full shadow-[0_0_10px_rgba(163,230,53,0.5)]"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Primary Action */}
+      <section className="space-y-4">
+        {error && (
+          <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-2">
+            <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+            <p className="text-[10px] font-bold text-rose-500 uppercase tracking-tight">{error}</p>
+          </div>
+        )}
+
+        <button
+          onClick={handleRequestLocation}
+          disabled={loading || todayChecked}
+          className={`w-full py-6 rounded-[2rem] font-black text-xl uppercase italic tracking-tighter transition-all flex flex-col items-center justify-center gap-1 font-sport shadow-2xl active:scale-95 group relative overflow-hidden ${todayChecked
+              ? 'bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed'
+              : 'bg-white text-black hover:bg-lime-400'
+            }`}
+        >
+          {loading ? (
+            <Loader2 className="w-8 h-8 animate-spin" />
+          ) : todayChecked ? (
+            <>
+              <CheckCircle className="w-8 h-8 mb-1" />
+              MISSÃO CONCLUÍDA
+              <span className="text-[9px] font-black not-italic tracking-widest opacity-40">VOLTE AMANHÃ</span>
+            </>
+          ) : (
+            <>
+              {!todayChecked && (
+                <div className="absolute inset-0 bg-lime-400 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              )}
+              <div className="relative z-10 flex flex-col items-center">
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-6 h-6" />
+                  REGISTRAR CHECK-IN
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-lime-400 border-2 border-black rounded-full"></div>
+                <span className="text-[9px] font-black not-italic tracking-widest opacity-60">PRESENÇA OBRIGATÓRIA</span>
               </div>
-              <div className="flex flex-col items-start pr-2">
-                <span className="text-[10px] font-black text-white italic font-sport tracking-tight max-w-[120px] truncate leading-none mb-0.5 uppercase">
-                  {currentUser.displayName || 'Atleta'}
-                </span>
-                <span className="text-[7px] text-zinc-500 font-black uppercase tracking-[0.1em]">{currentUser.email}</span>
+              <ArrowRight className="absolute right-6 w-6 h-6 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
+            </>
+          )}
+        </button>
+      </section>
+
+      {/* Stats Quick Grid */}
+      <section className="grid grid-cols-2 gap-4">
+        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-3xl space-y-2 group hover:border-zinc-700 transition-colors">
+          <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Star className="w-4 h-4 text-orange-500 fill-orange-500" />
+          </div>
+          <div>
+            <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Check-ins</p>
+            <p className="text-xl font-black text-white font-sport italic">{userCheckIns.length}</p>
+          </div>
+        </div>
+        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-3xl space-y-2 group hover:border-zinc-700 transition-colors">
+          <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Award className="w-4 h-4 text-blue-500" />
+          </div>
+          <div>
+            <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Ranking</p>
+            <p className="text-xl font-black text-white font-sport italic">#14</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Recent Activity */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+            <History className="w-3.5 h-3.5" /> Atividade Recente
+          </h3>
+          <button className="text-[9px] font-black uppercase text-lime-400 tracking-tighter hover:underline">Ver Todos</button>
+        </div>
+
+        <div className="space-y-3">
+          {userCheckIns.slice(0, 3).map((checkin, i) => (
+            <div key={i} className="bg-zinc-900/30 border border-zinc-800/80 p-4 rounded-2xl flex items-center justify-between animate-in slide-in-from-right-4 transition-all hover:bg-zinc-900/50" style={{ animationDelay: `${i * 100}ms` }}>
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-black border border-zinc-800 flex items-center justify-center">
+                  <Navigation className="w-5 h-5 text-zinc-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-white uppercase italic font-sport tracking-tight">{checkin.address.split(',')[0]}</p>
+                  <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">{new Date(checkin.date).toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
+                </div>
               </div>
-              <div className="w-px h-6 bg-zinc-800 mx-1"></div>
-              <button
-                onClick={handleLogout}
-                className="p-2 hover:bg-rose-500/10 rounded-xl transition-all group"
-                title="Sair"
-              >
-                <LogOut className="w-4 h-4 text-zinc-600 group-hover:text-rose-500" />
-              </button>
+              <div className="text-right">
+                <p className="text-sm font-black text-lime-400 font-sport italic tracking-tighter">+{checkin.score} <span className="text-[8px] not-italic text-zinc-600">PTS</span></p>
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">{checkin.time}</p>
+              </div>
+            </div>
+          ))}
+          {userCheckIns.length === 0 && (
+            <div className="py-12 text-center border-2 border-dashed border-zinc-900 rounded-3xl">
+              <p className="text-[9px] font-black text-zinc-700 uppercase tracking-widest">Nenhuma atividade registrada</p>
             </div>
           )}
         </div>
-
-        {error && (
-          <div className="bg-zinc-900/80 border border-zinc-800 p-6 rounded-2xl animate-in slide-in-from-top-2 backdrop-blur-sm">
-            {debugInfo && error.includes('longe') ? (
-              <div className="space-y-4 text-center">
-                <div className="mx-auto w-12 h-12 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center animate-pulse">
-                  <MapPin className="w-6 h-6" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-white font-black italic uppercase font-sport text-lg tracking-wide">Você está fora do local de check-in</h3>
-                  <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">Aproxime-se para realizar o check-in</p>
-                </div>
-
-                <div className="py-4 relative">
-                  {/* Visual Distance Bar */}
-                  <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden flex items-center relative">
-                    <div className="w-1/2 h-full bg-transparent border-r-2 border-dashed border-zinc-600 absolute left-0 top-0"></div>
-                    {/* Marker for allowed radius */}
-                    <div className="absolute left-[20%] top-1/2 -translate-y-1/2 w-3 h-3 bg-lime-500 rounded-full shadow-[0_0_10px_rgba(163,230,53,0.5)] z-10"></div>
-
-                    {/* Marker for user position (clamped) */}
-                    <div className="absolute right-[20%] top-1/2 -translate-y-1/2 w-3 h-3 bg-rose-500 rounded-full shadow-[0_0_10px_rgba(244,63,94,0.5)] animate-ping opacity-75"></div>
-                    <div className="absolute right-[20%] top-1/2 -translate-y-1/2 w-3 h-3 bg-rose-500 rounded-full z-10"></div>
-
-                    <div className="absolute left-[22%] top-[-10px] text-[8px] font-black text-lime-500">RAIO {debugInfo.radius}m</div>
-                    <div className="absolute right-[22%] top-[-10px] text-[8px] font-black text-rose-500">VOCÊ</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-8 border-t border-zinc-800 pt-4">
-                  <div className="text-center">
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Sua Distância</p>
-                    <p className="text-2xl font-black text-rose-500 font-sport italic tracking-tighter">{Math.round(debugInfo.distance)}<span className="text-sm text-zinc-600 not-italic">m</span></p>
-                  </div>
-                  <div className="w-px h-8 bg-zinc-800"></div>
-                  <div className="text-center">
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Raio Permitido</p>
-                    <p className="text-2xl font-black text-lime-500 font-sport italic tracking-tighter">{debugInfo.radius}<span className="text-sm text-zinc-600 not-italic">m</span></p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-start gap-4">
-                <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-1" />
-                <div className="space-y-1">
-                  <p className="text-rose-500 font-black text-[10px] uppercase tracking-widest text-left">Aviso de Sistema</p>
-                  <p className="text-white text-xs font-bold uppercase tracking-tight leading-snug text-left">{error}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {step === 1 ? (
-          <form onSubmit={handleSearch} className="space-y-8">
-            <div className="space-y-3">
-              <label className="block text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em] ml-1">Identificação do Atleta</label>
-              <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-lime-400 transition-colors w-4 h-4" />
-                <input
-                  required
-                  type="text"
-                  placeholder="CPF OU TAG ÚNICA"
-                  className="w-full pl-12 pr-5 py-5 bg-zinc-900/50 border border-zinc-800 rounded-2xl text-white font-bold placeholder:text-zinc-700 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase font-sport tracking-widest text-lg"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                />
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-5 bg-white text-black rounded-2xl font-black text-xl uppercase italic tracking-tighter hover:bg-lime-400 transition-all flex items-center justify-center gap-2 font-sport shadow-2xl active:scale-95"
-            >
-              {loading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div> : (
-                <>PRÓXIMO <ChevronRight className="w-6 h-6" /></>
-              )}
-            </button>
-          </form>
-        ) : (
-          <div className="space-y-8 animate-in slide-in-from-right-4">
-            <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-[1.5rem] space-y-5">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-lime-400 rounded-2xl flex items-center justify-center text-black font-black text-2xl font-sport italic shadow-lg overflow-hidden">
-                  {user?.photoUrl ? (
-                    <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
-                  ) : (
-                    user?.name[0].toUpperCase() || '?'
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-white uppercase italic font-sport tracking-tight leading-none mb-1.5">{user?.name}</h3>
-                  <div className="inline-flex items-center px-2 py-0.5 bg-black rounded-lg border border-zinc-800">
-                    <span className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mr-2">ID:</span>
-                    <span className="text-[9px] text-lime-400 font-black font-sport italic">{user?.uniqueCode}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-1">
-                <div className="bg-black/40 p-4 rounded-xl border border-zinc-800/50 w-full text-center">
-                  <p className="text-[7.5px] font-black text-zinc-600 uppercase tracking-widest mb-1">Saldo Atual</p>
-                  <p className="text-2xl font-black text-white font-sport italic">R$ {user?.balance.toFixed(2)}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-[70px_1fr] gap-3">
-                <button
-                  onClick={() => setStep(1)}
-                  className="py-5 bg-zinc-900 border border-zinc-800 text-zinc-500 rounded-2xl flex items-center justify-center hover:text-white transition-all active:scale-90"
-                >
-                  <ArrowLeft className="w-6 h-6" />
-                </button>
-
-                {(!permissionStatus || permissionStatus === 'prompt' || permissionStatus === 'granted') && (
-                  <button
-                    onClick={handleRequestLocation}
-                    disabled={loading}
-                    className="py-5 bg-lime-400 text-black rounded-2xl font-black text-xl uppercase italic tracking-tighter hover:bg-white transition-all flex items-center justify-center gap-3 font-sport shadow-[0_20px_40px_rgba(163,230,53,0.15)] active:scale-95"
-                  >
-                    {loading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div> : (
-                      <>
-                        <MapPin className="w-6 h-6" />
-                        CHECK-IN
-                      </>
-                    )}
-                  </button>
-                )}
-
-                {permissionStatus === 'denied' && (
-                  <button
-                    onClick={handleRequestLocation}
-                    className="py-5 bg-rose-500 text-white rounded-2xl font-black text-sm uppercase italic tracking-tighter hover:bg-rose-400 transition-all flex items-center justify-center gap-2 font-sport shadow-[0_20px_40px_rgba(244,63,94,0.15)] active:scale-95 px-4"
-                  >
-                    <AlertCircle className="w-5 h-5 mx-auto mb-1" />
-                    {isIOS ? 'HABILITAR NO SAFARI' : 'TENTAR NOVAMENTE'}
-                  </button>
-                )}
-
-              </div>
-
-              {permissionStatus === 'denied' && (
-                <p className="text-[9px] text-zinc-500 text-center font-black uppercase tracking-widest max-w-[280px] mx-auto">
-                  Localização obrigatória para validar presença na academia.
-                </p>
-              )}
-              <div className="pt-4 flex flex-col items-center gap-4 border-t border-zinc-800/50 mt-4">
-                <button
-                  onClick={() => setShowLocationsModal(true)}
-                  className="flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all group w-full max-w-xs justify-center"
-                >
-                  <Map className="w-4 h-4 text-lime-400" />
-                  <span className="text-xs font-black uppercase tracking-widest text-zinc-300 group-hover:text-white">Locais de Check-in</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="pt-12 flex flex-col items-center gap-4">
-
-
-          <Link to="/admin/login" className="group flex items-center gap-3 px-6 py-3 bg-zinc-900/30 border border-zinc-800/50 rounded-full transition-all hover:bg-lime-400/10 hover:border-lime-400/30">
-            <Lock className="w-3 h-3 text-zinc-600 group-hover:text-lime-400 transition-colors" />
-            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 group-hover:text-white transition-colors">ACESSO RESTRITO AO COMANDO</span>
-          </Link>
-          <p className="text-[8px] text-zinc-800 font-black uppercase tracking-[0.6em]">Impulso Club Performance V4</p>
-        </div>
-      </div>
-
-      {/* Locations Modal */}
-      {showLocationsModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
-
-            {/* Header */}
-            <div className="p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-950">
-              <h3 className="text-lg font-black italic uppercase font-sport text-white tracking-wider flex items-center gap-2">
-                <Map className="w-5 h-5 text-lime-400" />
-                Locais Disponíveis
-              </h3>
-              <button
-                onClick={() => { setShowLocationsModal(false); setSelectedLocation(null); }}
-                className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-0">
-              {selectedLocation ? (
-                <div className="animate-in slide-in-from-right-4 duration-300">
-                  {/* Location Photo */}
-                  <div className="h-48 bg-zinc-800 relative group overflow-hidden">
-                    {selectedLocation.photoUrl ? (
-                      <img
-                        src={selectedLocation.photoUrl}
-                        alt={selectedLocation.locationName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
-                        <MapPin className="w-12 h-12 text-zinc-700" />
-                      </div>
-                    )}
-
-                    {/* Map Overlay Gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent"></div>
-
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter leading-none mb-1 shadow-black drop-shadow-lg">
-                        {selectedLocation.locationName}
-                      </h2>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="bg-lime-400 text-black text-xs font-black px-3 py-1 rounded shadow-[0_0_20px_rgba(163,230,53,0.4)] whitespace-nowrap font-sport italic tracking-tighter flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-black text-black" />
-                          {selectedLocation.weight * 10} PONTOS
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-6 space-y-6">
-                    <div className="space-y-4">
-                      <div className="flex items-start gap-4 p-4 bg-black/40 rounded-xl border border-zinc-800">
-                        <MapPin className="w-5 h-5 text-zinc-400 mt-1" />
-                        <div>
-                          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Endereço</p>
-                          <p className="text-sm font-bold text-white uppercase leading-snug">
-                            {/* Address fallback since we don't have exact address field yet */}
-                            {selectedLocation.locationName}, Latitude: {selectedLocation.latitude.toFixed(4)}, Longitude: {selectedLocation.longitude.toFixed(4)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-4 p-4 bg-black/40 rounded-xl border border-zinc-800">
-                        <Clock className="w-5 h-5 text-zinc-400 mt-1" />
-                        <div>
-                          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Horários de Check-in</p>
-                          <div className="flex flex-wrap gap-2">
-                            {selectedLocation.intervals && selectedLocation.intervals.filter(inv => inv.startTime.trim() !== '' || inv.endTime.trim() !== '').length > 0 ? (
-                              selectedLocation.intervals
-                                .filter(inv => inv.startTime.trim() !== '' || inv.endTime.trim() !== '')
-                                .map((interval, i) => (
-                                  <p key={i} className="text-2xl font-black text-lime-400 font-sport italic whitespace-nowrap bg-lime-400/10 px-3 py-1 rounded-xl border border-lime-400/20 shadow-[0_0_20px_rgba(163,230,53,0.1)]">
-                                    {interval.startTime} <span className="text-lime-400/40 not-italic mx-1">-</span> {interval.endTime}
-                                  </p>
-                                ))
-                            ) : (
-                              <p className="text-2xl font-black text-lime-400 font-sport italic bg-lime-400/10 px-3 py-1 rounded-xl border border-lime-400/20 shadow-[0_0_20px_rgba(163,230,53,0.1)]">
-                                {selectedLocation.startTime} <span className="text-lime-400/40 not-italic mx-1">-</span> {selectedLocation.endTime}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${selectedLocation.latitude},${selectedLocation.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
-                      >
-                        <ExternalLink className="w-5 h-5 mb-1" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Google Maps</span>
-                      </a>
-                      <a
-                        href={`https://waze.com/ul?ll=${selectedLocation.latitude},${selectedLocation.longitude}&navigate=yes`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-4 bg-cyan-500 hover:bg-cyan-400 text-white rounded-xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
-                      >
-                        <Navigation className="w-5 h-5 mb-1" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Waze</span>
-                      </a>
-                    </div>
-
-                    <button
-                      onClick={() => setSelectedLocation(null)}
-                      className="w-full py-4 text-zinc-500 hover:text-white font-black uppercase text-xs tracking-widest transition-colors flex items-center justify-center gap-2"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      Voltar para lista
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 space-y-6">
-                  {[1, 2, 3, 4, 5, 6, 0].map(dayIdx => { // Start with Monday(1) ends with Sunday(0)
-                    const daySlots = timeSlots.filter(s => {
-                      // 1. Filter by Day
-                      if (!s.days.includes(dayIdx)) return false;
-
-                      // 2. Strict City Filter
-                      if (!user?.city) return false; // User without city sees nothing (or only global? Assume strict for now based on request)
-                      if (!s.city) return false; // Slot without city does not match user with city
-
-                      const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-                      const userCity = normalize(user.city);
-                      const slotCity = normalize(s.city);
-
-                      if (userCity !== slotCity) return false;
-
-                      // 3. Exclusivity Filter
-                      if (s.isExclusive) {
-                        return s.allowedUserIds?.includes(user!.id);
-                      }
-
-                      return true;
-                    }).sort((a, b) => a.startTime.localeCompare(b.startTime));
-                    if (daySlots.length === 0) return null;
-
-                    const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-
-                    return (
-                      <div key={dayIdx} className="space-y-3">
-                        <div className="flex items-center gap-3 px-2">
-                          <Calendar className="w-4 h-4 text-lime-400" />
-                          <h4 className="text-sm font-black text-white uppercase tracking-widest">{dayNames[dayIdx]}</h4>
-                          <div className="h-px bg-zinc-800 flex-1"></div>
-                        </div>
-
-                        <div className="grid gap-2">
-                          {daySlots.map(slot => (
-                            <button
-                              key={slot.id}
-                              onClick={() => setSelectedLocation(slot)}
-                              className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-lime-400/30 p-4 rounded-xl text-left transition-all active:scale-[0.98] group"
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-white font-bold uppercase text-sm truncate pr-2 group-hover:text-lime-400 transition-colors">{slot.locationName}</span>
-                                <span className="bg-lime-400 text-black text-[10px] font-black px-2.5 py-1 rounded shadow-[0_0_15px_rgba(163,230,53,0.3)] whitespace-nowrap font-sport italic tracking-tighter transform hover:scale-110 transition-transform duration-300">
-                                  {slot.weight * 10} PTS
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-2 mt-2">
-                                <Clock className="w-3 h-3 text-lime-400" />
-                                <div className="flex flex-wrap gap-1.5">
-                                  {slot.intervals && slot.intervals.filter(inv => inv.startTime.trim() !== '' || inv.endTime.trim() !== '').length > 0 ? (
-                                    slot.intervals
-                                      .filter(inv => inv.startTime.trim() !== '' || inv.endTime.trim() !== '')
-                                      .map((interval, i) => (
-                                        <span key={i} className="text-[10px] font-black font-mono bg-lime-400/10 text-lime-400 border border-lime-400/20 px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-[0_0_15px_rgba(163,230,53,0.1)]">
-                                          {interval.startTime} <span className="opacity-40 font-sans">-</span> {interval.endTime}
-                                        </span>
-                                      ))
-                                  ) : (
-                                    <span className="text-[10px] font-black font-mono bg-lime-400/10 text-lime-400 border border-lime-400/20 px-2 py-0.5 rounded-lg">
-                                      {slot.startTime} <span className="opacity-40 font-sans">-</span> {slot.endTime}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      </section>
     </div>
   );
 };
