@@ -3,7 +3,9 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { User, UserStatus, TimeSlot, CheckIn } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, addCheckIn, updateUser } from '../../services/db';
 import { GYM_LOCATION } from '../../constants';
-import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin, Map, X, ExternalLink, Calendar, Star, Navigation, Camera, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Search, Clock, AlertCircle, CheckCircle, Lock, ArrowLeft, Activity, ChevronRight, MapPin, Map, X, ExternalLink, Calendar, Star, Navigation, Camera, Loader2, Image as ImageIcon, LogOut } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { auth as firebaseAuth } from '../../services/firebase';
 import {
   ensureAuth,
   getUserLocation,
@@ -14,6 +16,7 @@ import {
 import { LocationResult } from '../../services/geolocation';
 
 const CheckInPage: React.FC = () => {
+  const { currentUser } = useAuth();
   const [searchParams] = useSearchParams();
   const tokenFromUrl = searchParams.get('token');
   const [step, setStep] = useState(1);
@@ -80,6 +83,28 @@ const CheckInPage: React.FC = () => {
       unsubCheckIns();
     };
   }, []);
+
+  // Auto-identify user if logged in via Google
+  useEffect(() => {
+    if (currentUser?.email && users.length > 0 && !user) {
+      const foundUser = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
+      if (foundUser) {
+        if (foundUser.status !== UserStatus.ELIMINATED && foundUser.status !== 'eliminado') {
+          setUser(foundUser);
+          setStep(2);
+        }
+      }
+    }
+  }, [currentUser, users, user]);
+
+  const handleLogout = async () => {
+    try {
+      await firebaseAuth.signOut();
+      window.location.href = '#/admin/login';
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   const getNowStr = () => {
     const hh = currentTime.getHours().toString().padStart(2, '0');
@@ -469,6 +494,37 @@ const CheckInPage: React.FC = () => {
             <Clock className="w-2.5 h-2.5 text-lime-500" />
             {currentTime.toLocaleTimeString('pt-BR')}
           </div>
+
+          {currentUser && (
+            <div className="flex items-center gap-4 bg-zinc-900/50 border border-zinc-800/80 px-4 py-2 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-500 mt-2">
+              <div className="relative group">
+                <div className="w-8 h-8 rounded-lg overflow-hidden border border-zinc-700 bg-zinc-800">
+                  {currentUser.photoURL ? (
+                    <img src={currentUser.photoURL} alt={currentUser.displayName || ''} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-lime-400 font-black text-xs">
+                      {currentUser.displayName?.[0] || currentUser.email?.[0].toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-lime-400 border-2 border-black rounded-full"></div>
+              </div>
+              <div className="flex flex-col items-start pr-2">
+                <span className="text-[10px] font-black text-white italic font-sport tracking-tight max-w-[120px] truncate leading-none mb-0.5 uppercase">
+                  {currentUser.displayName || 'Atleta'}
+                </span>
+                <span className="text-[7px] text-zinc-500 font-black uppercase tracking-[0.1em]">{currentUser.email}</span>
+              </div>
+              <div className="w-px h-6 bg-zinc-800 mx-1"></div>
+              <button
+                onClick={handleLogout}
+                className="p-2 hover:bg-rose-500/10 rounded-xl transition-all group"
+                title="Sair"
+              >
+                <LogOut className="w-4 h-4 text-zinc-600 group-hover:text-rose-500" />
+              </button>
+            </div>
+          )}
         </div>
 
         {error && (

@@ -13,6 +13,7 @@ import Dashboard from './views/admin/Dashboard';
 import Profile from './views/admin/Profile';
 import ExternalSignup from './views/public/ExternalSignup';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ADMIN_EMAILS } from './constants';
 
 // Componente para proteger rotas administrativas
 const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -24,6 +25,13 @@ const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children
 
   if (!currentUser) {
     return <Navigate to="/admin/login" replace />;
+  }
+
+  // Verificar se o usuário é admin
+  const isAdmin = ADMIN_EMAILS.includes(currentUser.email || '');
+
+  if (!isAdmin) {
+    return <Navigate to="/checkin" replace />;
   }
 
   return <>{children}</>;

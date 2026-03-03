@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, User, LogIn, AlertCircle, Activity } from 'lucide-react';
+import { Lock, User as UserIcon, LogIn, AlertCircle, Activity } from 'lucide-react';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '../../services/firebase';
+import { subscribeToUsers } from '../../services/db';
+import { User } from '../../types';
+import { ADMIN_EMAILS } from '../../constants';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [athletes, setAthletes] = useState<User[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsub = subscribeToUsers(setAthletes);
+    return () => unsub();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,8 +26,16 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate('/admin/usuarios');
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const userEmail = result.user.email;
+
+      const isAdmin = ADMIN_EMAILS.includes(userEmail || '');
+
+      if (isAdmin) {
+        navigate('/admin');
+      } else {
+        navigate('/checkin');
+      }
     } catch (err: any) {
       if (err.code === 'auth/invalid-credential') {
         setError('CREDENCIAIS INVÁLIDAS.');
@@ -36,10 +53,30 @@ const Login: React.FC = () => {
     const provider = new GoogleAuthProvider();
 
     try {
-      await signInWithPopup(auth, provider);
-      navigate('/admin/usuarios');
+      const result = await signInWithPopup(auth, provider);
+      const userEmail = result.user.email;
+
+      // Check if user is an admin
+      const isAdmin = ADMIN_EMAILS.includes(userEmail || '');
+
+      if (isAdmin) {
+        navigate('/admin');
+      } else {
+        // Check if user is an athlete
+        const isAthlete = athletes.some(a => a.email?.toLowerCase() === userEmail?.toLowerCase());
+        if (isAthlete) {
+          navigate('/checkin');
+        } else {
+          // If neither, send to signup
+          navigate('/inscrever');
+        }
+      }
     } catch (err: any) {
-      setError('ERRO AO FAZER LOGIN COM GOOGLE: ' + err.message);
+      if (err.code === 'auth/unauthorized-domain') {
+        setError('DOMÍNIO NÃO AUTORIZADO NO FIREBASE. ADICIONE AO CONSOLE.');
+      } else {
+        setError('ERRO AO FAZER LOGIN COM GOOGLE: ' + err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -61,7 +98,7 @@ const Login: React.FC = () => {
             <div>
               <label className="block text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-2 ml-1">Email</label>
               <div className="relative group">
-                <User className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-lime-400 transition-colors w-4 h-4" />
+                <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-lime-400 transition-colors w-4 h-4" />
                 <input
                   type="email"
                   required

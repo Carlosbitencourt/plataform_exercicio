@@ -245,6 +245,12 @@ const ExternalSignup: React.FC = () => {
 
             setGeneratedId(uniqueCode);
             setStep('success');
+
+            // Redireciona automaticamente após 5 segundos
+            setTimeout(() => {
+                window.location.href = '#/checkin';
+            }, 5000);
+
         } catch (error: any) {
             console.error("Error signing up:", error);
             alert("Erro ao realizar cadastro: " + error.message);
@@ -290,6 +296,8 @@ const ExternalSignup: React.FC = () => {
 
                         <p className="text-zinc-500 text-[8px] font-bold uppercase tracking-widest leading-relaxed mt-4">
                             Guarde este código! Você precisará dele para seus check-ins diários.
+                            <br />
+                            <span className="text-lime-400/50">Redirecionando para o check-in em instantes...</span>
                         </p>
                     </div>
 

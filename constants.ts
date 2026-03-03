@@ -6,3 +6,8 @@ export const GYM_LOCATION = {
   lng: -46.633308,
   radius: 500, // metros
 };
+
+export const ADMIN_EMAILS = [
+  'admin@admin.com',
+  'carlos.bitencourt@fitreward.com.br'
+];
