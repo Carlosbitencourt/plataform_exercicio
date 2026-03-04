@@ -94,10 +94,10 @@ const AthleteRanking: React.FC = () => {
 
     const getRankStyle = (index: number) => {
         switch (index) {
-            case 0: return { border: 'border-amber-400', glow: 'shadow-[0_0_20px_rgba(251,191,36,0.3)]', icon: 'text-amber-400', bg: 'bg-amber-400/10' };
-            case 1: return { border: 'border-zinc-300', glow: 'shadow-[0_0_20px_rgba(212,212,216,0.3)]', icon: 'text-zinc-300', bg: 'bg-zinc-300/10' };
-            case 2: return { border: 'border-orange-500', glow: 'shadow-[0_0_20px_rgba(249,115,22,0.3)]', icon: 'text-orange-500', bg: 'bg-orange-500/10' };
-            default: return { border: 'border-zinc-800', glow: '', icon: 'text-zinc-500', bg: 'bg-zinc-900/50' };
+            case 0: return { border: 'border-amber-400', glow: 'shadow-[0_4px_20px_rgba(251,191,36,0.2)]', icon: 'text-amber-500', bg: 'bg-amber-400' };
+            case 1: return { border: 'border-zinc-300', glow: 'shadow-[0_4px_20px_rgba(0,0,0,0.1)]', icon: 'text-zinc-500', bg: 'bg-zinc-100' };
+            case 2: return { border: 'border-orange-500', glow: 'shadow-[0_4px_20px_rgba(249,115,22,0.2)]', icon: 'text-orange-500', bg: 'bg-orange-100' };
+            default: return { border: 'border-zinc-100', glow: 'shadow-[0_4px_15px_rgba(0,0,0,0.05)]', icon: 'text-zinc-400', bg: 'bg-zinc-50' };
         }
     };
 
@@ -143,12 +143,12 @@ const AthleteRanking: React.FC = () => {
                     return (
                         <div
                             key={user.id}
-                            className={`bg-zinc-900/40 backdrop-blur-sm border ${style.border} ${style.glow} p-4 rounded-3xl flex items-center justify-between transition-all hover:translate-x-1 group relative overflow-hidden`}
+                            className={`bg-white border-2 ${style.border} ${style.glow} p-4 rounded-[2rem] flex items-center justify-between transition-all hover:scale-[1.02] group relative overflow-hidden`}
                             style={{ animationDelay: `${index * 50}ms` }}
                         >
                             {isTop3 && (
-                                <div className={`absolute top-0 right-0 p-1 px-2 ${style.bg} border-b border-l ${style.border} rounded-bl-xl`}>
-                                    <Star className={`w-3 h-3 fill-current ${style.icon}`} />
+                                <div className={`absolute top-0 right-0 p-1.5 px-3 ${style.bg} border-b-2 border-l-2 ${style.border} rounded-bl-2xl shadow-sm`}>
+                                    <Star className={`w-3.5 h-3.5 fill-current ${index === 0 ? 'text-white' : style.icon}`} />
                                 </div>
                             )}
 
@@ -171,24 +171,24 @@ const AthleteRanking: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <h3 className="text-sm font-black italic font-sport text-white uppercase tracking-tight group-hover:text-lime-400 transition-colors">
+                                    <h3 className="text-lg font-black italic font-sport text-zinc-900 uppercase tracking-tight group-hover:text-lime-600 transition-colors leading-none mb-1">
                                         {user.name.split(' ').slice(0, 2).join(' ')}
                                     </h3>
                                     <div className="flex items-center gap-3">
-                                        <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1">
-                                            <Clock className="w-2.5 h-2.5" />
+                                        <span className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 bg-zinc-100 px-2 py-0.5 rounded-full">
+                                            <Clock className="w-3 h-3" />
                                             {'checkInTime' in item ? item.checkInTime : 'ATIVO'}
                                         </span>
-                                        <span className="text-[10px] font-black text-lime-400 italic font-sport">R$ {user.balance.toFixed(2)}</span>
+                                        <span className="text-sm font-black text-lime-600 italic font-sport">R$ {user.balance.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="text-right">
-                                <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-0.5">Pontos</p>
-                                <div className="flex items-center justify-end gap-1">
-                                    <Zap className="w-3.5 h-3.5 text-lime-400 fill-lime-400" />
-                                    <span className="text-xl font-black text-white font-sport italic tracking-tighter">
+                                <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] mb-0.5">Pontos</p>
+                                <div className="flex items-center justify-end gap-1.5">
+                                    <Zap className="w-4 h-4 text-lime-500 fill-lime-500" />
+                                    <span className="text-2xl font-black text-zinc-900 font-sport italic tracking-tighter">
                                         {score.toFixed(0)}
                                     </span>
                                 </div>

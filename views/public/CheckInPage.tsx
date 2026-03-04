@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, UserStatus, TimeSlot, CheckIn } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns } from '../../services/db';
 import { GYM_LOCATION } from '../../constants';
-import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   ensureAuth,
@@ -33,6 +33,9 @@ const CheckInPage: React.FC = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
 
+  // Ranking Positions
+  const [positions, setPositions] = useState({ daily: '-', weekly: '-', general: '-' });
+
   // iOS Detection for specific instructions
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
@@ -60,17 +63,57 @@ const CheckInPage: React.FC = () => {
     };
   }, []);
 
-  // Auto-identify user
+  // Auto-identify user and calculate positions
   useEffect(() => {
     if (currentUser?.email && users.length > 0) {
       const foundUser = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
       if (foundUser) {
         if (foundUser.status !== UserStatus.ELIMINATED && foundUser.status !== 'eliminado') {
           setUser(foundUser);
+
+          // Calculate Positions
+          const today = getTodayISO();
+
+          // 1. Daily Position (by check-in time)
+          const todayCheckIns = checkIns
+            .filter(c => c.date === today)
+            .sort((a, b) => a.time.localeCompare(b.time));
+
+          const uniqueDailyAtletes = Array.from(new Set(todayCheckIns.map(c => c.userId)));
+          const dailyPos = uniqueDailyAtletes.indexOf(foundUser.id) + 1;
+
+          // 2. Weekly Position
+          const now = new Date();
+          const startOfWeek = new Date(now);
+          startOfWeek.setDate(now.getDate() - now.getDay());
+          startOfWeek.setHours(0, 0, 0, 0);
+
+          const weeklyRank = users
+            .map(u => {
+              const uCheckIns = checkIns.filter(c => {
+                const [y, m, d] = c.date.split('-').map(Number);
+                const cDate = new Date(y, m - 1, d);
+                return u.id === c.userId && cDate >= startOfWeek;
+              });
+              const score = uCheckIns.reduce((acc, c) => acc + (c.score || 0), 0);
+              return { id: u.id, score };
+            })
+            .sort((a, b) => b.score - a.score);
+          const weeklyPos = weeklyRank.findIndex(r => r.id === foundUser.id) + 1;
+
+          // 3. General Position
+          const generalRank = [...users].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+          const generalPos = generalRank.findIndex(r => r.id === foundUser.id) + 1;
+
+          setPositions({
+            daily: dailyPos > 0 ? `#${dailyPos}` : '-',
+            weekly: weeklyPos > 0 ? `#${weeklyPos}` : '-',
+            general: generalPos > 0 ? `#${generalPos}` : '-'
+          });
         }
       }
     }
-  }, [currentUser, users]);
+  }, [currentUser, users, checkIns]);
 
   const getNowStr = () => {
     const hh = currentTime.getHours().toString().padStart(2, '0');
@@ -301,31 +344,38 @@ const CheckInPage: React.FC = () => {
           </div>
 
           <div className="space-y-1">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Ganhos Acumulados</p>
+            <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Ganhos Acumulados</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black text-white font-sport italic tracking-tighter">
+              <span className="text-6xl font-black text-white font-sport italic tracking-tighter">
                 R$ {user?.balance.toFixed(2) || '0.00'}
               </span>
-              <span className="text-lime-400 text-xs font-black uppercase">V4.0</span>
+              <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20">LIVE</span>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div className="pt-4 border-t border-zinc-800/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
-                <Clock className="w-4 h-4 text-zinc-500" />
-              </div>
-              <div>
-                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Sessão</p>
-                <p className="text-[10px] font-black text-zinc-300 uppercase italic font-sport tracking-tight">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <p className="text-[10px] font-black text-lime-400 uppercase italic font-sport tracking-tight">Level 12</p>
-              <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div className="w-2/3 h-full bg-lime-400 rounded-full shadow-[0_0_10px_rgba(163,230,53,0.5)]"></div>
-              </div>
-            </div>
+      {/* Real-time Ranking Positions */}
+      <section className="grid grid-cols-3 gap-3">
+        <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-[1.5rem] text-center space-y-2 group hover:border-lime-500/30 transition-all">
+          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest group-hover:text-zinc-300 transition-colors">DIÁRIO</p>
+          <div className="flex items-center justify-center gap-2">
+            <Trophy className="w-4 h-4 text-amber-500" />
+            <p className="text-2xl font-black text-white font-sport italic tracking-tighter">{positions.daily}</p>
+          </div>
+        </div>
+        <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-[1.5rem] text-center space-y-2 group hover:border-lime-500/30 transition-all">
+          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest group-hover:text-zinc-300 transition-colors">SEMANAL</p>
+          <div className="flex items-center justify-center gap-2">
+            <Award className="w-4 h-4 text-blue-500" />
+            <p className="text-2xl font-black text-white font-sport italic tracking-tighter">{positions.weekly}</p>
+          </div>
+        </div>
+        <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-[1.5rem] text-center space-y-2 group hover:border-lime-500/30 transition-all">
+          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest group-hover:text-zinc-300 transition-colors">GERAL</p>
+          <div className="flex items-center justify-center gap-2">
+            <Star className="w-4 h-4 text-lime-500 fill-lime-500/20" />
+            <p className="text-2xl font-black text-white font-sport italic tracking-tighter">{positions.general}</p>
           </div>
         </div>
       </section>
@@ -342,56 +392,56 @@ const CheckInPage: React.FC = () => {
         <button
           onClick={handleRequestLocation}
           disabled={loading || todayChecked}
-          className={`w-full py-6 rounded-[2rem] font-black text-xl uppercase italic tracking-tighter transition-all flex flex-col items-center justify-center gap-1 font-sport shadow-2xl active:scale-95 group relative overflow-hidden ${todayChecked
-              ? 'bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed'
-              : 'bg-white text-black hover:bg-lime-400'
+          className={`w-full py-8 rounded-[2.5rem] font-black text-2xl uppercase italic tracking-tighter transition-all flex flex-col items-center justify-center gap-1 font-sport shadow-[0_20px_50px_rgba(255,255,255,0.1)] active:scale-95 group relative overflow-hidden ${todayChecked
+            ? 'bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed'
+            : 'bg-white text-black hover:shadow-[0_20px_60px_rgba(163,230,53,0.3)]'
             }`}
         >
           {loading ? (
-            <Loader2 className="w-8 h-8 animate-spin" />
+            <Loader2 className="w-10 h-10 animate-spin" />
           ) : todayChecked ? (
-            <>
-              <CheckCircle className="w-8 h-8 mb-1" />
-              MISSÃO CONCLUÍDA
-              <span className="text-[9px] font-black not-italic tracking-widest opacity-40">VOLTE AMANHÃ</span>
-            </>
+            <div className="flex flex-col items-center animate-in fade-in duration-700">
+              <div className="bg-zinc-800 p-2 rounded-full mb-2">
+                <CheckCircle className="w-8 h-8 text-zinc-500" />
+              </div>
+              <span className="text-zinc-500">MISSÃO CONCLUÍDA</span>
+              <span className="text-[9px] font-black not-italic tracking-[0.3em] opacity-40">VOLTE AMANHÃ</span>
+            </div>
           ) : (
             <>
-              {!todayChecked && (
-                <div className="absolute inset-0 bg-lime-400 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              )}
+              <div className="absolute inset-0 bg-gradient-to-tr from-lime-400/0 via-white/40 to-lime-400/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out"></div>
               <div className="relative z-10 flex flex-col items-center">
-                <div className="flex items-center gap-3">
-                  <MapPin className="w-6 h-6" />
-                  REGISTRAR CHECK-IN
+                <div className="flex items-center gap-5">
+                  <div className="p-4 bg-black rounded-2xl group-hover:bg-lime-500 transition-colors duration-300 shadow-xl">
+                    <MapPin className="w-8 h-8 text-white group-hover:text-black" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-2xl font-black italic tracking-tighter leading-none mb-1">REGISTRAR CHECK-IN</p>
+                    <p className="text-xs font-bold not-italic tracking-[0.2em] text-zinc-500 uppercase">PRESENÇA OBRIGATÓRIA</p>
+                  </div>
                 </div>
-                <span className="text-[9px] font-black not-italic tracking-widest opacity-60">PRESENÇA OBRIGATÓRIA</span>
               </div>
-              <ArrowRight className="absolute right-6 w-6 h-6 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
+              <ArrowRight className="absolute right-8 w-6 h-6 opacity-40 group-hover:opacity-100 group-hover:translate-x-2 transition-all" />
             </>
           )}
         </button>
       </section>
 
       {/* Stats Quick Grid */}
-      <section className="grid grid-cols-2 gap-4">
-        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-3xl space-y-2 group hover:border-zinc-700 transition-colors">
-          <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Star className="w-4 h-4 text-orange-500 fill-orange-500" />
+      <section className="grid grid-cols-1 gap-4">
+        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-[2.5rem] flex items-center justify-between group hover:border-zinc-700 transition-colors">
+          <div className="flex items-center gap-5">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Star className="w-6 h-6 text-orange-500 fill-orange-500" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-1">Total de Check-ins</p>
+              <p className="text-3xl font-black text-white font-sport italic tracking-tighter">
+                {userCheckIns.length} <span className="text-sm text-zinc-500 not-italic uppercase tracking-widest ml-1">TREINOS</span>
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Check-ins</p>
-            <p className="text-xl font-black text-white font-sport italic">{userCheckIns.length}</p>
-          </div>
-        </div>
-        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-3xl space-y-2 group hover:border-zinc-700 transition-colors">
-          <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Award className="w-4 h-4 text-blue-500" />
-          </div>
-          <div>
-            <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Ranking</p>
-            <p className="text-xl font-black text-white font-sport italic">#14</p>
-          </div>
+          <History className="w-5 h-5 text-zinc-800" />
         </div>
       </section>
 

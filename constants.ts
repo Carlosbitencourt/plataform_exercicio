@@ -9,5 +9,6 @@ export const GYM_LOCATION = {
 
 export const ADMIN_EMAILS = [
   'admin@admin.com',
-  'carlos.bitencourt@fitreward.com.br'
+  'carlos.bitencourt@fitreward.com.br',
+  'agenciaconativa@gmail.com'
 ];
