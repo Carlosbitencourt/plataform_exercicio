@@ -156,7 +156,7 @@ export const deleteCheckIn = async (id: string) => {
 // --- Distributions ---
 
 export const subscribeToDistributions = (callback: (distributions: Distribution[]) => void) => {
-    const q = query(collection(db, DISTRIBUTIONS_COLLECTION), orderBy('date', 'asc')); // Order might need adjustment based on date string format
+    const q = query(collection(db, DISTRIBUTIONS_COLLECTION)); // Removed orderBy to avoid missing index issues on new systems/mobile
     return onSnapshot(q, (snapshot) => {
         const distributions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Distribution));
         callback(distributions);
