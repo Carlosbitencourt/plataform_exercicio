@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { safeUpdateDoc } from './firebaseGuard';
 import { addDistribution } from './db';
@@ -175,6 +175,91 @@ export const runWeeklyDistribution = async () => {
 
   } catch (error) {
     console.error("Error distributing pool:", error);
+    throw error;
+  }
+};
+export const syncUserAbsences = async (userId: string) => {
+  const today = getLocalDate();
+  const weekDays = getWeekDays();
+  const daysToCheck = weekDays.filter(d => d < today); // Strictly past days of current week
+
+  if (daysToCheck.length === 0) return;
+
+  try {
+    // 1. Fetch user
+    const userSnap = await getDocs(query(collection(db, 'users'), where('id', '==', userId))); // userId is doc ID usually
+    // Actually safeUpdateDoc uses doc ID. Let's get the ref directly if we have userId as doc ID.
+    // In this project, userId in checkIns matches user doc ID.
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    if (!userDoc.exists()) return;
+    const user = { id: userDoc.id, ...userDoc.data() } as User;
+
+    if (user.status !== UserStatus.ACTIVE) return;
+
+    // 2. Fetch check-ins for the user this week
+    const checkInsSnap = await getDocs(query(
+      collection(db, 'checkIns'),
+      where('userId', '==', userId),
+      where('date', 'in', daysToCheck)
+    ));
+    const userCheckIns = checkInsSnap.docs.map(doc => doc.data() as CheckIn);
+    const presentDays = new Set(userCheckIns.map(c => c.date));
+
+    // 3. Fetch existing absence distributions for this week
+    const distSnap = await getDocs(query(
+      collection(db, 'distributions'),
+      where('userId', '==', userId),
+      where('date', 'in', daysToCheck)
+    ));
+    const existingPenaltyDates = new Set(
+      distSnap.docs
+        .map(doc => doc.data() as Distribution)
+        .filter(d => d.reason.startsWith('FALTA:'))
+        .map(d => d.reason.split(':')[1])
+    );
+
+    let newPenalties = 0;
+    for (const day of daysToCheck) {
+      if (!presentDays.has(day) && !existingPenaltyDates.has(day)) {
+        // Apply penalty for this specific day
+        const penalty = Math.min(user.balance - newPenalties, 10.0);
+        if (penalty > 0) {
+          newPenalties += penalty;
+          await addDistribution({
+            userId: userId,
+            amount: -penalty,
+            date: day, // Set specifically to the missed day
+            reason: `FALTA:${day}`,
+            createdAt: new Date().toISOString()
+          } as any);
+        }
+      }
+    }
+
+    if (newPenalties > 0) {
+      await safeUpdateDoc('users', userId, {
+        balance: user.balance - newPenalties
+      });
+    }
+
+  } catch (error) {
+    console.error(`Error syncing absences for user ${userId}:`, error);
+  }
+};
+
+export const syncAllUsersAbsences = async () => {
+  try {
+    const usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', UserStatus.ACTIVE)));
+    const activeUsers = usersSnap.docs.map(doc => doc.id);
+
+    console.log(`Syncing absences for ${activeUsers.length} users...`);
+    for (const userId of activeUsers) {
+      await syncUserAbsences(userId);
+    }
+    return { success: true, count: activeUsers.length };
+  } catch (error) {
+    console.error("Error syncing all users absences:", error);
     throw error;
   }
 };

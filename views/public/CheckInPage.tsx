@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserStatus, TimeSlot, CheckIn, Distribution } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
+import { runWeeklyPenaltyCheck, runWeeklyDistribution, syncUserAbsences } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -73,6 +74,7 @@ const CheckInPage: React.FC = () => {
       if (foundUser) {
         if (foundUser.status !== UserStatus.ELIMINATED && foundUser.status !== 'eliminado') {
           setUser(foundUser);
+          syncUserAbsences(foundUser.id);
 
           // Calculate Positions
           const today = getTodayISO();
@@ -354,11 +356,11 @@ const CheckInPage: React.FC = () => {
             <div className="space-y-1">
               <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Saldo Total (Portfólio)</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-6xl font-black text-white font-sport italic tracking-tighter">
+                <span className="text-6xl font-black text-white font-sport italic tracking-tighter text-shadow-glow">
                   {(() => {
                     const userDist = distributions.filter(d => d.userId === user?.id);
-                    const profit = userDist.reduce((acc, d) => acc + d.amount, 0);
-                    const totalValue = (user?.depositedValue || 0) + profit;
+                    const netProfit = userDist.reduce((acc, d) => acc + d.amount, 0);
+                    const totalValue = (user?.depositedValue || 0) + netProfit;
                     return `R$ ${totalValue.toFixed(2)}`;
                   })()}
                 </span>
@@ -367,25 +369,42 @@ const CheckInPage: React.FC = () => {
             </div>
 
             {/* Breakdown Grid */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="bg-black/40 border border-zinc-800/50 p-3 rounded-2xl">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+              <div className="bg-black/40 border border-zinc-800/50 p-4 rounded-2xl">
                 <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-1">Depósito Inicial</p>
-                <p className="text-lg font-black text-zinc-300 font-sport italic leading-none">
+                <p className="text-xl font-black text-white font-sport italic leading-none">
                   R$ {user?.depositedValue?.toFixed(2) || '0.00'}
                 </p>
               </div>
-              <div className="bg-lime-400/5 border border-lime-400/20 p-3 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-1 opacity-20">
-                  <Zap className="w-4 h-4 text-lime-400" />
+
+              <div className="grid grid-cols-2 gap-3 md:col-span-2">
+                <div className="bg-lime-400/5 border border-lime-400/20 p-4 rounded-2xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-1 opacity-20">
+                    <Award className="w-4 h-4 text-lime-400" />
+                  </div>
+                  <p className="text-[8px] font-black text-lime-600/60 uppercase tracking-widest mb-1">Lucro Gerado</p>
+                  <p className="text-xl font-black text-lime-400 font-sport italic leading-none">
+                    {(() => {
+                      const userDist = distributions.filter(d => d.userId === user?.id);
+                      const positiveProfit = userDist.filter(d => d.amount > 0).reduce((acc, d) => acc + d.amount, 0);
+                      return `R$ ${positiveProfit.toFixed(2)}`;
+                    })()}
+                  </p>
                 </div>
-                <p className="text-[8px] font-black text-lime-600/60 uppercase tracking-widest mb-1">Lucro Gerado</p>
-                <p className="text-lg font-black text-lime-400 font-sport italic leading-none">
-                  {(() => {
-                    const userDist = distributions.filter(d => d.userId === user?.id);
-                    const profit = userDist.reduce((acc, d) => acc + d.amount, 0);
-                    return `R$ ${profit.toFixed(2)}`;
-                  })()}
-                </p>
+
+                <div className="bg-rose-500/5 border border-rose-500/20 p-4 rounded-2xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-1 opacity-20">
+                    <AlertCircle className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <p className="text-[8px] font-black text-rose-500/60 uppercase tracking-widest mb-1">Penalidades (Faltas)</p>
+                  <p className="text-xl font-black text-rose-500 font-sport italic leading-none">
+                    {(() => {
+                      const userDist = distributions.filter(d => d.userId === user?.id);
+                      const penalties = userDist.filter(d => d.amount < 0).reduce((acc, d) => acc + d.amount, 0);
+                      return `R$ ${Math.abs(penalties).toFixed(2)}`;
+                    })()}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

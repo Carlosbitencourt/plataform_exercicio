@@ -1,7 +1,8 @@
 import React from 'react';
 import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon, Loader2, Camera } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { subscribeToUsers, subscribeToCheckIns } from '../../services/db';
+import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
+import { syncUserAbsences } from '../../services/rewardSystem';
 import { User, UserStatus, CheckIn } from '../../types';
 import { auth as firebaseAuth } from '../../services/firebase';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +12,7 @@ const AthleteProfile: React.FC = () => {
     const navigate = useNavigate();
     const [userData, setUserData] = React.useState<User | null>(null);
     const [checkIns, setCheckIns] = React.useState<CheckIn[]>([]);
+    const [distributions, setDistributions] = React.useState<any[]>([]);
     const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
@@ -42,6 +44,40 @@ const AthleteProfile: React.FC = () => {
             .replace(/(\d{3})(\d{1,2})/, '$1-$2')
             .replace(/(-\d{2})\d+?$/, '$1');
     };
+
+    React.useEffect(() => {
+        if (!currentUser?.email) return;
+
+        const unsubUsers = subscribeToUsers((users) => {
+            const found = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
+            if (found) {
+                setUserData(found);
+                syncUserAbsences(found.id);
+            }
+        });
+
+        const unsubCheckIns = subscribeToCheckIns((allChecks) => {
+            if (userData?.id) {
+                const userChecks = allChecks
+                    .filter(c => c.userId === userData.id)
+                    .sort((a, b) => b.date.localeCompare(a.date));
+                setCheckIns(userChecks);
+            }
+        });
+
+        const unsubDist = subscribeToDistributions((allDists) => {
+            if (userData?.id) {
+                const userDists = allDists.filter(d => d.userId === userData.id);
+                setDistributions(userDists);
+            }
+        });
+
+        return () => {
+            unsubUsers();
+            unsubCheckIns();
+            unsubDist();
+        };
+    }, [currentUser, userData?.id]);
 
     React.useEffect(() => {
         if (userData && !isEditModalOpen) {
@@ -154,15 +190,34 @@ const AthleteProfile: React.FC = () => {
                 </div>
             </header>
 
-            <div className="grid grid-cols-2 gap-4">
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-2 relative overflow-hidden group hover:border-lime-500/30 transition-all">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-4 relative overflow-hidden group hover:border-lime-500/30 transition-all md:col-span-2">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
                         <Zap className="w-12 h-12 text-lime-400" />
                     </div>
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Saldo Total</p>
-                    <p className="text-3xl font-black text-white font-sport italic tracking-tighter relative z-10">
-                        R$ {userData?.balance.toFixed(2) || '0.00'}
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Saldo Total (Portfólio)</p>
+                    <p className="text-4xl font-black text-white font-sport italic tracking-tighter relative z-10">
+                        {(() => {
+                            const netProfit = distributions.reduce((acc, d) => acc + d.amount, 0);
+                            const total = (userData?.depositedValue || 0) + netProfit;
+                            return `R$ ${total.toFixed(2)}`;
+                        })()}
                     </p>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-800/50">
+                        <div>
+                            <p className="text-[7px] font-black text-zinc-600 uppercase tracking-widest mb-1">Depósito</p>
+                            <p className="text-xs font-black text-zinc-300 font-sport italic">R$ {userData?.depositedValue?.toFixed(2) || '0.00'}</p>
+                        </div>
+                        <div>
+                            <p className="text-[7px] font-black text-zinc-600 uppercase tracking-widest mb-1">Lucro</p>
+                            <p className="text-xs font-black text-lime-400 font-sport italic">R$ {distributions.filter(d => d.amount > 0).reduce((acc, d) => acc + d.amount, 0).toFixed(2)}</p>
+                        </div>
+                        <div>
+                            <p className="text-[7px] font-black text-zinc-600 uppercase tracking-widest mb-1">Faltas</p>
+                            <p className="text-xs font-black text-rose-500 font-sport italic">R$ {Math.abs(distributions.filter(d => d.amount < 0).reduce((acc, d) => acc + d.amount, 0)).toFixed(2)}</p>
+                        </div>
+                    </div>
                 </div>
                 <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-2 relative overflow-hidden group hover:border-amber-500/30 transition-all">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">

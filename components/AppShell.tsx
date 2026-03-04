@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Trophy, MapPin, User as UserIcon, LogOut, Bell, Menu } from 'lucide-react';
+import { Home, Trophy, MapPin, User as UserIcon, LogOut, Bell, Menu, ShieldAlert, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { auth as firebaseAuth } from '../services/firebase';
 import { subscribeToUsers } from '../services/db';
@@ -11,7 +11,7 @@ interface AppShellProps {
 }
 
 const AppShell: React.FC<AppShellProps> = ({ children }) => {
-    const { currentUser } = useAuth();
+    const { currentUser, isImpersonating, stopImpersonating } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('home');
@@ -56,6 +56,28 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
     return (
         <div className="min-h-screen bg-black text-white flex flex-col font-sans overflow-x-hidden">
+            {/* Impersonation Banner */}
+            {isImpersonating && (
+                <div className="bg-rose-600 px-6 py-2 flex items-center justify-between sticky top-0 z-[100] animate-in slide-in-from-top duration-500">
+                    <div className="flex items-center gap-3">
+                        <ShieldAlert className="w-4 h-4 text-white animate-pulse" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">
+                            Modo Visualização: <span className="opacity-80">{userData?.name || currentUser?.displayName}</span>
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => {
+                            stopImpersonating();
+                            navigate('/admin/usuarios');
+                        }}
+                        className="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1"
+                    >
+                        <X className="w-3 h-3" />
+                        Encerrar
+                    </button>
+                </div>
+            )}
+
             {/* Premium Header */}
             <header className="sticky top-0 z-40 bg-black/60 backdrop-blur-xl border-b border-zinc-900 px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">

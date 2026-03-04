@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2 } from 'lucide-react';
+import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser, deleteUser } from '../../services/db';
 import { auth } from '../../services/firebase';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { safeUploadFile } from '../../services/firebaseGuard';
 import { User, UserStatus } from '../../types';
 
 const Users: React.FC = () => {
+  const { impersonate } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -267,6 +271,16 @@ const Users: React.FC = () => {
                   Editar
                 </button>
                 <button
+                  onClick={() => {
+                    impersonate(user);
+                    navigate('/checkin');
+                  }}
+                  className="flex-1 py-2 bg-black text-lime-400 font-bold uppercase tracking-widest text-[9px] rounded-lg border border-zinc-800 hover:bg-zinc-900 transition-colors flex items-center justify-center gap-1"
+                >
+                  <LogIn className="w-3 h-3" />
+                  Acessar
+                </button>
+                <button
                   onClick={() => toggleStatus(user)}
                   className={`flex-1 py-2 font-bold uppercase tracking-widest text-[9px] rounded-lg border transition-colors ${user.status === UserStatus.ACTIVE
                     ? 'bg-rose-50 text-rose-600 border-rose-200'
@@ -339,8 +353,18 @@ const Users: React.FC = () => {
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-right">
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => openEdit(user)} className="p-1.5 bg-white text-slate-400 hover:text-black hover:border-black rounded-md transition-all border border-slate-200 shadow-sm">
+                    <button onClick={() => openEdit(user)} className="p-1.5 bg-white text-slate-400 hover:text-black hover:border-black rounded-md transition-all border border-slate-200 shadow-sm" title="Editar Perfil">
                       <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        impersonate(user);
+                        navigate('/checkin');
+                      }}
+                      className="p-1.5 bg-black text-lime-400 hover:scale-[1.1] rounded-md transition-all border border-zinc-800 shadow-sm"
+                      title="Acessar Conta do Atleta"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => toggleStatus(user)}

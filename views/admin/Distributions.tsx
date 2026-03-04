@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Users, DollarSign, Calendar, Play, CheckCircle2, Zap, AlertTriangle } from 'lucide-react';
 import { subscribeToDistributions, subscribeToUsers, subscribeToCheckIns } from '../../services/db';
-import { runWeeklyPenaltyCheck, runWeeklyDistribution } from '../../services/rewardSystem';
+import { runWeeklyPenaltyCheck, runWeeklyDistribution, syncAllUsersAbsences } from '../../services/rewardSystem';
 import { Distribution, User, CheckIn, UserStatus } from '../../types';
 
 const Distributions: React.FC = () => {
@@ -21,13 +21,17 @@ const Distributions: React.FC = () => {
   }, []);
 
   const handleWeeklyCheck = async () => {
-    if (!window.confirm("Confirmar verificação SEMANAL de penalidades? Isso irá descontar R$ 10,00 por dia perdido de Seg-Sex.")) return;
+    if (!window.confirm("Confirmar verificação automática de penalidades (Segunda a Ontem)?")) return;
 
     setIsProcessing(true);
     setLastResult(null);
     try {
-      const result = await runWeeklyPenaltyCheck();
-      setLastResult({ type: 'penalty', ...result });
+      const result = await syncAllUsersAbsences();
+      setLastResult({
+        type: 'penalty',
+        message: `Sincronização concluída para ${result.count} usuários.`,
+        absentCount: result.count
+      });
     } catch (error: any) {
       console.error("Weekly check failed:", error);
       alert(`Erro: ${error.message}`);
