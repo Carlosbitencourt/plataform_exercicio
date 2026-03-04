@@ -56,20 +56,33 @@ const Login: React.FC = () => {
       const result = await signInWithPopup(auth, provider);
       const userEmail = result.user.email;
 
-      // Check if user is an admin
-      const isAdmin = ADMIN_EMAILS.includes(userEmail || '');
-
-      if (isAdmin) {
+      // 1. Check if user is an admin
+      if (ADMIN_EMAILS.includes(userEmail || '')) {
         navigate('/admin');
+        return;
+      }
+
+      // 2. Check if user is an existing athlete
+      // Add a small delay to ensure subscribeToUsers has populated the athletes list
+      // especially on the first load of the login page
+      const findAthlete = () => athletes.find(a =>
+        a.id === result.user.uid ||
+        (userEmail && a.email?.toLowerCase() === userEmail.toLowerCase())
+      );
+
+      let athlete = findAthlete();
+
+      if (!athlete) {
+        // Wait up to 1s for athletes to load if not found immediately
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        athlete = findAthlete();
+      }
+
+      if (athlete) {
+        navigate('/checkin');
       } else {
-        // Check if user is an athlete
-        const isAthlete = athletes.some(a => a.email?.toLowerCase() === userEmail?.toLowerCase());
-        if (isAthlete) {
-          navigate('/checkin');
-        } else {
-          // If neither, send to signup
-          navigate('/inscrever');
-        }
+        // If not admin and not athlete, redirect to signup
+        navigate('/inscrever');
       }
     } catch (err: any) {
       if (err.code === 'auth/unauthorized-domain') {

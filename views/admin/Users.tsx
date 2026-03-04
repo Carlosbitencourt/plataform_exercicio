@@ -17,8 +17,6 @@ const Users: React.FC = () => {
   const [pixCopied, setPixCopied] = useState(false);
   const [idCopied, setIdCopied] = useState(false);
 
-  // ... (existing code)
-
   const [formData, setFormData] = useState({
     name: '',
     cpf: '',
@@ -29,7 +27,8 @@ const Users: React.FC = () => {
     street: '',
     neighborhood: '',
     city: '',
-    photoUrl: ''
+    photoUrl: '',
+    email: ''
   });
 
   const generateUniqueCode = () => {
@@ -56,7 +55,6 @@ const Users: React.FC = () => {
     setUploadProgress(0);
 
     try {
-      // Simulating progress since safeUploadFile is a Promise
       const interval = setInterval(() => {
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 200);
@@ -79,8 +77,6 @@ const Users: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Current User:", auth.currentUser); // Debug auth
-    console.log("Form Data:", formData);
     try {
       if (editingUser) {
         await updateUser({ ...editingUser, ...formData });
@@ -97,7 +93,8 @@ const Users: React.FC = () => {
         street: '',
         neighborhood: '',
         city: '',
-        photoUrl: ''
+        photoUrl: '',
+        email: ''
       });
       setEditingUser(null);
       setIsModalOpen(false);
@@ -119,7 +116,8 @@ const Users: React.FC = () => {
       street: user.street || '',
       neighborhood: user.neighborhood || '',
       city: user.city || '',
-      photoUrl: user.photoUrl || ''
+      photoUrl: user.photoUrl || '',
+      email: user.email || ''
     });
     setIsModalOpen(true);
   };
@@ -169,7 +167,8 @@ const Users: React.FC = () => {
   const filteredUsers = users.filter(u =>
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.cpf.includes(searchTerm) ||
-    u.uniqueCode.toLowerCase().includes(searchTerm.toLowerCase())
+    u.uniqueCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -208,7 +207,8 @@ const Users: React.FC = () => {
                 street: '',
                 neighborhood: '',
                 city: '',
-                photoUrl: ''
+                photoUrl: '',
+                email: ''
               });
               setIsModalOpen(true);
             }}
@@ -244,7 +244,7 @@ const Users: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <h3 className="font-black text-slate-900 uppercase tracking-tight text-sm truncate">{user.name}</h3>
-                  <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mb-1">{user.phone}</p>
+                  <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mb-1">{user.phone} {user.email && <span className="lowercase">| {user.email}</span>}</p>
                   <div className="text-xs text-black font-black font-sport bg-lime-400 inline-block px-2 py-0.5 rounded border border-lime-500 uppercase tracking-widest italic shadow-sm">
                     {user.uniqueCode}
                   </div>
@@ -310,8 +310,10 @@ const Users: React.FC = () => {
                       )}
                     </div>
                     <div>
-                      <div className="text-xs font-black text-slate-900 uppercase tracking-tight">{user.name}</div>
-                      <div className="text-[9px] text-slate-400 font-bold tracking-widest uppercase">{user.phone}</div>
+                      <div>
+                        <div className="text-xs font-black text-slate-900 uppercase tracking-tight">{user.name}</div>
+                        <div className="text-[9px] text-slate-400 font-bold tracking-widest uppercase">{user.phone} {user.email && <span className="lowercase">| {user.email}</span>}</div>
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -437,6 +439,18 @@ const Users: React.FC = () => {
                       onChange={e => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">E-mail (Para Login Google)</label>
+                    <input
+                      type="email"
+                      className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none placeholder:text-slate-300 text-xs lowercase"
+                      placeholder="email@exemplo.com"
+                      value={formData.email}
+                      onChange={e => setFormData({ ...formData, email: e.target.value.toLowerCase() })}
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">CPF Registro</label>
