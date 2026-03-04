@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, UserStatus, TimeSlot, CheckIn } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns } from '../../services/db';
 import { GYM_LOCATION } from '../../constants';
-import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   ensureAuth,
@@ -490,8 +490,8 @@ const CheckInPage: React.FC = () => {
 
         <button
           onClick={handleRequestLocation}
-          disabled={loading || todayChecked}
-          className={`w-full py-8 rounded-[1.5rem] font-black text-2xl uppercase italic tracking-tighter transition-all flex flex-col items-center justify-center gap-1 font-sport shadow-[0_20px_50px_rgba(255,255,255,0.1)] active:scale-95 group relative overflow-hidden ${todayChecked
+          disabled={loading || todayChecked || user?.status === UserStatus.PENDING}
+          className={`w-full py-8 rounded-[1.5rem] font-black text-2xl uppercase italic tracking-tighter transition-all flex flex-col items-center justify-center gap-1 font-sport shadow-[0_20px_50px_rgba(255,255,255,0.1)] active:scale-95 group relative overflow-hidden ${todayChecked || user?.status === UserStatus.PENDING
             ? 'bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed'
             : 'bg-white text-black hover:shadow-[0_20px_60px_rgba(163,230,53,0.3)]'
             }`}
@@ -505,6 +505,12 @@ const CheckInPage: React.FC = () => {
               </div>
               <span className="text-zinc-500">MISSÃO CONCLUÍDA</span>
               <span className="text-[9px] font-black not-italic tracking-[0.3em] opacity-40">VOLTE AMANHÃ</span>
+            </div>
+          ) : user?.status === UserStatus.PENDING ? (
+            <div className="flex flex-col items-center opacity-60">
+              <Bell className="w-8 h-8 mb-2 text-amber-500 animate-pulse" />
+              <span className="text-zinc-500">AGUARDANDO APROVAÇÃO</span>
+              <span className="text-[9px] font-black not-italic tracking-[0.3em] opacity-40">REGISTRO BLOQUEADO</span>
             </div>
           ) : (
             <>

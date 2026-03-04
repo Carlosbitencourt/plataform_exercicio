@@ -4,7 +4,7 @@ import { Home, Trophy, MapPin, User as UserIcon, LogOut, Bell, Menu } from 'luci
 import { useAuth } from '../contexts/AuthContext';
 import { auth as firebaseAuth } from '../services/firebase';
 import { subscribeToUsers } from '../services/db';
-import { User } from '../types';
+import { User, UserStatus } from '../types';
 
 interface AppShellProps {
     children: React.ReactNode;
@@ -93,7 +93,28 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
             </header>
 
             {/* Main Content Area */}
-            <main className="flex-1 pb-32 animate-in fade-in duration-500">
+            <main className="flex-1 pb-32 animate-in fade-in duration-500 relative">
+                {userData?.status === UserStatus.PENDING && (
+                    <div className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm px-6 flex items-center justify-center text-center">
+                        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] shadow-2xl max-w-xs space-y-4 animate-in zoom-in-95 duration-500">
+                            <div className="w-16 h-16 bg-amber-400/10 border border-amber-400/20 rounded-2xl flex items-center justify-center mx-auto">
+                                <Bell className="w-8 h-8 text-amber-500 animate-bounce" />
+                            </div>
+                            <div className="space-y-2">
+                                <h2 className="text-xl font-black italic font-sport text-white uppercase tracking-tighter">Conta em Análise</h2>
+                                <p className="text-zinc-500 font-bold uppercase text-[9px] tracking-widest leading-relaxed">
+                                    Sua conta está sendo revisada. As funcionalidades serão liberadas automaticamente após a aprovação da administração.
+                                </p>
+                            </div>
+                            <div className="pt-2">
+                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-400/10 border border-amber-400/20 rounded-full">
+                                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></div>
+                                    <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest">Aguardando Aprovação</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {children}
             </main>
 
