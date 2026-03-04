@@ -55,10 +55,10 @@ const AthleteLocations: React.FC = () => {
                                         href={`https://waze.com/ul?ll=${location.latitude},${location.longitude}&navigate=yes`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="p-3 bg-white text-black rounded-2xl hover:bg-lime-400 transition-all active:scale-90 shadow-xl flex items-center justify-center group/btn"
+                                        className="w-[44px] h-[44px] bg-white rounded-2xl overflow-hidden shadow-xl active:scale-90 flex items-center justify-center group/btn"
                                         title="Abrir no Waze"
                                     >
-                                        <img src="/waze-icon.png" alt="Waze" className="w-6 h-6 group-hover/btn:scale-110 transition-transform object-contain" />
+                                        <img src="/waze-icon.png" alt="Waze" className="w-full h-full object-cover group-hover/btn:scale-110 transition-transform" />
                                     </a>
                                 </div>
                             </div>
