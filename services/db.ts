@@ -111,7 +111,21 @@ export const subscribeToCheckIns = (callback: (checkIns: CheckIn[]) => void) => 
 };
 
 export const addCheckIn = async (checkInData: Omit<CheckIn, 'id'>) => {
-    await safeAddDoc(CHECKINS_COLLECTION, checkInData);
+    const checkInRef = await safeAddDoc(CHECKINS_COLLECTION, checkInData);
+
+    // Update user score
+    const userRef = doc(db, USERS_COLLECTION, checkInData.userId);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+        const userData = userSnap.data() as User;
+        await updateDoc(userRef, {
+            totalScore: (userData.totalScore || 0) + checkInData.score,
+            weeklyScore: (userData.weeklyScore || 0) + checkInData.score
+        });
+    }
+
+    return checkInRef;
 };
 
 export const deleteCheckIn = async (id: string) => {
