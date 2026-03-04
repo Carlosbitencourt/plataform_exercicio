@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, Trophy, MapPin, User as UserIcon, LogOut, Bell, Menu } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { auth as firebaseAuth } from '../services/firebase';
+import { subscribeToUsers } from '../services/db';
+import { User } from '../types';
 
 interface AppShellProps {
     children: React.ReactNode;
@@ -13,6 +15,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('home');
+    const [userData, setUserData] = useState<User | null>(null);
 
     useEffect(() => {
         const path = location.pathname;
@@ -21,6 +24,15 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         else if (path.includes('/perfil')) setActiveTab('perfil');
         else setActiveTab('home');
     }, [location]);
+
+    useEffect(() => {
+        if (!currentUser?.email) return;
+
+        return subscribeToUsers((users) => {
+            const found = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
+            if (found) setUserData(found);
+        });
+    }, [currentUser]);
 
     const handleLogout = async () => {
         try {
@@ -49,11 +61,11 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 <div className="flex items-center gap-3">
                     <div className="relative">
                         <div className="w-10 h-10 rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900 group">
-                            {currentUser?.photoURL ? (
-                                <img src={currentUser.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                            {userData?.photoUrl || currentUser?.photoURL ? (
+                                <img src={userData?.photoUrl || currentUser?.photoURL || ''} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-lime-400 font-bold">
-                                    {currentUser?.displayName?.[0] || 'A'}
+                                <div className="w-full h-full flex items-center justify-center text-lime-400 font-bold text-xs">
+                                    {userData?.name?.[0] || currentUser?.displayName?.[0] || 'A'}
                                 </div>
                             )}
                         </div>
@@ -62,7 +74,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
                     <div className="flex flex-col">
                         <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest leading-none mb-1">Bem-vindo</span>
                         <span className="text-sm font-black italic font-sport tracking-tight text-white uppercase truncate max-w-[120px]">
-                            {currentUser?.displayName?.split(' ')[0] || 'Atleta'}
+                            {userData?.name?.split(' ')[0] || currentUser?.displayName?.split(' ')[0] || 'Atleta'}
                         </span>
                     </div>
                 </div>

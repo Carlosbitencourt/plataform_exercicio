@@ -381,22 +381,31 @@ const CheckInPage: React.FC = () => {
         <div className="flex items-center justify-between relative z-10">
           <div>
             <p className="text-xs font-black text-white uppercase tracking-tighter italic font-sport">Frequência Semanal</p>
+            <p className="text-xs font-black uppercase tracking-tighter italic font-sport">Frequência Semanal</p>
             <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Segunda a Sexta-feira</p>
           </div>
           <div className="text-right">
             <p className="text-lg font-black text-lime-400 font-sport italic leading-none">
               {(() => {
-                const today = new Date();
-                const weekStart = new Date(today);
-                weekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1));
-                const weekEnd = new Date(weekStart);
-                weekEnd.setDate(weekStart.getDate() + 4);
+                const now = new Date();
+                const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                const currentDay = now.getDay() === 0 ? 7 : now.getDay();
 
-                const weeklyCheckIns = userCheckIns.filter(ci => {
-                  const checkInDate = new Date(ci.date);
-                  return checkInDate >= weekStart && checkInDate <= weekEnd;
-                });
-                return weeklyCheckIns.length;
+                // Obter segunda-feira da semana atual
+                const monday = new Date(now);
+                monday.setDate(now.getDate() - (currentDay - 1));
+                monday.setHours(0, 0, 0, 0);
+
+                let completedCount = 0;
+                for (let i = 0; i < 5; i++) {
+                  const target = new Date(monday);
+                  target.setDate(monday.getDate() + i);
+                  const targetStr = target.toISOString().split('T')[0];
+                  if (userCheckIns.some(ci => ci.date === targetStr)) {
+                    completedCount++;
+                  }
+                }
+                return completedCount;
               })()}/5
             </p>
             <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest leading-none mt-1">Treinos</p>
@@ -405,28 +414,34 @@ const CheckInPage: React.FC = () => {
 
         <div className="flex gap-2 relative z-10">
           {[1, 2, 3, 4, 5].map((day) => {
-            const today = new Date();
-            const currentDayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
+            const now = new Date();
+            const currentDayNum = now.getDay() === 0 ? 7 : now.getDay();
 
-            const weekStart = new Date(today);
-            weekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1));
+            // Monday of current week
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - (currentDayNum - 1));
+            monday.setHours(0, 0, 0, 0);
 
-            const targetDate = new Date(weekStart);
-            targetDate.setDate(weekStart.getDate() + day - 1);
-            const dateStr = targetDate.toISOString().split('T')[0];
+            const targetDate = new Date(monday);
+            targetDate.setDate(monday.getDate() + day - 1);
+            const targetDateStr = targetDate.toISOString().split('T')[0];
 
-            const hasCheckIn = userCheckIns.some(ci => ci.date === dateStr);
-            const isToday = currentDayOfWeek === day;
-            const isPast = currentDayOfWeek > day;
+            const hasCheckIn = userCheckIns.some(ci => ci.date === targetDateStr);
+            const isToday = currentDayNum === day;
+            const isPast = currentDayNum > day;
+            const isMissed = isPast && !hasCheckIn;
 
             return (
               <div key={day} className="flex-1 space-y-2">
-                <div className={`h-2 rounded-full transition-all duration-500 ${hasCheckIn ? 'bg-lime-400 shadow-[0_0_10px_rgba(163,230,53,0.5)]' :
-                    isPast ? 'bg-zinc-800' :
-                      isToday ? 'bg-zinc-800 border border-lime-400/30 animate-pulse' :
-                        'bg-zinc-900 border border-zinc-800'
+                <div className={`h-2 rounded-full transition-all duration-500 shadow-sm ${hasCheckIn
+                    ? 'bg-lime-400 shadow-[0_0_15px_rgba(163,230,53,0.4)]'
+                    : isMissed
+                      ? 'bg-rose-600 shadow-[0_0_15px_rgba(225,29,72,0.6)] animate-pulse'
+                      : isToday
+                        ? 'bg-zinc-800 border border-lime-400/30 ring-1 ring-lime-400/20'
+                        : 'bg-zinc-900 border border-zinc-800'
                   }`} />
-                <p className={`text-center text-[8px] font-black uppercase tracking-tighter ${isToday ? 'text-lime-400' : hasCheckIn ? 'text-zinc-400' : 'text-zinc-600'
+                <p className={`text-center text-[8px] font-black uppercase tracking-tighter ${isToday ? 'text-lime-400' : isMissed ? 'text-rose-500' : hasCheckIn ? 'text-zinc-400' : 'text-zinc-600'
                   }`}>
                   {['SEG', 'TER', 'QUA', 'QUI', 'SEX'][day - 1]}
                 </p>
