@@ -1,8 +1,8 @@
 import React from 'react';
-import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard } from 'lucide-react';
+import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { subscribeToUsers } from '../../services/db';
-import { User, UserStatus } from '../../types';
+import { subscribeToUsers, subscribeToCheckIns } from '../../services/db';
+import { User, UserStatus, CheckIn } from '../../types';
 import { auth as firebaseAuth } from '../../services/firebase';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,15 +10,35 @@ const AthleteProfile: React.FC = () => {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     const [userData, setUserData] = React.useState<User | null>(null);
+    const [checkIns, setCheckIns] = React.useState<CheckIn[]>([]);
+    const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
 
     React.useEffect(() => {
         if (!currentUser?.email) return;
 
-        return subscribeToUsers((users) => {
+        const unsubUsers = subscribeToUsers((users) => {
             const found = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
             if (found) setUserData(found);
         });
-    }, [currentUser]);
+
+        const unsubCheckIns = subscribeToCheckIns((allCheckIns) => {
+            if (userData?.id) {
+                const userCheckIns = allCheckIns
+                    .filter(c => c.userId === userData.id)
+                    .sort((a, b) => {
+                        const timeA = new Date(`${a.date}T${a.time}`).getTime();
+                        const timeB = new Date(`${b.date}T${b.time}`).getTime();
+                        return timeB - timeA;
+                    });
+                setCheckIns(userCheckIns);
+            }
+        });
+
+        return () => {
+            unsubUsers();
+            unsubCheckIns();
+        };
+    }, [currentUser, userData?.id]);
 
     const handleLogout = async () => {
         try {
@@ -30,7 +50,12 @@ const AthleteProfile: React.FC = () => {
     };
 
     const menuItems = [
-        { icon: History, label: 'Meu Histórico', color: 'text-blue-400' },
+        {
+            icon: History,
+            label: 'Meu Histórico',
+            color: 'text-blue-400',
+            action: () => setIsHistoryOpen(true)
+        },
         { icon: Award, label: 'Minhas Conquistas', color: 'text-amber-400' },
         { icon: CreditCard, label: 'Dados de Pagamento', color: 'text-emerald-400' },
         { icon: Settings, label: 'Configurações', color: 'text-zinc-400' },
@@ -55,47 +80,110 @@ const AthleteProfile: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                    <h1 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter">{userData?.name || currentUser?.displayName}</h1>
-                    <p className="text-zinc-500 font-black uppercase text-[9px] tracking-[0.3em]">{userData?.uniqueCode || 'ATLETA TITULAR'}</p>
+                    <h1 className="text-3xl font-black italic font-sport text-white uppercase tracking-tighter leading-none mb-1">
+                        {userData?.name || currentUser?.displayName}
+                    </h1>
+                    <p className="text-zinc-500 font-black uppercase text-[10px] tracking-[0.3em]">
+                        {userData?.uniqueCode || 'ATLETA TITULAR'}
+                    </p>
                 </div>
             </header>
 
-            {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-4">
-                <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-3xl space-y-1 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-40 transition-opacity">
-                        <Zap className="w-10 h-10 text-lime-400" />
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] space-y-2 relative overflow-hidden group hover:border-lime-500/30 transition-all">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+                        <Zap className="w-12 h-12 text-lime-400" />
                     </div>
-                    <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Saldo Total</p>
-                    <p className="text-2xl font-black text-white font-sport italic tracking-tighter relative z-10">
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Saldo Total</p>
+                    <p className="text-3xl font-black text-white font-sport italic tracking-tighter relative z-10">
                         R$ {userData?.balance.toFixed(2) || '0.00'}
                     </p>
                 </div>
-                <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-3xl space-y-1 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-40 transition-opacity">
-                        <Award className="w-10 h-10 text-amber-500" />
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] space-y-2 relative overflow-hidden group hover:border-amber-500/30 transition-all">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+                        <Award className="w-12 h-12 text-amber-500" />
                     </div>
-                    <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Ranking</p>
-                    <p className="text-2xl font-black text-white font-sport italic tracking-tighter relative z-10">
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Ranking</p>
+                    <p className="text-3xl font-black text-white font-sport italic tracking-tighter relative z-10">
                         #12
                     </p>
                 </div>
             </div>
 
-            {/* Menu List */}
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-[2rem] overflow-hidden divide-y divide-zinc-800/50">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] overflow-hidden divide-y divide-zinc-800/50">
                 {menuItems.map((item, i) => (
-                    <button key={i} className="w-full flex items-center justify-between p-5 hover:bg-zinc-800/50 transition-colors group">
-                        <div className="flex items-center gap-4">
-                            <div className={`p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 ${item.color}`}>
-                                <item.icon className="w-5 h-5" />
+                    <button
+                        key={i}
+                        onClick={item.action}
+                        className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/80 transition-all group active:scale-[0.98]"
+                    >
+                        <div className="flex items-center gap-5">
+                            <div className={`p-3 rounded-2xl bg-black border border-zinc-800 group-hover:border-lime-500/50 transition-colors ${item.color}`}>
+                                <item.icon className="w-6 h-6" />
                             </div>
-                            <span className="text-xs font-black uppercase tracking-widest text-zinc-300 group-hover:text-white transition-colors">{item.label}</span>
+                            <span className="text-sm font-black uppercase tracking-[0.2em] text-zinc-300 group-hover:text-white transition-colors">{item.label}</span>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-lime-400 transition-colors" />
+                        <ChevronRight className="w-5 h-5 text-zinc-800 group-hover:text-lime-400 group-hover:translate-x-1 transition-all" />
                     </button>
                 ))}
             </div>
+
+            {/* History Modal */}
+            {isHistoryOpen && (
+                <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsHistoryOpen(false)}></div>
+                    <div className="relative w-full max-w-lg bg-zinc-900 border-t border-zinc-800 rounded-t-[3rem] p-8 space-y-8 animate-in slide-in-from-bottom-full duration-500 max-h-[85vh] overflow-y-auto">
+                        <header className="flex items-center justify-between sticky top-0 bg-zinc-900 pb-4 z-10 border-b border-zinc-800/50">
+                            <div>
+                                <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter">Histórico</h2>
+                                <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Suas últimas atividades</p>
+                            </div>
+                            <button
+                                onClick={() => setIsHistoryOpen(false)}
+                                className="p-3 bg-zinc-800 text-zinc-400 rounded-2xl hover:text-white transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </header>
+
+                        <div className="space-y-4 pb-12">
+                            {checkIns.length > 0 ? checkIns.map((ci) => (
+                                <div key={ci.id} className="bg-black/40 border border-zinc-800/50 p-5 rounded-3xl flex items-center justify-between group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800 text-lime-400">
+                                            <MapPin className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-black text-white uppercase tracking-tight leading-none mb-1">{ci.locationName || 'Local Desconhecido'}</p>
+                                            <div className="flex items-center gap-3 text-zinc-500">
+                                                <span className="text-[10px] font-bold flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {ci.date.split('-').reverse().join('/')}
+                                                </span>
+                                                <span className="text-[10px] font-bold flex items-center gap-1">
+                                                    <ClockIcon className="w-3 h-3" />
+                                                    {ci.time}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-black text-lime-400 font-sport italic">+{ci.score?.toFixed(0) || 10}P</p>
+                                        <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">VALIDADO</p>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="py-12 text-center space-y-4">
+                                    <div className="w-16 h-16 bg-zinc-800 rounded-full mx-auto flex items-center justify-center text-zinc-600">
+                                        <History className="w-8 h-8" />
+                                    </div>
+                                    <p className="text-zinc-500 font-black uppercase text-[10px] tracking-widest">Nenhuma atividade registrada</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <button
                 onClick={handleLogout}

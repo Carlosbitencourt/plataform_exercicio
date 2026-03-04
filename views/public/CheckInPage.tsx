@@ -343,15 +343,96 @@ const CheckInPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-1">
-            <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Ganhos Acumulados</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-6xl font-black text-white font-sport italic tracking-tighter">
-                R$ {user?.balance.toFixed(2) || '0.00'}
-              </span>
-              <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20">LIVE</span>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Saldo Total (Portfólio)</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-6xl font-black text-white font-sport italic tracking-tighter">
+                  R$ {user?.balance.toFixed(2) || '0.00'}
+                </span>
+                <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20 shadow-[0_0_15px_rgba(163,230,53,0.1)]">LIVE</span>
+              </div>
+            </div>
+
+            {/* Breakdown Grid */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="bg-black/40 border border-zinc-800/50 p-3 rounded-2xl">
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-1">Depósito Inicial</p>
+                <p className="text-lg font-black text-zinc-300 font-sport italic leading-none">
+                  R$ {user?.depositedValue.toFixed(2) || '0.00'}
+                </p>
+              </div>
+              <div className="bg-lime-400/5 border border-lime-400/20 p-3 rounded-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-1 opacity-20">
+                  <Zap className="w-4 h-4 text-lime-400" />
+                </div>
+                <p className="text-[8px] font-black text-lime-600/60 uppercase tracking-widest mb-1">Lucro Gerado</p>
+                <p className="text-lg font-black text-lime-400 font-sport italic leading-none">
+                  R$ {(user && user.balance > user.depositedValue) ? (user.balance - user.depositedValue).toFixed(2) : '0.00'}
+                </p>
+              </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Weekly Progress Bar (Segunda a Sexta) */}
+      <section className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] space-y-4 relative overflow-hidden">
+        <div className="flex items-center justify-between relative z-10">
+          <div>
+            <p className="text-xs font-black text-white uppercase tracking-tighter italic font-sport">Frequência Semanal</p>
+            <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Segunda a Sexta-feira</p>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-black text-lime-400 font-sport italic leading-none">
+              {(() => {
+                const today = new Date();
+                const weekStart = new Date(today);
+                weekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1));
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekStart.getDate() + 4);
+
+                const weeklyCheckIns = userCheckIns.filter(ci => {
+                  const checkInDate = new Date(ci.date);
+                  return checkInDate >= weekStart && checkInDate <= weekEnd;
+                });
+                return weeklyCheckIns.length;
+              })()}/5
+            </p>
+            <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest leading-none mt-1">Treinos</p>
+          </div>
+        </div>
+
+        <div className="flex gap-2 relative z-10">
+          {[1, 2, 3, 4, 5].map((day) => {
+            const today = new Date();
+            const currentDayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
+
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() - 1));
+
+            const targetDate = new Date(weekStart);
+            targetDate.setDate(weekStart.getDate() + day - 1);
+            const dateStr = targetDate.toISOString().split('T')[0];
+
+            const hasCheckIn = userCheckIns.some(ci => ci.date === dateStr);
+            const isToday = currentDayOfWeek === day;
+            const isPast = currentDayOfWeek > day;
+
+            return (
+              <div key={day} className="flex-1 space-y-2">
+                <div className={`h-2 rounded-full transition-all duration-500 ${hasCheckIn ? 'bg-lime-400 shadow-[0_0_10px_rgba(163,230,53,0.5)]' :
+                    isPast ? 'bg-zinc-800' :
+                      isToday ? 'bg-zinc-800 border border-lime-400/30 animate-pulse' :
+                        'bg-zinc-900 border border-zinc-800'
+                  }`} />
+                <p className={`text-center text-[8px] font-black uppercase tracking-tighter ${isToday ? 'text-lime-400' : hasCheckIn ? 'text-zinc-400' : 'text-zinc-600'
+                  }`}>
+                  {['SEG', 'TER', 'QUA', 'QUI', 'SEX'][day - 1]}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </section>
 
