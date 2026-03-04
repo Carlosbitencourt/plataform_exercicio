@@ -190,9 +190,7 @@ export const syncUserAbsences = async (userId: string) => {
 
   try {
     // 1. Fetch user
-    const userSnap = await getDocs(query(collection(db, 'users'), where('id', '==', userId))); // userId is doc ID usually
-    // Actually safeUpdateDoc uses doc ID. Let's get the ref directly if we have userId as doc ID.
-    // In this project, userId in checkIns matches user doc ID.
+    // 1. Fetch user directly by ID
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
     if (!userDoc.exists()) return;
@@ -241,8 +239,11 @@ export const syncUserAbsences = async (userId: string) => {
     }
 
     if (newPenalties > 0) {
+      // Only reduce balance if it hasn't been reduced already for these specific penalties
+      // To be safe, we calculate what the balance should be: current balance - newly added penalties
+      const currentBalance = user.balance || 0;
       await safeUpdateDoc('users', userId, {
-        balance: user.balance - newPenalties
+        balance: currentBalance - newPenalties
       });
     }
 

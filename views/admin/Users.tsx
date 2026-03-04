@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn } from 'lucide-react';
+import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser, deleteUser } from '../../services/db';
 import { auth } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -142,6 +142,18 @@ const Users: React.FC = () => {
     }
   };
 
+  const handleSyncAccount = async (user: User) => {
+    if (!window.confirm(`SINCRONIZAR CONTA DE ${user.name.toUpperCase()}? ESTA AÇÃO VERIFICARÁ FALTAS NÃO COBRADAS E ATUALIZARÁ O SALDO.`)) return;
+    try {
+      const { syncUserAbsences } = await import('../../services/rewardSystem');
+      await syncUserAbsences(user.id);
+      alert("SINCRONIZAÇÃO CONCLUÍDA COM SUCESSO!");
+    } catch (error) {
+      console.error("Error syncing:", error);
+      alert("ERRO AO SINCRONIZAR CONTA.");
+    }
+  };
+
   const handleDelete = async (user: User) => {
     if (window.confirm(`TEM CERTEZA QUE DESEJA APAGAR O ATLETA ${user.name.toUpperCase()}? ESTA AÇÃO NÃO PODE SER DESFEITA.`)) {
       try {
@@ -270,6 +282,9 @@ const Users: React.FC = () => {
                 <button onClick={() => openEdit(user)} className="flex-1 py-2 bg-slate-50 text-slate-500 font-bold uppercase tracking-widest text-[9px] rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
                   Editar
                 </button>
+                <button onClick={() => handleSyncAccount(user)} className="p-2 bg-white text-amber-500 hover:bg-amber-50 rounded-lg border border-slate-200 transition-all shadow-sm" title="Sincronizar">
+                  <RefreshCw className="w-4 h-4" />
+                </button>
                 <button
                   onClick={() => {
                     impersonate(user);
@@ -377,6 +392,13 @@ const Users: React.FC = () => {
                       title={user.status === UserStatus.PENDING ? "Aprovar Atleta" : user.status === UserStatus.ACTIVE ? "Eliminar Atleta" : "Reativar Atleta"}
                     >
                       {user.status === UserStatus.ACTIVE ? <ShieldAlert className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => handleSyncAccount(user)}
+                      className="p-1.5 bg-white text-slate-400 hover:text-amber-500 hover:border-amber-400 rounded-md transition-all border border-slate-200 shadow-sm"
+                      title="Sincronizar e Corrigir Penalidades"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(user)}
