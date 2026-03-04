@@ -1,5 +1,5 @@
 import React from 'react';
-import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon } from 'lucide-react';
+import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon, Loader2, Camera } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToUsers, subscribeToCheckIns } from '../../services/db';
 import { User, UserStatus, CheckIn } from '../../types';
@@ -12,33 +12,87 @@ const AthleteProfile: React.FC = () => {
     const [userData, setUserData] = React.useState<User | null>(null);
     const [checkIns, setCheckIns] = React.useState<CheckIn[]>([]);
     const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
+    const [editForm, setEditForm] = React.useState({
+        name: '',
+        phone: '',
+        street: '',
+        neighborhood: '',
+        city: '',
+        cpf: '',
+        pixKey: '',
+        photoUrl: ''
+    });
+
+    const maskPhone = (value: string) => {
+        return value
+            .replace(/\D/g, '')
+            .replace(/(\d{2})(\d)/, '($1) $2')
+            .replace(/(\d{5})(\d)/, '$1-$2')
+            .replace(/(-\d{4})\d+?$/, '$1');
+    };
+
+    const maskCPF = (value: string) => {
+        return value
+            .replace(/\D/g, '')
+            .replace(/(\d{3})(\d)/, '$1.$2')
+            .replace(/(\d{3})(\d)/, '$1.$2')
+            .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+            .replace(/(-\d{2})\d+?$/, '$1');
+    };
 
     React.useEffect(() => {
-        if (!currentUser?.email) return;
+        if (userData && !isEditModalOpen) {
+            setEditForm({
+                name: userData.name || '',
+                phone: userData.phone || '',
+                street: userData.street || '',
+                neighborhood: userData.neighborhood || '',
+                city: userData.city || '',
+                cpf: userData.cpf || '',
+                pixKey: userData.pixKey || '',
+                photoUrl: userData.photoUrl || ''
+            });
+        }
+    }, [userData, isEditModalOpen]);
 
-        const unsubUsers = subscribeToUsers((users) => {
-            const found = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
-            if (found) setUserData(found);
-        });
+    const handleUpdateProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!userData) return;
 
-        const unsubCheckIns = subscribeToCheckIns((allCheckIns) => {
-            if (userData?.id) {
-                const userCheckIns = allCheckIns
-                    .filter(c => c.userId === userData.id)
-                    .sort((a, b) => {
-                        const timeA = new Date(`${a.date}T${a.time}`).getTime();
-                        const timeB = new Date(`${b.date}T${b.time}`).getTime();
-                        return timeB - timeA;
-                    });
-                setCheckIns(userCheckIns);
-            }
-        });
+        setIsSaving(true);
+        try {
+            const { updateUser } = await import('../../services/db');
+            await updateUser({
+                ...userData,
+                ...editForm
+            });
+            setIsEditModalOpen(false);
+        } catch (error) {
+            console.error("Error updating profile:", error);
+            alert("Erro ao atualizar perfil.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
-        return () => {
-            unsubUsers();
-            unsubCheckIns();
-        };
-    }, [currentUser, userData?.id]);
+    const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingPhoto(true);
+        try {
+            const { safeUploadFile } = await import('../../services/firebaseGuard');
+            const url = await safeUploadFile(file, `profiles/athletes/${userData?.id || 'unknown'}_${Date.now()}`);
+            setEditForm(prev => ({ ...prev, photoUrl: url }));
+        } catch (error: any) {
+            alert("Erro ao enviar foto: " + error.message);
+        } finally {
+            setUploadingPhoto(false);
+        }
+    };
 
     const handleLogout = async () => {
         try {
@@ -56,9 +110,14 @@ const AthleteProfile: React.FC = () => {
             color: 'text-blue-400',
             action: () => setIsHistoryOpen(true)
         },
+        {
+            icon: Settings,
+            label: 'Editar Perfil',
+            color: 'text-zinc-400',
+            action: () => setIsEditModalOpen(true)
+        },
         { icon: Award, label: 'Minhas Conquistas', color: 'text-amber-400' },
         { icon: CreditCard, label: 'Dados de Pagamento', color: 'text-emerald-400' },
-        { icon: Settings, label: 'Configurações', color: 'text-zinc-400' },
     ];
 
     return (
@@ -133,6 +192,152 @@ const AthleteProfile: React.FC = () => {
                     </button>
                 ))}
             </div>
+
+            {/* Edit Modal */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsEditModalOpen(false)}></div>
+                    <div className="relative w-full max-w-lg bg-zinc-900 border-t border-zinc-800 rounded-t-[3rem] p-8 space-y-8 animate-in slide-in-from-bottom-full duration-500 max-h-[90vh] overflow-y-auto">
+                        <header className="flex items-center justify-between sticky top-0 bg-zinc-900 pb-4 z-10 border-b border-zinc-800/50">
+                            <div>
+                                <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter">Editar Perfil</h2>
+                                <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Atualize seus dados cadastrais</p>
+                            </div>
+                            <button
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="p-3 bg-zinc-800 text-zinc-400 rounded-2xl hover:text-white transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </header>
+
+                        <form onSubmit={handleUpdateProfile} className="space-y-6 pb-12">
+                            {/* Photo Upload */}
+                            <div className="flex flex-col items-center space-y-4">
+                                <div className="relative">
+                                    <div
+                                        onClick={() => document.getElementById('profile-photo-input')?.click()}
+                                        className="w-24 h-24 rounded-[2rem] bg-zinc-800 border-2 border-dashed border-zinc-700 overflow-hidden cursor-pointer group hover:border-lime-400 transition-all"
+                                    >
+                                        {uploadingPhoto ? (
+                                            <div className="w-full h-full flex items-center justify-center bg-black/50">
+                                                <Loader2 className="w-6 h-6 text-lime-400 animate-spin" />
+                                            </div>
+                                        ) : editForm.photoUrl ? (
+                                            <img src={editForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                                                <Camera className="w-8 h-8" />
+                                            </div>
+                                        )}
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <span className="text-[8px] font-black text-white uppercase tracking-widest">Trocar Foto</span>
+                                        </div>
+                                    </div>
+                                    <input
+                                        id="profile-photo-input"
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handlePhotoChange}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Nome Completo</label>
+                                    <input
+                                        required
+                                        className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all uppercase"
+                                        value={editForm.name}
+                                        onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                                    />
+                                </div>
+
+                                <div className="space-y-2 opacity-50">
+                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">E-mail (Não editável)</label>
+                                    <input
+                                        disabled
+                                        className="w-full px-6 py-4 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-500 font-bold outline-none"
+                                        value={userData?.email}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">WhatsApp</label>
+                                        <input
+                                            required
+                                            className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all"
+                                            value={editForm.phone}
+                                            onChange={e => setEditForm(prev => ({ ...prev, phone: maskPhone(e.target.value) }))}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">CPF</label>
+                                        <input
+                                            required
+                                            className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all"
+                                            value={editForm.cpf}
+                                            onChange={e => setEditForm(prev => ({ ...prev, cpf: maskCPF(e.target.value) }))}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Endereço (Rua e Nº)</label>
+                                    <input
+                                        required
+                                        className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all uppercase"
+                                        value={editForm.street}
+                                        onChange={e => setEditForm(prev => ({ ...prev, street: e.target.value }))}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Bairro</label>
+                                        <input
+                                            required
+                                            className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all uppercase"
+                                            value={editForm.neighborhood}
+                                            onChange={e => setEditForm(prev => ({ ...prev, neighborhood: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Cidade</label>
+                                        <input
+                                            required
+                                            className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all uppercase"
+                                            value={editForm.city}
+                                            onChange={e => setEditForm(prev => ({ ...prev, city: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Chave PIX</label>
+                                    <input
+                                        required
+                                        className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all uppercase"
+                                        value={editForm.pixKey}
+                                        onChange={e => setEditForm(prev => ({ ...prev, pixKey: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isSaving || uploadingPhoto}
+                                className="w-full py-5 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-lime-400/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Salvar Alterações'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* History Modal */}
             {isHistoryOpen && (

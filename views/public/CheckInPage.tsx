@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserStatus, TimeSlot, CheckIn } from '../../types';
-import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns } from '../../services/db';
+import { User, UserStatus, TimeSlot, CheckIn, Distribution } from '../../types';
+import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
 import { GYM_LOCATION } from '../../constants';
 import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -19,6 +19,7 @@ const CheckInPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+  const [distributions, setDistributions] = useState<Distribution[]>([]);
 
   // Geolocation & UI States
   const [loading, setLoading] = useState(false);
@@ -44,6 +45,7 @@ const CheckInPage: React.FC = () => {
     const unsubUsers = subscribeToUsers(setUsers);
     const unsubSlots = subscribeToTimeSlots(setTimeSlots);
     const unsubCheckIns = subscribeToCheckIns(setCheckIns);
+    const unsubDist = subscribeToDistributions(setDistributions);
 
     // Initial Permission Check
     if (navigator.permissions && navigator.permissions.query) {
@@ -60,6 +62,7 @@ const CheckInPage: React.FC = () => {
       unsubUsers();
       unsubSlots();
       unsubCheckIns();
+      unsubDist();
     };
   }, []);
 
@@ -352,7 +355,12 @@ const CheckInPage: React.FC = () => {
               <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Saldo Total (Portfólio)</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-6xl font-black text-white font-sport italic tracking-tighter">
-                  R$ {user?.balance?.toFixed(2) || '0.00'}
+                  {(() => {
+                    const userDist = distributions.filter(d => d.userId === user?.id);
+                    const profit = userDist.reduce((acc, d) => acc + d.amount, 0);
+                    const totalValue = (user?.depositedValue || 0) + profit;
+                    return `R$ ${totalValue.toFixed(2)}`;
+                  })()}
                 </span>
                 <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20 shadow-[0_0_15px_rgba(163,230,53,0.1)]">LIVE</span>
               </div>
@@ -372,7 +380,11 @@ const CheckInPage: React.FC = () => {
                 </div>
                 <p className="text-[8px] font-black text-lime-600/60 uppercase tracking-widest mb-1">Lucro Gerado</p>
                 <p className="text-lg font-black text-lime-400 font-sport italic leading-none">
-                  R$ {(user && user.balance > user.depositedValue) ? (user.balance - user.depositedValue).toFixed(2) : '0.00'}
+                  {(() => {
+                    const userDist = distributions.filter(d => d.userId === user?.id);
+                    const profit = userDist.reduce((acc, d) => acc + d.amount, 0);
+                    return `R$ ${profit.toFixed(2)}`;
+                  })()}
                 </p>
               </div>
             </div>
