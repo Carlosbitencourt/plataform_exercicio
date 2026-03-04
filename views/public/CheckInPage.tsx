@@ -558,7 +558,7 @@ const CheckInPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-xs font-black text-white uppercase italic font-sport tracking-tight">{checkin.address.split(',')[0]}</p>
-                  <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">{new Date(checkin.date).toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
+                  <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">{new Date(checkin.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
                 </div>
               </div>
               <div className="text-right">
