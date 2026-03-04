@@ -141,22 +141,27 @@ const AthleteRanking: React.FC = () => {
                     const isTop3 = index < 3;
 
                     return (
-                        <div
-                            key={user.id}
-                            className={`bg-white border-2 ${style.border} ${style.glow} p-4 rounded-[2rem] flex items-center justify-between transition-all hover:scale-[1.02] group relative overflow-hidden`}
+                        <div className={`bg-white border-2 ${style.border} ${style.glow} p-4 rounded-[1.5rem] flex items-center justify-between transition-all hover:scale-[1.02] group relative overflow-hidden`}
                             style={{ animationDelay: `${index * 50}ms` }}
                         >
                             {isTop3 && (
-                                <div className={`absolute top-0 right-0 p-1.5 px-3 ${style.bg} border-b-2 border-l-2 ${style.border} rounded-bl-2xl shadow-sm`}>
+                                <div className={`absolute top-0 right-0 p-1.5 px-3 ${style.bg} border-b-2 border-l-2 ${style.border} rounded-bl-xl shadow-sm`}>
                                     <Star className={`w-3.5 h-3.5 fill-current ${index === 0 ? 'text-white' : style.icon}`} />
                                 </div>
                             )}
 
                             <div className="flex items-center gap-4">
                                 <div className="relative">
-                                    <div className={`w-14 h-14 rounded-[1.25rem] overflow-hidden border-2 bg-black ${style.border} relative z-10`}>
+                                    <div className={`w-14 h-14 rounded-2xl overflow-hidden border-2 bg-black ${style.border} relative z-10`}>
                                         {user.photoUrl ? (
-                                            <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                                            <img
+                                                src={user.photoUrl}
+                                                alt={user.name}
+                                                className="w-full h-full object-cover"
+                                                loading={index < 3 ? "eager" : "lazy"}
+                                                decoding="async"
+                                                {...(index < 3 ? { fetchpriority: "high" } : {})}
+                                            />
                                         ) : (
                                             <div className={`w-full h-full flex items-center justify-center font-black italic font-sport text-xl ${style.icon}`}>
                                                 #{index + 1}

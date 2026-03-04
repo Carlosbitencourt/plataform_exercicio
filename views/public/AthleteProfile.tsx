@@ -65,9 +65,15 @@ const AthleteProfile: React.FC = () => {
         <div className="p-6 space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             <header className="flex flex-col items-center text-center space-y-4 py-4">
                 <div className="relative">
-                    <div className="w-28 h-28 rounded-[2.5rem] bg-zinc-900 border-2 border-zinc-800 p-1 group overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
+                    <div className="w-28 h-28 rounded-3xl bg-zinc-900 border-2 border-zinc-800 p-1 group overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
                         {userData?.photoUrl || currentUser?.photoURL ? (
-                            <img src={userData?.photoUrl || currentUser?.photoURL || ''} alt="Profile" className="w-full h-full object-cover rounded-[2rem]" />
+                            <img
+                                src={userData?.photoUrl || currentUser?.photoURL || ''}
+                                alt="Profile"
+                                className="w-full h-full object-cover rounded-2xl"
+                                loading="eager"
+                                decoding="async"
+                            />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-lime-400 font-bold text-4xl">
                                 {userData?.name[0] || currentUser?.displayName?.[0] || 'A'}
@@ -90,7 +96,7 @@ const AthleteProfile: React.FC = () => {
             </header>
 
             <div className="grid grid-cols-2 gap-4">
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] space-y-2 relative overflow-hidden group hover:border-lime-500/30 transition-all">
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-2 relative overflow-hidden group hover:border-lime-500/30 transition-all">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
                         <Zap className="w-12 h-12 text-lime-400" />
                     </div>
@@ -99,7 +105,7 @@ const AthleteProfile: React.FC = () => {
                         R$ {userData?.balance.toFixed(2) || '0.00'}
                     </p>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] space-y-2 relative overflow-hidden group hover:border-amber-500/30 transition-all">
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-2 relative overflow-hidden group hover:border-amber-500/30 transition-all">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
                         <Award className="w-12 h-12 text-amber-500" />
                     </div>
@@ -110,7 +116,7 @@ const AthleteProfile: React.FC = () => {
                 </div>
             </div>
 
-            <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] overflow-hidden divide-y divide-zinc-800/50">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden divide-y divide-zinc-800/50">
                 {menuItems.map((item, i) => (
                     <button
                         key={i}

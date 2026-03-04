@@ -331,8 +331,8 @@ const CheckInPage: React.FC = () => {
     <div className="p-6 space-y-8 animate-in fade-in duration-500 pb-20">
       {/* Featured Balance Card */}
       <section className="relative overflow-hidden group">
-        <div className="absolute inset-0 bg-gradient-to-br from-lime-500/20 via-transparent to-transparent rounded-[2.5rem] blur-3xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
-        <div className="relative bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/50 p-6 rounded-[2.5rem] space-y-6 shadow-2xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-lime-500/20 via-transparent to-transparent rounded-[1.5rem] blur-3xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
+        <div className="relative bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/50 p-6 rounded-[1.5rem] space-y-6 shadow-2xl">
           <div className="flex items-center justify-between">
             <div className="bg-lime-400/10 p-3 rounded-2xl border border-lime-400/20">
               <Zap className="w-6 h-6 text-lime-400" />
@@ -377,11 +377,10 @@ const CheckInPage: React.FC = () => {
       </section>
 
       {/* Weekly Progress Bar (Segunda a Sexta) */}
-      <section className="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] space-y-4 relative overflow-hidden">
+      <section className="bg-zinc-900 border border-zinc-800 p-6 rounded-[1.5rem] space-y-4 relative overflow-hidden">
         <div className="flex items-center justify-between relative z-10">
           <div>
             <p className="text-xs font-black text-white uppercase tracking-tighter italic font-sport">Frequência Semanal</p>
-            <p className="text-xs font-black uppercase tracking-tighter italic font-sport">Frequência Semanal</p>
             <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Segunda a Sexta-feira</p>
           </div>
           <div className="text-right">
@@ -434,12 +433,12 @@ const CheckInPage: React.FC = () => {
             return (
               <div key={day} className="flex-1 space-y-2">
                 <div className={`h-2 rounded-full transition-all duration-500 shadow-sm ${hasCheckIn
-                    ? 'bg-lime-400 shadow-[0_0_15px_rgba(163,230,53,0.4)]'
-                    : isMissed
-                      ? 'bg-rose-600 shadow-[0_0_15px_rgba(225,29,72,0.6)] animate-pulse'
-                      : isToday
-                        ? 'bg-zinc-800 border border-lime-400/30 ring-1 ring-lime-400/20'
-                        : 'bg-zinc-900 border border-zinc-800'
+                  ? 'bg-lime-400 shadow-[0_0_15px_rgba(163,230,53,0.4)]'
+                  : isMissed
+                    ? 'bg-rose-600 shadow-[0_0_15px_rgba(225,29,72,0.6)] animate-pulse'
+                    : isToday
+                      ? 'bg-zinc-800 border border-lime-400/30 ring-1 ring-lime-400/20'
+                      : 'bg-zinc-900 border border-zinc-800'
                   }`} />
                 <p className={`text-center text-[8px] font-black uppercase tracking-tighter ${isToday ? 'text-lime-400' : isMissed ? 'text-rose-500' : hasCheckIn ? 'text-zinc-400' : 'text-zinc-600'
                   }`}>
@@ -488,7 +487,7 @@ const CheckInPage: React.FC = () => {
         <button
           onClick={handleRequestLocation}
           disabled={loading || todayChecked}
-          className={`w-full py-8 rounded-[2.5rem] font-black text-2xl uppercase italic tracking-tighter transition-all flex flex-col items-center justify-center gap-1 font-sport shadow-[0_20px_50px_rgba(255,255,255,0.1)] active:scale-95 group relative overflow-hidden ${todayChecked
+          className={`w-full py-8 rounded-[1.5rem] font-black text-2xl uppercase italic tracking-tighter transition-all flex flex-col items-center justify-center gap-1 font-sport shadow-[0_20px_50px_rgba(255,255,255,0.1)] active:scale-95 group relative overflow-hidden ${todayChecked
             ? 'bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed'
             : 'bg-white text-black hover:shadow-[0_20px_60px_rgba(163,230,53,0.3)]'
             }`}
@@ -525,7 +524,7 @@ const CheckInPage: React.FC = () => {
 
       {/* Stats Quick Grid */}
       <section className="grid grid-cols-1 gap-4">
-        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-[2.5rem] flex items-center justify-between group hover:border-zinc-700 transition-colors">
+        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-[1.5rem] flex items-center justify-between group hover:border-zinc-700 transition-colors">
           <div className="flex items-center gap-5">
             <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
               <Star className="w-6 h-6 text-orange-500 fill-orange-500" />
