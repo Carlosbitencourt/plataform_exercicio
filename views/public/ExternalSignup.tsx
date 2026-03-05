@@ -5,6 +5,7 @@ import { safeUploadFile } from '../../services/firebaseGuard';
 import { auth } from '../../services/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { useAuth } from '../../contexts/AuthContext';
+import { sendWelcomeMessage } from '../../services/whatsapp';
 
 const ExternalSignup: React.FC = () => {
     const { currentUser, loading: authLoading } = useAuth();
@@ -245,6 +246,12 @@ const ExternalSignup: React.FC = () => {
 
             setGeneratedId(uniqueCode);
             setStep('success');
+
+            // Enviar mensagem de boas-vindas via WhatsApp
+            if (formData.phone) {
+                sendWelcomeMessage(formData.phone, formData.name, uniqueCode)
+                    .catch(err => console.error("Erro ao enviar boas-vindas WhatsApp:", err));
+            }
 
             // Redireciona automaticamente após 5 segundos
             setTimeout(() => {

@@ -4,6 +4,7 @@ import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeT
 import { runWeeklyPenaltyCheck, runWeeklyDistribution, syncUserAbsences } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell } from 'lucide-react';
+import { sendCheckInConfirmation } from '../../services/whatsapp';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   ensureAuth,
@@ -276,6 +277,12 @@ const CheckInPage: React.FC = () => {
       totalScore: (user!.totalScore || 0) + score
     });
     setSuccess(true);
+
+    // Enviar confirmação via WhatsApp
+    if (user && user.phone) {
+      sendCheckInConfirmation(user.phone, user.name, nowStr)
+        .catch(err => console.error("Erro ao enviar confirmação WhatsApp:", err));
+    }
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

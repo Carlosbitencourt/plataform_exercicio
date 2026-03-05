@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { safeUpdateDoc } from './firebaseGuard';
 import { addDistribution } from './db';
 import { UserStatus, User, CheckIn, Distribution } from '../types';
+import { sendAbsenceNotification } from './whatsapp';
 
 // Helper to get Mon-Fri dates of current week
 const getWeekDays = () => {
@@ -234,6 +235,12 @@ export const syncUserAbsences = async (userId: string) => {
             reason: `FALTA:${day}`,
             createdAt: new Date().toISOString()
           } as any);
+
+          // Enviar notificação de falta via WhatsApp
+          if (user.phone) {
+            sendAbsenceNotification(user.phone, user.name, day)
+              .catch(err => console.error(`Erro ao enviar notificação de falta para ${user.name}:`, err));
+          }
         }
       }
     }
