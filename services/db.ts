@@ -168,6 +168,30 @@ export const addDistribution = async (distData: Omit<Distribution, 'id'>) => {
     await addDoc(collection(db, DISTRIBUTIONS_COLLECTION), distData);
 };
 
+export const deleteDistribution = async (id: string) => {
+    const distRef = doc(db, DISTRIBUTIONS_COLLECTION, id);
+    const distSnap = await getDoc(distRef);
+
+    if (distSnap.exists()) {
+        const data = distSnap.data() as Distribution;
+        const amountToRevert = data.amount || 0;
+        const userId = data.userId;
+
+        // Revert the balance on the user object
+        const userRef = doc(db, USERS_COLLECTION, userId);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+            const userData = userSnap.data() as User;
+            await updateDoc(userRef, {
+                balance: (userData.balance || 0) - amountToRevert // Subtracting (negative amount) adds it back
+            });
+        }
+
+        await deleteDoc(distRef);
+    }
+};
+
 
 // --- QR Codes ---
 

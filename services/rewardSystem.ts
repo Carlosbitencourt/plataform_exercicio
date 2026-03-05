@@ -5,18 +5,23 @@ import { addDistribution } from './db';
 import { UserStatus, User, CheckIn, Distribution } from '../types';
 import { sendAbsenceNotification } from './whatsapp';
 
-// Helper to get Mon-Fri dates of current week
-const getWeekDays = () => {
-  const curr = new Date();
-  const day = curr.getDay(); // Sun=0, Mon=1...
-  // Shift to start from Monday
-  const diff = curr.getDate() - day + (day === 0 ? -6 : 1);
-  const mon = new Date(curr.setDate(diff));
+// Helper to get Mon-Fri dates of current week (Monday to Friday)
+export const getWeekDays = () => {
+  const now = new Date();
+  const day = now.getDay(); // Sun=0, Mon=1...
+
+  // Calculate Monday of current week
+  // If today is Sunday (0), we go back 6 days to Monday
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
 
   const days = [];
   for (let i = 0; i < 5; i++) {
-    const d = new Date(mon);
-    d.setDate(mon.getDate() + i);
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
     days.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
   }
   return days;
@@ -200,26 +205,45 @@ export const syncUserAbsences = async (userId: string) => {
     if (user.status !== UserStatus.ACTIVE) return;
 
     // 2. Fetch check-ins for the user this week
+    // 2. Fetch ALL check-ins for the user and filter locally to avoid index requirements
     const checkInsSnap = await getDocs(query(
       collection(db, 'checkIns'),
-      where('userId', '==', userId),
-      where('date', 'in', daysToCheck)
+      where('userId', '==', userId)
     ));
     const userCheckIns = checkInsSnap.docs.map(doc => doc.data() as CheckIn);
-    const presentDays = new Set(userCheckIns.map(c => c.date));
+    const presentDays = new Set(
+      userCheckIns
+        .filter(c => daysToCheck.includes(c.date))
+        .map(c => c.date)
+    );
 
-    // 3. Fetch existing absence distributions for this week
+    // 3. Fetch ALL distributions for this user and filter locally
     const distSnap = await getDocs(query(
       collection(db, 'distributions'),
-      where('userId', '==', userId),
-      where('date', 'in', daysToCheck)
+      where('userId', '==', userId)
     ));
-    const existingPenaltyDates = new Set(
-      distSnap.docs
-        .map(doc => doc.data() as Distribution)
-        .filter(d => d.reason.startsWith('FALTA:'))
-        .map(d => d.reason.split(':')[1])
-    );
+
+    const allDistributions = distSnap.docs.map(doc => doc.data() as Distribution);
+    const existingPenaltyDates = new Set<string>();
+
+    // Process all penalties to map which days are already covered
+    allDistributions.forEach(d => {
+      // Handle "FALTA:2025-03-05" format
+      if (d.reason.startsWith('FALTA:')) {
+        const datePart = d.reason.split(':')[1];
+        if (datePart) existingPenaltyDates.add(datePart);
+      }
+      // Handle "FALTAS SEMANA (3 dias)" format (legacy or weekly check)
+      // If "FALTAS SEMANA" exists, we assume the week was already processed and avoid double charging
+      if (d.reason.includes('FALTAS SEMANA')) {
+        daysToCheck.forEach(day => existingPenaltyDates.add(day));
+      }
+    });
+
+    console.log(`[SYNC] Atleta: ${user.name}`);
+    console.log(`[SYNC] Dias para verificar:`, daysToCheck);
+    console.log(`[SYNC] Dias com check-in:`, Array.from(presentDays));
+    console.log(`[SYNC] Dias já penalizados:`, Array.from(existingPenaltyDates));
 
     let newPenalties = 0;
     for (const day of daysToCheck) {

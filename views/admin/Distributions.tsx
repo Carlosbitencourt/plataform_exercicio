@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Users, DollarSign, Calendar, Play, CheckCircle2, Zap, AlertTriangle } from 'lucide-react';
-import { subscribeToDistributions, subscribeToUsers, subscribeToCheckIns } from '../../services/db';
+import { TrendingUp, Users, DollarSign, Calendar, Play, CheckCircle2, Zap, AlertTriangle, Trash2 } from 'lucide-react';
+import { subscribeToDistributions, subscribeToUsers, subscribeToCheckIns, deleteDistribution } from '../../services/db';
 import { runWeeklyPenaltyCheck, runWeeklyDistribution, syncAllUsersAbsences } from '../../services/rewardSystem';
 import { Distribution, User, CheckIn, UserStatus } from '../../types';
 
@@ -19,6 +19,16 @@ const Distributions: React.FC = () => {
       unsubUsers();
     };
   }, []);
+
+  const handleDelete = async (id: string, userName: string) => {
+    if (!window.confirm(`Tem certeza que deseja apagar esta transação de ${userName}? O saldo do atleta será ajustado automaticamente.`)) return;
+    try {
+      await deleteDistribution(id);
+    } catch (error) {
+      console.error("Error deleting distribution:", error);
+      alert("Erro ao apagar distribuição.");
+    }
+  };
 
   const handleWeeklyCheck = async () => {
     if (!window.confirm("Confirmar verificação automática de penalidades (Segunda a Ontem)?")) return;
@@ -209,6 +219,9 @@ const Distributions: React.FC = () => {
                   }`}>
                   {dist.amount > 0 ? '+' : ''} R$ {dist.amount.toFixed(2)}
                 </span>
+                <button onClick={() => handleDelete(dist.id, users.find(u => u.id === dist.userId)?.name || 'Atleta')} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
               <div className="mb-2">
                 <div className="text-xs font-black text-slate-900 uppercase tracking-tight">
@@ -257,6 +270,11 @@ const Distributions: React.FC = () => {
                       }`}>
                       {dist.amount > 0 ? '+' : ''} R$ {dist.amount.toFixed(2)}
                     </span>
+                  </td>
+                  <td className="px-5 py-3 whitespace-nowrap text-right">
+                    <button onClick={() => handleDelete(dist.id, users.find(u => u.id === dist.userId)?.name || 'Atleta')} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors group">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               ))}

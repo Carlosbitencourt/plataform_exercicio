@@ -143,7 +143,7 @@ const Users: React.FC = () => {
   };
 
   const handleSyncAccount = async (user: User) => {
-    if (!window.confirm(`SINCRONIZAR CONTA DE ${user.name.toUpperCase()}? ESTA AÇÃO VERIFICARÁ FALTAS NÃO COBRADAS E ATUALIZARÁ O SALDO.`)) return;
+    if (!window.confirm(`SINCRONIZAR CONTA DE ${user.name.toUpperCase()}? ESTA AÇÃO VERIFICARÁ FALTAS APENAS NA SEMANA VIGENTE (SEGUNDA A HOJE) E ATUALIZARÁ O SALDO.`)) return;
     try {
       const { syncUserAbsences } = await import('../../services/rewardSystem');
       await syncUserAbsences(user.id);
