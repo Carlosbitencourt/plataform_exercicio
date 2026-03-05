@@ -7,8 +7,9 @@
  * Header: { "Authorization": "Bearer cFpUHoKRhfWU8ZcsdVVqwOXTa76F9jSfixCbBLtqRSjG6rKTd0bIfk5" }
  */
 
-import { db } from './firebase';
+import { db, functions } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
 const DEFAULT_WHATSAPP_URL = 'https://appback.conativadesk.com.br/api/messages/whatsmeow/sendTextPRO';
 const DEFAULT_WHATSAPP_TOKEN = 'cFpUHoKRhfWU8ZcsdVVqwOXTa76F9jSfixCbBLtqRSjG6rKTd0bIfk5';
@@ -22,59 +23,32 @@ const DEFAULT_TRANSMISSION_NUMBER = '5571993231592';
  */
 export const sendWhatsAppMessage = async (number: string, body: string, config?: { apiUrl?: string, apiKey?: string, queueId?: string }) => {
     try {
-        // Buscar configurações dinâmicas do Firestore para permitir alteração no painel Admin
-        let url = config?.apiUrl || DEFAULT_WHATSAPP_URL;
-        let token = config?.apiKey || DEFAULT_WHATSAPP_TOKEN;
-        let queueId = config?.queueId || "45";
+        const sendWhatsAppFn = httpsCallable(functions, 'whatsappSender');
 
-        // Se não foi passada config manual, tenta buscar do Firestore
-        if (!config) {
-            try {
-                const settingsSnap = await getDoc(doc(db, 'settings', 'integrations'));
-                if (settingsSnap.exists()) {
-                    const data = settingsSnap.data();
-                    if (data.whatsapp?.apiUrl) url = data.whatsapp.apiUrl.trim();
-                    if (data.whatsapp?.apiKey) token = data.whatsapp.apiKey.trim();
-                    if (data.whatsapp?.queueId) queueId = data.whatsapp.queueId.trim();
-                }
-            } catch (e) {
-                console.warn("Usando credenciais padrão do WhatsApp (falha ao buscar settings):", e);
-            }
-        }
-
-        const formattedNumber = number.replace(/\D/g, '').trim();
-        const payload = {
-            number: formattedNumber,
-            openTicket: 0,
-            queueId: queueId,
-            body: body
-        };
-
-        console.log(`Enviando WhatsApp para ${formattedNumber} via ${url}...`);
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(payload)
+        const result: any = await sendWhatsAppFn({
+            number,
+            body,
+            config
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error('WhatsApp API Error:', {
-                status: response.status,
-                data: errorData
-            });
-            return { success: false, status: response.status, error: errorData };
+        if (result.data && result.data.success) {
+            return { success: true, data: result.data.data };
+        } else {
+            console.error('WhatsApp Function Error:', result.data);
+            return {
+                success: false,
+                error: result.data?.error || 'Erro desconhecido na Cloud Function'
+            };
         }
-
-        const result = await response.json();
-        return { success: true, data: result };
-    } catch (error) {
-        console.error('WhatsApp Service Exception:', error);
-        return { success: false, error };
+    } catch (error: any) {
+        console.error('WhatsApp Function Exception:', error);
+        return {
+            success: false,
+            error: {
+                message: error.message || 'Falha ao chamar a Cloud Function de WhatsApp.',
+                details: error
+            }
+        };
     }
 };
 
