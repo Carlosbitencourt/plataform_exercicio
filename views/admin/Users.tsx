@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw, Wallet, PiggyBank } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser, deleteUser } from '../../services/db';
 import { auth, functions } from '../../services/firebase';
 import { httpsCallable } from 'firebase/functions';
@@ -21,6 +21,7 @@ const Users: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
   const [idCopied, setIdCopied] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -164,14 +165,34 @@ const Users: React.FC = () => {
   };
 
   const handleSyncAccount = async (user: User) => {
-    if (!window.confirm(`SINCRONIZAR CONTA DE ${user.name.toUpperCase()}? ESTA AÇÃO VERIFICARÁ FALTAS APENAS NA SEMANA VIGENTE (SEGUNDA A HOJE) E ATUALIZARÁ O SALDO.`)) return;
+    if (!window.confirm(`SINCRONIZAR CONTA DE ${user.name.toUpperCase()}? ESTA AÇÃO RECALCULARÁ AS PENALIDADES E CORRIGIRÁ O SALDO SE HOUVERAM COBRANÇAS INDEVIDAS.`)) return;
     try {
       const { syncUserAbsences } = await import('../../services/rewardSystem');
-      await syncUserAbsences(user.id);
-      alert("SINCRONIZAÇÃO CONCLUÍDA COM SUCESSO!");
+      const wasAdjusted = await syncUserAbsences(user.id);
+      if (wasAdjusted) {
+        alert("SINCRONIZAÇÃO CONCLUÍDA! O SALDO DO ATLETA FOI AJUSTADO COM SUCESSO.");
+      } else {
+        alert("SINCRONIZAÇÃO CONCLUÍDA! NENHUM AJUSTE FOI NECESSÁRIO.");
+      }
     } catch (error) {
       console.error("Error syncing:", error);
       alert("ERRO AO SINCRONIZAR CONTA.");
+    }
+  };
+
+  const handleSyncAll = async () => {
+    if (!window.confirm("DESEJA RECALCULAR O SALDO DE TODOS OS ATLETAS ATIVOS? ESTA AÇÃO CORRIGIRÁ FALTAS INDEVIDAS E APLICARÁ AS PENALIDADES DA SEMANA VIGENTE.")) return;
+
+    setIsSyncingAll(true);
+    try {
+      const { syncAllUsersAbsences } = await import('../../services/rewardSystem');
+      const result = await syncAllUsersAbsences();
+      alert(`SINCRONIZAÇÃO COMPLETA!\n${result.count} ATLETAS PROCESSADOS.\n${result.adjustedCount} SALDOS FORAM ATUALIZADOS/CORRIGIDOS.`);
+    } catch (error) {
+      console.error("Error syncing all:", error);
+      alert("ERRO AO SINCRONIZAR TODOS OS ATLETAS.");
+    } finally {
+      setIsSyncingAll(false);
     }
   };
 
@@ -224,6 +245,14 @@ const Users: React.FC = () => {
           />
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={handleSyncAll}
+            disabled={isSyncingAll}
+            className={`w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-white text-amber-600 border-2 border-amber-100 rounded-xl font-black uppercase italic tracking-tighter hover:bg-amber-50 hover:border-amber-200 transition-all shadow-md active:scale-95 text-[10px] ${isSyncingAll ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isSyncingAll ? 'animate-spin' : ''}`} />
+            {isSyncingAll ? 'Sincronizando...' : 'Sincronizar Todos'}
+          </button>
           <button
             onClick={() => setIsLinkModalOpen(true)}
             className="w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-white text-slate-600 border-2 border-slate-200 rounded-xl font-black uppercase italic tracking-tighter hover:bg-slate-50 hover:border-slate-300 transition-all shadow-md active:scale-95 text-[10px]"
@@ -289,14 +318,25 @@ const Users: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 text-[10px]">
-                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <span className="block text-slate-400 font-black uppercase tracking-widest text-[8px]">Contribuição</span>
-                  <span className="font-bold text-slate-900">R$ {user.depositedValue?.toFixed(2)}</span>
+              <div className="mt-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100 group/fin">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-white rounded-lg border border-slate-200 text-slate-400 group-hover/fin:text-slate-600 transition-colors">
+                      <PiggyBank className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contribuição</span>
+                  </div>
+                  <span className="font-bold text-slate-900 text-xs">R$ {user.depositedValue?.toFixed(2)}</span>
                 </div>
-                <div className="bg-lime-50 p-2 rounded-lg border border-lime-100">
-                  <span className="block text-lime-600 font-black uppercase tracking-widest text-[8px]">Saldo Atual</span>
-                  <span className="font-black text-slate-900 italic font-sport text-sm">R$ {user.balance?.toFixed(2)}</span>
+
+                <div className="flex items-center justify-between p-3 bg-lime-400/10 rounded-2xl border border-lime-400/20 group/fin">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-lime-400 rounded-lg border border-lime-500 text-black">
+                      <Wallet className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[10px] font-black text-lime-600 uppercase tracking-widest">Saldo Atual</span>
+                  </div>
+                  <span className="font-black text-slate-900 italic font-sport text-base tracking-tighter">R$ {user.balance?.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -375,8 +415,16 @@ const Users: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Contribuição: R$ {user.depositedValue?.toFixed(2)}</div>
-                  <div className="text-sm font-black text-slate-900 italic font-sport">R$ {user.balance?.toFixed(2)}</div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 bg-slate-50 w-fit pl-1.5 pr-3 py-1 rounded-lg border border-slate-100">
+                      <PiggyBank className="w-3 h-3 text-slate-400" />
+                      <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">R$ {user.depositedValue?.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-lime-400/15 w-fit pl-1.5 pr-3 py-1 rounded-lg border border-lime-400/20 shadow-sm">
+                      <Wallet className="w-3 h-3 text-lime-600" />
+                      <span className="text-sm font-black text-slate-900 italic font-sport tracking-tighter">R$ {user.balance?.toFixed(2)}</span>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <span className={`px-2 py-0.5 inline-flex text-[9px] font-black rounded-full uppercase tracking-widest italic border shadow-sm ${user.status === UserStatus.ACTIVE

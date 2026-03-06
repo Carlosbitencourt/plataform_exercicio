@@ -428,8 +428,11 @@ const CheckInPage: React.FC = () => {
           <div className="text-right">
             <p className="text-lg font-black text-lime-400 font-sport italic leading-none">
               {(() => {
+                const toLocalISO = (d: Date) => {
+                  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                };
+
                 const now = new Date();
-                const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
                 const currentDay = now.getDay() === 0 ? 7 : now.getDay();
 
                 // Obter segunda-feira da semana atual
@@ -441,7 +444,7 @@ const CheckInPage: React.FC = () => {
                 for (let i = 0; i < 5; i++) {
                   const target = new Date(monday);
                   target.setDate(monday.getDate() + i);
-                  const targetStr = target.toISOString().split('T')[0];
+                  const targetStr = toLocalISO(target);
                   if (userCheckIns.some(ci => ci.date === targetStr)) {
                     completedCount++;
                   }
@@ -465,7 +468,10 @@ const CheckInPage: React.FC = () => {
 
             const targetDate = new Date(monday);
             targetDate.setDate(monday.getDate() + day - 1);
-            const targetDateStr = targetDate.toISOString().split('T')[0];
+            const toLocalISO = (d: Date) => {
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            };
+            const targetDateStr = toLocalISO(targetDate);
 
             const hasCheckIn = userCheckIns.some(ci => ci.date === targetDateStr);
             const isToday = currentDayNum === day;

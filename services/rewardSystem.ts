@@ -58,12 +58,27 @@ export const runWeeklyPenaltyCheck = async () => {
     const allCheckIns: CheckIn[] = checkInsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CheckIn));
 
     for (const user of activeUsers) {
+      const registrationDate = user.createdAt ? new Date(user.createdAt) : null;
+      if (registrationDate) {
+        registrationDate.setHours(0, 0, 0, 0);
+      }
+
+      const activeDaysToCheck = daysToCheck.filter(day => {
+        if (!registrationDate) return true;
+        const [y, m, d] = day.split('-').map(Number);
+        const dayDate = new Date(y, m - 1, d);
+        dayDate.setHours(0, 0, 0, 0);
+        return dayDate >= registrationDate;
+      });
+
+      if (activeDaysToCheck.length === 0) continue;
+
       // Get user check-ins for the days we are checking
       const userCheckIns = allCheckIns.filter(c => c.userId === user.id);
       const presentDays = new Set(userCheckIns.map(c => c.date));
 
       // Misses = Expected - Present
-      const misses = daysToCheck.length - presentDays.size;
+      const misses = activeDaysToCheck.length - activeDaysToCheck.filter(d => presentDays.has(d)).length;
 
       let actualPenalty = 0;
       if (misses > 0) {
@@ -187,99 +202,184 @@ export const runWeeklyDistribution = async () => {
     throw error;
   }
 };
-export const syncUserAbsences = async (userId: string) => {
+// Helper to parse dates from various formats (String, Timestamp, Date)
+const parseDate = (dateVal: any): Date | null => {
+  if (!dateVal) return null;
+  if (dateVal instanceof Date) return dateVal;
+  if (typeof dateVal === 'string') {
+    const d = new Date(dateVal);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof dateVal === 'object') {
+    if (typeof dateVal.toDate === 'function') return dateVal.toDate();
+    if (typeof dateVal.seconds === 'number') return new Date(dateVal.seconds * 1000);
+  }
+  const d = new Date(dateVal);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+export const syncUserAbsences = async (userId: string): Promise<boolean> => {
   const today = getLocalDate();
   const weekDays = getWeekDays();
   const daysToCheck = weekDays.filter(d => d < today); // Strictly past days of current week
 
-  if (daysToCheck.length === 0) return;
+  if (daysToCheck.length === 0) return false;
 
   try {
-    // 1. Fetch user
     // 1. Fetch user directly by ID
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
-    if (!userDoc.exists()) return;
+    if (!userDoc.exists()) return false;
     const user = { id: userDoc.id, ...userDoc.data() } as User;
 
-    if (user.status !== UserStatus.ACTIVE) return;
+    if (user.status === UserStatus.ELIMINATED) return false;
 
-    // 2. Fetch check-ins for the user this week
-    // 2. Fetch ALL check-ins for the user and filter locally to avoid index requirements
-    const checkInsSnap = await getDocs(query(
-      collection(db, 'checkIns'),
-      where('userId', '==', userId)
-    ));
+    // 2. Fetch ALL check-ins and distributions for the user
+    // We use a broader query to ensure we have all history for consistency checks
+    const [checkInsSnap, distSnap] = await Promise.all([
+      getDocs(query(collection(db, 'checkIns'), where('userId', '==', userId))),
+      getDocs(query(collection(db, 'distributions'), where('userId', '==', userId)))
+    ]);
+
     const userCheckIns = checkInsSnap.docs.map(doc => doc.data() as CheckIn);
-    const presentDays = new Set(
-      userCheckIns
-        .filter(c => daysToCheck.includes(c.date))
-        .map(c => c.date)
-    );
+    const presentDays = new Set(userCheckIns.map(c => c.date));
 
-    // 3. Fetch ALL distributions for this user and filter locally
-    const distSnap = await getDocs(query(
-      collection(db, 'distributions'),
-      where('userId', '==', userId)
-    ));
+    // Map of distributions to their IDs for deletion if invalid
+    const distributions = distSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Distribution));
 
-    const allDistributions = distSnap.docs.map(doc => doc.data() as Distribution);
-    const existingPenaltyDates = new Set<string>();
+    const penaltyDaysMap = new Map<string, string>(); // date -> distributionId
+    let hasLegacyBulkPenalty = false;
+    let legacyBulkPenaltyId = "";
 
-    // Process all penalties to map which days are already covered
-    allDistributions.forEach(d => {
-      // Handle "FALTA:2025-03-05" format
+    distributions.forEach(d => {
       if (d.reason.startsWith('FALTA:')) {
         const datePart = d.reason.split(':')[1];
-        if (datePart) existingPenaltyDates.add(datePart);
+        if (datePart) penaltyDaysMap.set(datePart, d.id);
       }
-      // Handle "FALTAS SEMANA (3 dias)" format (legacy or weekly check)
-      // If "FALTAS SEMANA" exists, we assume the week was already processed and avoid double charging
       if (d.reason.includes('FALTAS SEMANA')) {
-        daysToCheck.forEach(day => existingPenaltyDates.add(day));
+        hasLegacyBulkPenalty = true;
+        legacyBulkPenaltyId = d.id;
       }
     });
 
-    console.log(`[SYNC] Atleta: ${user.name}`);
-    console.log(`[SYNC] Dias para verificar:`, daysToCheck);
-    console.log(`[SYNC] Dias com check-in:`, Array.from(presentDays));
-    console.log(`[SYNC] Dias já penalizados:`, Array.from(existingPenaltyDates));
+    const registrationDate = parseDate(user.createdAt);
+    if (registrationDate) {
+      registrationDate.setHours(0, 0, 0, 0);
+    }
 
-    let newPenalties = 0;
-    for (const day of daysToCheck) {
-      if (!presentDays.has(day) && !existingPenaltyDates.has(day)) {
-        // Apply penalty for this specific day
-        const penalty = Math.min(user.balance - newPenalties, 10.0);
-        if (penalty > 0) {
-          newPenalties += penalty;
-          await addDistribution({
-            userId: userId,
-            amount: -penalty,
-            date: day, // Set specifically to the missed day
-            reason: `FALTA:${day}`,
-            createdAt: new Date().toISOString()
-          } as any);
+    console.log(`[SYNC] Atleta: ${user.name} | Cadastro: ${registrationDate?.toISOString()}`);
 
-          // Enviar notificação de falta via WhatsApp
-          if (user.phone) {
-            sendAbsenceNotification(user.phone, user.name, day)
-              .catch(err => console.error(`Erro ao enviar notificação de falta para ${user.name}:`, err));
-          }
+    let balanceAdjustment = 0;
+    const itemsToDelete: string[] = [];
+
+    // --- SELF-CORRECTION: Identify and Remove Invalid Penalties ---
+
+    // If a legacy bulk penalty exists, it's safer to remove it and let the daily sync rebuild correctly
+    // or if the user joined mid-week, the bulk penalty is almost certainly wrong.
+    if (hasLegacyBulkPenalty) {
+      const dist = distributions.find(d => d.id === legacyBulkPenaltyId);
+      if (dist) {
+        console.log(`[SYNC] Removendo penalidade em massa legada (${dist.amount}) para correção diária.`);
+        balanceAdjustment -= dist.amount; // dist.amount is negative, so this adds it back
+        itemsToDelete.push(legacyBulkPenaltyId);
+      }
+    }
+
+    // Check individual daily penalties
+    for (const [pDate, distId] of penaltyDaysMap.entries()) {
+      let isInvalid = false;
+
+      // 1. Check if user was actually present
+      if (presentDays.has(pDate)) {
+        console.log(`[SYNC] Penalidade INVÁLIDA para ${pDate}: Atleta compareceu.`);
+        isInvalid = true;
+      }
+
+      // 2. Check if penalty is for a day before registration
+      if (registrationDate) {
+        const [y, m, d] = pDate.split('-').map(Number);
+        const dayDate = new Date(y, m - 1, d);
+        dayDate.setHours(0, 0, 0, 0);
+        if (dayDate < registrationDate) {
+          console.log(`[SYNC] Penalidade INVÁLIDA para ${pDate}: Antes do cadastro.`);
+          isInvalid = true;
+        }
+      }
+
+      if (isInvalid) {
+        const dist = distributions.find(d => d.id === distId);
+        if (dist) {
+          balanceAdjustment -= dist.amount; // dist.amount is negative, adds it back
+          itemsToDelete.push(distId);
         }
       }
     }
 
-    if (newPenalties > 0) {
-      // Only reduce balance if it hasn't been reduced already for these specific penalties
-      // To be safe, we calculate what the balance should be: current balance - newly added penalties
-      const currentBalance = user.balance || 0;
-      await safeUpdateDoc('users', userId, {
-        balance: currentBalance - newPenalties
-      });
+    // --- APPLY MISSING PENALTIES ---
+    const missingPenaltyDays: string[] = [];
+    for (const day of daysToCheck) {
+      // Skip if penalty already exists (and wasn't marked for deletion)
+      if (penaltyDaysMap.has(day) && !itemsToDelete.includes(penaltyDaysMap.get(day)!)) continue;
+
+      // Skip if present
+      if (presentDays.has(day)) continue;
+
+      // Skip if before registration
+      if (registrationDate) {
+        const [y, m, d] = day.split('-').map(Number);
+        const dayDate = new Date(y, m - 1, d);
+        dayDate.setHours(0, 0, 0, 0);
+        if (dayDate < registrationDate) continue;
+      }
+
+      missingPenaltyDays.push(day);
     }
 
+    // Process deletions
+    for (const id of itemsToDelete) {
+      // Import deleteDoc dynamically or use local reference if possible
+      // Since we already have the ID, we can use the ref
+      const { deleteDoc: firestoreDelete } = await import('firebase/firestore');
+      await firestoreDelete(doc(db, 'distributions', id));
+    }
+
+    // Process additions
+    for (const day of missingPenaltyDays) {
+      const penalty = 10.0;
+      balanceAdjustment -= penalty;
+      await addDistribution({
+        userId: userId,
+        amount: -penalty,
+        date: day,
+        reason: `FALTA:${day}`,
+        createdAt: new Date().toISOString()
+      } as any);
+
+      if (user.phone) {
+        sendAbsenceNotification(user.phone, user.name, day)
+          .catch(err => console.error(`Erro notificação ${user.name}:`, err));
+      }
+    }
+
+    // Final balance update
+    if (balanceAdjustment !== 0 || itemsToDelete.length > 0 || missingPenaltyDays.length > 0) {
+      // We re-fetch user balance to avoid race conditions if possible
+      const freshSnap = await getDoc(userRef);
+      const freshBalance = freshSnap.data()?.balance || 0;
+
+      console.log(`[SYNC] Corrigindo saldo de ${user.name}: ${freshBalance} -> ${freshBalance + balanceAdjustment}`);
+
+      await safeUpdateDoc('users', userId, {
+        balance: freshBalance + balanceAdjustment,
+        weeklyMisses: Math.max(0, Array.from(penaltyDaysMap.keys()).filter(d => !itemsToDelete.includes(penaltyDaysMap.get(d)!)).length + missingPenaltyDays.length)
+      });
+      return true;
+    }
+
+    return false;
   } catch (error) {
     console.error(`Error syncing absences for user ${userId}:`, error);
+    return false;
   }
 };
 
@@ -289,10 +389,12 @@ export const syncAllUsersAbsences = async () => {
     const activeUsers = usersSnap.docs.map(doc => doc.id);
 
     console.log(`Syncing absences for ${activeUsers.length} users...`);
+    let adjustedCount = 0;
     for (const userId of activeUsers) {
-      await syncUserAbsences(userId);
+      const wasAdjusted = await syncUserAbsences(userId);
+      if (wasAdjusted) adjustedCount++;
     }
-    return { success: true, count: activeUsers.length };
+    return { success: true, count: activeUsers.length, adjustedCount };
   } catch (error) {
     console.error("Error syncing all users absences:", error);
     throw error;

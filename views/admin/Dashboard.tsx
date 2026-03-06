@@ -8,18 +8,26 @@ import {
     Zap,
     ArrowUpRight,
     ShieldCheck,
-    MoreHorizontal,
-    MapPin
+    Calendar,
+    MapPin,
+    X,
+    UserMinus
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
 import { User, CheckIn, Distribution, UserStatus } from '../../types';
-import { runWeeklyPenaltyCheck, runWeeklyDistribution } from '../../services/rewardSystem';
+import { runWeeklyPenaltyCheck, runWeeklyDistribution, getWeekDays } from '../../services/rewardSystem';
+
+type FilterType = 'week' | 'month' | 'custom';
 
 const Dashboard: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
     const [distributions, setDistributions] = useState<Distribution[]>([]);
+    const [filterType, setFilterType] = useState<FilterType>('week');
+    const [customRange, setCustomRange] = useState({ start: '', end: '' });
+    const [showAbsenceModal, setShowAbsenceModal] = useState(false);
+    const [absenceDetails, setAbsenceDetails] = useState<{ userName: string, date: string }[]>([]);
 
     useEffect(() => {
         const unsubUsers = subscribeToUsers(setUsers);
@@ -33,33 +41,122 @@ const Dashboard: React.FC = () => {
         };
     }, []);
 
+    // Helper functions for date ranges
+    const getRangeDates = () => {
+        const now = new Date();
+        let start = new Date();
+        let end = new Date();
+
+        if (filterType === 'week') {
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday
+            start = new Date(now.setDate(diff));
+            start.setHours(0, 0, 0, 0);
+            end = new Date(); // Up to now
+        } else if (filterType === 'month') {
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+            start.setHours(0, 0, 0, 0);
+            end = new Date();
+        } else if (filterType === 'custom' && customRange.start && customRange.end) {
+            start = new Date(customRange.start);
+            start.setHours(0, 0, 0, 0);
+            end = new Date(customRange.end);
+            end.setHours(23, 59, 59, 999);
+        }
+
+        return { start, end };
+    };
+
+    const { start: startDate, end: endDate } = getRangeDates();
+
+    const isDateInRange = (dateStr: string) => {
+        const d = new Date(dateStr + 'T12:00:00'); // Midday to avoid TZ issues
+        return d >= startDate && d <= endDate;
+    };
+
     // Metrics Calculation
-    // Metrics Calculation
-    // Relaxed active status check to catch all variations
-    const activeUsers = users.filter(u =>
+    const activeUsersList = users.filter(u =>
         u.status === UserStatus.ACTIVE ||
         u.status === 'ativo' ||
         u.status === 'active'
-    ).length;
+    );
+    const activeUsersCount = activeUsersList.length;
 
-    const totalBalance = users.reduce((acc, curr) => acc + (curr.balance || 0), 0);
-    const totalDistributed = distributions.reduce((acc, curr) => acc + (curr.amount > 0 ? curr.amount : 0), 0);
+    const totalBalance = users
+        .filter(u => u.status === UserStatus.ACTIVE || u.status === UserStatus.PENDING || u.status === 'ativo' || u.status === 'active')
+        .reduce((acc, curr) => acc + (curr.balance ?? 0), 0);
+
+    // Filtered Check-ins
+    const filteredCheckIns = checkIns.filter(c => isDateInRange(c.date));
+    const checkInsInPeriod = filteredCheckIns.length;
+
+    // Filtered Distributions (Positive only)
+    const filteredDistributions = distributions.filter(d =>
+        d.amount > 0 && isDateInRange(d.date.split('T')[0])
+    );
+    const totalDistributed = filteredDistributions.reduce((acc, curr) => acc + curr.amount, 0);
+
+    // Helper for local date string (YYYY-MM-DD)
+    const toLocalISO = (d: Date) => {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    // Calculate Absences (Faltas) for the period
+    const getAbsencesDetails = () => {
+        const weekdaysInRange: string[] = [];
+        const details: { userName: string, date: string }[] = [];
+
+        const current = new Date(startDate);
+        const todayAtStart = new Date();
+        todayAtStart.setHours(0, 0, 0, 0);
+
+        const limit = endDate < todayAtStart ? endDate : new Date(todayAtStart.getTime() - 86400000);
+
+        while (current <= limit) {
+            const dayOfWeek = current.getDay();
+            if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Mon-Fri
+                weekdaysInRange.push(toLocalISO(current));
+            }
+            current.setDate(current.getDate() + 1);
+        }
+
+        let totalMisses = 0;
+        activeUsersList.forEach(user => {
+            const userCheckInDates = new Set(
+                checkIns
+                    .filter(c => c.userId === user.id)
+                    .map(c => c.date)
+            );
+
+            weekdaysInRange.forEach(date => {
+                if (!userCheckInDates.has(date)) {
+                    totalMisses++;
+                    details.push({ userName: user.name, date });
+                }
+            });
+        });
+
+        return { count: totalMisses, details };
+    };
+
+    const absencesResult = getAbsencesDetails();
+    const totalAbsences = absencesResult.count;
+    const estimatedPool = totalAbsences * 10;
 
     const getTodayISO = () => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
-    const today = getTodayISO();
+    const todayStr = getTodayISO();
 
-    // Robust date check: handle potential time components or ISO strings
     const checkInsToday = checkIns.filter(c =>
-        c.date === today ||
-        c.date.startsWith(today) ||
-        c.date.split('T')[0] === today
+        c.date === todayStr ||
+        c.date.startsWith(todayStr) ||
+        c.date.split('T')[0] === todayStr
     ).length;
 
     // Recent Activity (Top 5 Check-ins)
-    const recentCheckIns = [...checkIns].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 5); // Simple sort by string time for "today", ideally meaningful timestamp sort if cross-day
+    const recentCheckIns = [...checkIns].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 5);
 
     return (
         <div className="space-y-12 animate-in fade-in duration-700">
@@ -76,6 +173,48 @@ const Dashboard: React.FC = () => {
                         Monitoramento em Tempo Real • Atletas e Performance
                     </p>
                 </div>
+
+                <div className="flex flex-col items-end gap-3">
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-sm">
+                        <button
+                            onClick={() => setFilterType('week')}
+                            className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${filterType === 'week' ? 'bg-black text-white' : 'text-slate-500 hover:text-black'}`}
+                        >
+                            Semana
+                        </button>
+                        <button
+                            onClick={() => setFilterType('month')}
+                            className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${filterType === 'month' ? 'bg-black text-white' : 'text-slate-500 hover:text-black'}`}
+                        >
+                            Mês
+                        </button>
+                        <button
+                            onClick={() => setFilterType('custom')}
+                            className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${filterType === 'custom' ? 'bg-black text-white' : 'text-slate-500 hover:text-black'}`}
+                        >
+                            Personalizado
+                        </button>
+                    </div>
+
+                    {filterType === 'custom' && (
+                        <div className="flex items-center gap-2 animate-in slide-in-from-top-2 duration-300">
+                            <input
+                                type="date"
+                                value={customRange.start}
+                                onChange={(e) => setCustomRange(prev => ({ ...prev, start: e.target.value }))}
+                                className="bg-white border-2 border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold focus:border-lime-400 outline-none"
+                            />
+                            <span className="text-[10px] font-black text-slate-400">ATÉ</span>
+                            <input
+                                type="date"
+                                value={customRange.end}
+                                onChange={(e) => setCustomRange(prev => ({ ...prev, end: e.target.value }))}
+                                className="bg-white border-2 border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold focus:border-lime-400 outline-none"
+                            />
+                        </div>
+                    )}
+                </div>
+
                 <div className="text-right hidden md:block">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status do Sistema</p>
                     <div className="flex items-center gap-1.5 text-lime-600 font-black uppercase tracking-widest text-[10px] bg-lime-50 px-2.5 py-1 rounded-lg border border-lime-200">
@@ -85,7 +224,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* KPI Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {/* KPI 1: Atletas Ativos */}
                 <div className="bg-black text-white p-5 rounded-[1.5rem] relative overflow-hidden group shadow-xl">
                     <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
@@ -96,16 +235,16 @@ const Dashboard: React.FC = () => {
                             <Users className="w-4 h-4" />
                         </div>
                         <div>
-                            <h3 className="text-3xl font-black font-sport italic tracking-tighter">{activeUsers}</h3>
+                            <h3 className="text-3xl font-black font-sport italic tracking-tighter">{activeUsersCount}</h3>
                             <p className="text-[10px] font-black text-zinc-500 uppercase tracking-wider mt-0.5">Atletas Ativos</p>
                         </div>
                         <div className="w-full bg-zinc-800 h-1 rounded-full overflow-hidden mt-1">
-                            <div className="bg-lime-400 h-full" style={{ width: `${(activeUsers / (users.length || 1)) * 100}%` }}></div>
+                            <div className="bg-lime-400 h-full" style={{ width: `${(activeUsersCount / (users.length || 1)) * 100}%` }}></div>
                         </div>
                     </div>
                 </div>
 
-                {/* KPI 2: Check-ins Hoje */}
+                {/* KPI 2: Check-ins no Período */}
                 <div className="bg-white p-5 rounded-[1.5rem] border-2 border-slate-200 relative overflow-hidden group hover:border-lime-400 transition-colors shadow-sm">
                     <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
                         <ClipboardList className="w-16 h-16 text-slate-900" />
@@ -115,13 +254,44 @@ const Dashboard: React.FC = () => {
                             <ShieldCheck className="w-4 h-4" />
                         </div>
                         <div>
-                            <h3 className="text-3xl font-black font-sport italic tracking-tighter text-slate-900">{checkInsToday}</h3>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-0.5">Check-ins Hoje</p>
+                            <div className="flex items-baseline gap-2">
+                                <h3 className="text-3xl font-black font-sport italic tracking-tighter text-slate-900">{checkInsInPeriod}</h3>
+                                {checkInsToday > 0 && (
+                                    <span className="text-[9px] font-black text-lime-600 bg-lime-50 px-1.5 py-0.5 rounded-md border border-lime-100">+{checkInsToday} HOJE</span>
+                                )}
+                            </div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-0.5">Check-ins no Período</p>
                         </div>
                     </div>
                 </div>
 
-                {/* KPI 3: Saldo em Custódia */}
+                {/* KPI 3: Faltas Acumuladas */}
+                {/* Absences Card (Clickable) */}
+                <div
+                    onClick={() => {
+                        setAbsenceDetails(absencesResult.details);
+                        setShowAbsenceModal(true);
+                    }}
+                    className="group bg-white border border-slate-100 p-8 rounded-[2.5rem] space-y-4 hover:shadow-2xl hover:shadow-rose-100 hover:border-rose-200 transition-all cursor-pointer relative overflow-hidden"
+                >
+                    <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                        <Clock className="w-24 h-24" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-rose-50 rounded-xl border border-rose-100 text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-all">
+                            <Clock className="w-5 h-5" />
+                        </div>
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest group-hover:text-rose-500 transition-colors">Faltas no Período</p>
+                    </div>
+                    <div>
+                        <h2 className="text-5xl font-black italic uppercase font-sport text-slate-900 group-hover:scale-105 transition-transform origin-left">{totalAbsences}</h2>
+                        <div className="flex items-center gap-2 mt-2">
+                            <span className="px-2 py-0.5 bg-rose-50 text-rose-500 rounded text-[9px] font-black uppercase tracking-wider">Ver Detalhes</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* KPI 4: Pool Estimado */}
                 <div className="bg-white p-5 rounded-[1.5rem] border-2 border-slate-200 relative overflow-hidden group hover:border-lime-400 transition-colors shadow-sm">
                     <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
                         <TrendingUp className="w-16 h-16 text-slate-900" />
@@ -131,13 +301,29 @@ const Dashboard: React.FC = () => {
                             <TrendingUp className="w-4 h-4" />
                         </div>
                         <div>
+                            <h3 className="text-2xl font-black font-sport italic tracking-tighter text-slate-900 truncate">R$ {estimatedPool}</h3>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-0.5">Prêmio para Distribuição</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* KPI 5: Saldo em Custódia */}
+                <div className="bg-white p-5 rounded-[1.5rem] border-2 border-slate-200 relative overflow-hidden group hover:border-zinc-400 transition-colors shadow-sm">
+                    <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+                        < ShieldCheck className="w-16 h-16 text-slate-900" />
+                    </div>
+                    <div className="relative z-10 space-y-2">
+                        <div className="p-2 bg-slate-50 border border-slate-100 w-fit rounded-lg text-slate-900">
+                            <Activity className="w-4 h-4" />
+                        </div>
+                        <div>
                             <h3 className="text-2xl font-black font-sport italic tracking-tighter text-slate-900 truncate">R$ {totalBalance.toFixed(0)}</h3>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-0.5">Saldo dos Atletas</p>
                         </div>
                     </div>
                 </div>
 
-                {/* KPI 4: Total Distribuído */}
+                {/* KPI 6: Total Pago em Prêmios */}
                 <div className="bg-lime-400 text-black p-5 rounded-[1.5rem] relative overflow-hidden group shadow-lg">
                     <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
                     <div className="relative z-10 space-y-2">
@@ -146,7 +332,7 @@ const Dashboard: React.FC = () => {
                         </div>
                         <div>
                             <h3 className="text-2xl font-black font-sport italic tracking-tighter truncate">R$ {totalDistributed.toFixed(0)}</h3>
-                            <p className="text-[10px] font-black text-black/60 uppercase tracking-wider mt-0.5">Total Pago em Prêmios</p>
+                            <p className="text-[10px] font-black text-black/60 uppercase tracking-wider mt-0.5">Prêmios Pagos no Período</p>
                         </div>
                     </div>
                 </div>
@@ -175,7 +361,7 @@ const Dashboard: React.FC = () => {
                                                 <div>
                                                     <h4 className="font-black text-slate-900 uppercase tracking-tight text-xs">{user?.name || 'Desconhecido'}</h4>
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
-                                                        <Clock className="w-3 h-3" /> {ci.time} • {ci.date === today ? 'Hoje' : ci.date}
+                                                        <Clock className="w-3 h-3" /> {ci.time} • {ci.date === todayStr ? 'Hoje' : ci.date}
                                                         {ci.address && (
                                                             <> • <MapPin className="w-3 h-3" /> <span className="max-w-[120px] truncate">{ci.address}</span></>
                                                         )}
@@ -243,6 +429,78 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
+            {/* Absences Detailed Modal */}
+            {showAbsenceModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => setShowAbsenceModal(false)}></div>
+                    <div className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-300">
+                        {/* Header */}
+                        <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-rose-50 rounded-2xl border border-rose-100 text-rose-500">
+                                    <UserMinus className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black italic uppercase font-sport text-slate-900 tracking-tighter">Detalhes das Faltas</h3>
+                                    <p className="text-slate-400 font-bold uppercase text-[9px] tracking-[0.2em]">{absenceDetails.length} faltas identificadas</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowAbsenceModal(false)}
+                                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                            >
+                                <X className="w-6 h-6 text-slate-400" />
+                            </button>
+                        </div>
+
+                        {/* List */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {absenceDetails.length > 0 ? (
+                                [...absenceDetails].sort((a, b) => b.date.localeCompare(a.date)).map((absence, i) => (
+                                    <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-slate-100 transition-colors group">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 font-sport italic font-black text-xs">
+                                                {i + 1}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{absence.userName}</p>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {new Date(absence.date + 'T12:00:00').toLocaleDateString('pt-BR', {
+                                                        weekday: 'long',
+                                                        day: 'numeric',
+                                                        month: 'long'
+                                                    })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="px-2 py-0.5 bg-rose-50 text-rose-500 rounded text-[8px] font-black uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
+                                            FALTA
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="py-20 text-center space-y-3 opacity-30">
+                                    <ShieldCheck className="w-12 h-12 mx-auto" />
+                                    <p className="font-sport italic font-black uppercase text-xs tracking-widest text-slate-900">
+                                        Nenhuma falta no período
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-6 bg-slate-50 border-t border-slate-100 sticky bottom-0">
+                            <button
+                                onClick={() => setShowAbsenceModal(false)}
+                                className="w-full py-4 bg-black text-white rounded-2xl font-black uppercase italic tracking-tighter hover:bg-slate-800 transition-all font-sport"
+                            >
+                                Fechar Detalhes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
