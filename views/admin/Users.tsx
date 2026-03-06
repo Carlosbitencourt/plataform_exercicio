@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser, deleteUser } from '../../services/db';
-import { auth } from '../../services/firebase';
+import { auth, functions } from '../../services/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { safeUploadFile } from '../../services/firebaseGuard';
@@ -32,7 +33,8 @@ const Users: React.FC = () => {
     neighborhood: '',
     city: '',
     photoUrl: '',
-    email: ''
+    email: '',
+    password: ''
   });
 
   const generateUniqueCode = () => {
@@ -82,10 +84,27 @@ const Users: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      let userIdMatch = editingUser?.id;
+
+      // Se houver senha, criar/atualizar no Auth via Cloud Function
+      if (formData.password) {
+        const setUserAuth = httpsCallable(functions, 'setUserAuth');
+        const result: any = await setUserAuth({
+          email: formData.email,
+          password: formData.password,
+          displayName: formData.name
+        });
+        userIdMatch = result.data.uid;
+      }
+
+      const { password, ...userDataToSave } = formData;
+
       if (editingUser) {
-        await updateUser({ ...editingUser, ...formData });
+        await updateUser({ ...editingUser, ...userDataToSave });
       } else {
-        await addUser(formData);
+        // Se criar sem senha (só email), ainda não temos UID do Auth
+        // Idealmente, pedir senha ou usar email como base
+        await addUser(userDataToSave, userIdMatch);
       }
       setFormData({
         name: '',
@@ -98,7 +117,8 @@ const Users: React.FC = () => {
         neighborhood: '',
         city: '',
         photoUrl: '',
-        email: ''
+        email: '',
+        password: ''
       });
       setEditingUser(null);
       setIsModalOpen(false);
@@ -121,7 +141,8 @@ const Users: React.FC = () => {
       neighborhood: user.neighborhood || '',
       city: user.city || '',
       photoUrl: user.photoUrl || '',
-      email: user.email || ''
+      email: user.email || '',
+      password: ''
     });
     setIsModalOpen(true);
   };
@@ -224,7 +245,8 @@ const Users: React.FC = () => {
                 neighborhood: '',
                 city: '',
                 photoUrl: '',
-                email: ''
+                email: '',
+                password: ''
               });
               setIsModalOpen(true);
             }}
@@ -487,13 +509,24 @@ const Users: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">E-mail (Para Login Google)</label>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">E-mail (Para Login Google/Sistema)</label>
                     <input
                       type="email"
                       className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none placeholder:text-slate-300 text-xs lowercase"
                       placeholder="email@exemplo.com"
                       value={formData.email}
                       onChange={e => setFormData({ ...formData, email: e.target.value.toLowerCase() })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Definir Senha (Mínimo 6 caracteres)</label>
+                    <input
+                      type="password"
+                      className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none placeholder:text-zinc-300 text-xs"
+                      placeholder={editingUser ? "DEIXE EM BRANCO PARA MANTER" : "••••••••"}
+                      value={formData.password}
+                      onChange={e => setFormData({ ...formData, password: e.target.value })}
                     />
                   </div>
 

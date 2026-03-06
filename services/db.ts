@@ -36,7 +36,7 @@ export const subscribeToUsers = (callback: (users: User[]) => void) => {
     });
 };
 
-export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status' | 'balance'> & { status?: UserStatus }) => {
+export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status' | 'balance'> & { status?: UserStatus }, customId?: string) => {
     const newUser: Omit<User, 'id'> = {
         ...userData,
         balance: userData.depositedValue,
@@ -45,7 +45,11 @@ export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status'
         photoUrl: userData.photoUrl || ''
     };
 
-    await safeAddDoc(USERS_COLLECTION, newUser);
+    if (customId) {
+        await setDoc(doc(db, USERS_COLLECTION, customId), newUser);
+    } else {
+        await safeAddDoc(USERS_COLLECTION, newUser);
+    }
 };
 
 export const updateUser = async (user: User) => {

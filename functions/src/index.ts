@@ -81,3 +81,51 @@ export const whatsappSender = onCall({
         return { success: false, error: error.message };
     }
 });
+
+/**
+ * Cloud Function to create or update an Auth user.
+ * Allows admins to set passwords for athletes.
+ */
+export const setUserAuth = onCall({
+    region: "us-central1",
+}, async (request) => {
+    const { email, password, displayName } = request.data;
+
+    if (!email || !password) {
+        throw new HttpsError("invalid-argument", "Email e senha são obrigatórios.");
+    }
+
+    try {
+        let userRecord;
+        try {
+            // Check if user exists
+            userRecord = await admin.auth().getUserByEmail(email);
+
+            // Update password
+            await admin.auth().updateUser(userRecord.uid, {
+                password: password,
+                displayName: displayName || userRecord.displayName
+            });
+
+            console.log(`Senha atualizada para o usuário: ${email}`);
+        } catch (error: any) {
+            if (error.code === 'auth/user-not-found') {
+                // Create new user
+                userRecord = await admin.auth().createUser({
+                    email,
+                    password,
+                    displayName: displayName || email.split('@')[0],
+                    emailVerified: true
+                });
+                console.log(`Novo usuário criado: ${email}`);
+            } else {
+                throw error;
+            }
+        }
+
+        return { uid: userRecord.uid };
+    } catch (error: any) {
+        console.error("Erro ao gerenciar usuário Auth:", error);
+        throw new HttpsError("internal", error.message);
+    }
+});

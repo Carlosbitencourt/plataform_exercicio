@@ -166,7 +166,7 @@ const Login: React.FC = () => {
               <div className="w-full border-t border-zinc-800"></div>
             </div>
             <div className="relative flex justify-center text-[8px] uppercase font-black tracking-[0.3em]">
-              <span className="bg-zinc-900 px-4 text-zinc-500">Ou continue com</span>
+              <span className="bg-zinc-900 px-4 text-zinc-500">Ou use sua Conta Google</span>
             </div>
           </div>
 
