@@ -35,7 +35,8 @@ const Users: React.FC = () => {
     city: '',
     photoUrl: '',
     email: '',
-    password: ''
+    password: '',
+    balance: 0
   });
 
   const generateUniqueCode = () => {
@@ -119,7 +120,8 @@ const Users: React.FC = () => {
         city: '',
         photoUrl: '',
         email: '',
-        password: ''
+        password: '',
+        balance: 0
       });
       setEditingUser(null);
       setIsModalOpen(false);
@@ -143,7 +145,8 @@ const Users: React.FC = () => {
       city: user.city || '',
       photoUrl: user.photoUrl || '',
       email: user.email || '',
-      password: ''
+      password: '',
+      balance: user.balance || 0
     });
     setIsModalOpen(true);
   };
@@ -165,14 +168,14 @@ const Users: React.FC = () => {
   };
 
   const handleSyncAccount = async (user: User) => {
-    if (!window.confirm(`SINCRONIZAR CONTA DE ${user.name.toUpperCase()}? ESTA AÇÃO RECALCULARÁ AS PENALIDADES E CORRIGIRÁ O SALDO SE HOUVERAM COBRANÇAS INDEVIDAS.`)) return;
+    if (!window.confirm(`SINCRONIZAR CONTA DE ${user.name.toUpperCase()}? ESTA AÇÃO RECALCULARÁ TODO O HISTÓRICO DE FALTAS DESDE O CADASTRO E CORRIGIRÁ O SALDO.`)) return;
     try {
       const { syncUserAbsences } = await import('../../services/rewardSystem');
-      const wasAdjusted = await syncUserAbsences(user.id);
+      const wasAdjusted = await syncUserAbsences(user.id, true); // Pass true for fullSync
       if (wasAdjusted) {
-        alert("SINCRONIZAÇÃO CONCLUÍDA! O SALDO DO ATLETA FOI AJUSTADO COM SUCESSO.");
+        alert("SINCRONIZAÇÃO COMPLETA! O SALDO FOI CORRIGIDO COM BASE NO HISTÓRICO TOTAL.");
       } else {
-        alert("SINCRONIZAÇÃO CONCLUÍDA! NENHUM AJUSTE FOI NECESSÁRIO.");
+        alert("SINCRONIZAÇÃO COMPLETA! NENHUM AJUSTE FOI NECESSÁRIO.");
       }
     } catch (error) {
       console.error("Error syncing:", error);
@@ -181,16 +184,16 @@ const Users: React.FC = () => {
   };
 
   const handleSyncAll = async () => {
-    if (!window.confirm("DESEJA RECALCULAR O SALDO DE TODOS OS ATLETAS ATIVOS? ESTA AÇÃO CORRIGIRÁ FALTAS INDEVIDAS E APLICARÁ AS PENALIDADES DA SEMANA VIGENTE.")) return;
+    if (!window.confirm("ATUALIZAÇÃO GERAL: DESEJA RECALCULAR O SALDO DE TODOS OS ATLETAS DESDE O INÍCIO DO CADASTRO? ESTA AÇÃO CORRIGIRÁ TODO O HISTÓRICO DE FALTAS.")) return;
 
     setIsSyncingAll(true);
     try {
       const { syncAllUsersAbsences } = await import('../../services/rewardSystem');
-      const result = await syncAllUsersAbsences();
-      alert(`SINCRONIZAÇÃO COMPLETA!\n${result.count} ATLETAS PROCESSADOS.\n${result.adjustedCount} SALDOS FORAM ATUALIZADOS/CORRIGIDOS.`);
+      const result = await syncAllUsersAbsences(true); // Pass true for fullSync
+      alert(`ATUALIZAÇÃO GERAL COMPLETA!\n${result.count} ATLETAS PROCESSADOS.\n${result.adjustedCount} SALDOS FORAM CORRIGIDOS DESDE O CADASTRO.`);
     } catch (error) {
       console.error("Error syncing all:", error);
-      alert("ERRO AO SINCRONIZAR TODOS OS ATLETAS.");
+      alert("ERRO NA ATUALIZAÇÃO GERAL.");
     } finally {
       setIsSyncingAll(false);
     }
@@ -275,7 +278,8 @@ const Users: React.FC = () => {
                 city: '',
                 photoUrl: '',
                 email: '',
-                password: ''
+                password: '',
+                balance: 0
               });
               setIsModalOpen(true);
             }}
@@ -319,24 +323,22 @@ const Users: React.FC = () => {
               </div>
 
               <div className="mt-4 flex flex-col gap-2">
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100 group/fin">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-white rounded-lg border border-slate-200 text-slate-400 group-hover/fin:text-slate-600 transition-colors">
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="flex flex-col p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 group/fin transition-all">
+                    <div className="flex items-center gap-1.5 mb-2 text-slate-400">
                       <PiggyBank className="w-3.5 h-3.5" />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Investido</span>
                     </div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contribuição</span>
+                    <span className="font-bold text-slate-900 text-sm">R$ {user.depositedValue?.toFixed(2)}</span>
                   </div>
-                  <span className="font-bold text-slate-900 text-xs">R$ {user.depositedValue?.toFixed(2)}</span>
-                </div>
 
-                <div className="flex items-center justify-between p-3 bg-lime-400/10 rounded-2xl border border-lime-400/20 group/fin">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-lime-400 rounded-lg border border-lime-500 text-black">
+                  <div className="flex flex-col p-3 bg-lime-400 rounded-2xl border-2 border-lime-500 shadow-sm transition-all group/fin">
+                    <div className="flex items-center gap-1.5 mb-2 text-black/60">
                       <Wallet className="w-3.5 h-3.5" />
+                      <span className="text-[9px] font-black uppercase tracking-widest text-black/80">Saldo Atual</span>
                     </div>
-                    <span className="text-[10px] font-black text-lime-600 uppercase tracking-widest">Saldo Atual</span>
+                    <span className="font-black text-black italic font-sport text-xl tracking-tighter leading-none">R$ {user.balance?.toFixed(2)}</span>
                   </div>
-                  <span className="font-black text-slate-900 italic font-sport text-base tracking-tighter">R$ {user.balance?.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -415,14 +417,21 @@ const Users: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2 bg-slate-50 w-fit pl-1.5 pr-3 py-1 rounded-lg border border-slate-100">
-                      <PiggyBank className="w-3 h-3 text-slate-400" />
-                      <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">R$ {user.depositedValue?.toFixed(2)}</span>
+                  <div className="flex flex-col gap-1.5 w-max">
+                    <div className="flex items-center justify-between gap-4 px-3 py-1 bg-slate-100 rounded-lg border border-slate-200 group-hover:bg-slate-200 transition-colors">
+                      <div className="flex items-center gap-1.5 opacity-60">
+                        <PiggyBank className="w-3 h-3 text-slate-500" />
+                        <span className="text-[8px] font-black uppercase tracking-tighter">Investido</span>
+                      </div>
+                      <span className="text-[10px] font-black text-slate-700">R$ {user.depositedValue?.toFixed(2)}</span>
                     </div>
-                    <div className="flex items-center gap-2 bg-lime-400/15 w-fit pl-1.5 pr-3 py-1 rounded-lg border border-lime-400/20 shadow-sm">
-                      <Wallet className="w-3 h-3 text-lime-600" />
-                      <span className="text-sm font-black text-slate-900 italic font-sport tracking-tighter">R$ {user.balance?.toFixed(2)}</span>
+
+                    <div className="flex items-center justify-between gap-4 px-3 py-1.5 bg-lime-400 rounded-lg border-2 border-lime-500 shadow-sm group-hover:shadow-md transition-all">
+                      <div className="flex items-center gap-1.5">
+                        <Wallet className="w-3.5 h-3.5 text-black" />
+                        <span className="text-[9px] font-black uppercase tracking-tighter text-black/80">Disponível</span>
+                      </div>
+                      <span className="text-sm font-black text-black font-sport italic tracking-tighter leading-none">R$ {user.balance?.toFixed(2)}</span>
                     </div>
                   </div>
                 </td>
@@ -631,25 +640,38 @@ const Users: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Pix</label>
-                      <div className="relative group/pix">
-                        <input
-                          type="text"
-                          className="w-full pl-4 pr-10 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-xs"
-                          placeholder="CHAVE"
-                          value={formData.pixKey}
-                          onChange={e => setFormData({ ...formData, pixKey: e.target.value })}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(formData.pixKey, 'pix')}
-                          className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all ${pixCopied ? 'bg-lime-400 text-black shadow-sm' : 'text-slate-400 hover:text-lime-600 hover:bg-lime-50'
-                            }`}
-                        >
-                          {pixCopied ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
+                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Pix (Chave)</label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-xs"
+                        placeholder="CHAVE"
+                        value={formData.pixKey}
+                        onChange={e => setFormData({ ...formData, pixKey: e.target.value })}
+                      />
                     </div>
+                  </div>
+
+                  <div className="bg-lime-400/10 p-4 rounded-2xl border-2 border-dotted border-lime-400 group/balance transition-all hover:bg-lime-400/20">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-[10px] font-black text-lime-700 uppercase tracking-widest flex items-center gap-2">
+                        <Wallet className="w-4 h-4" /> Saldo Atual do Atleta (R$)
+                      </label>
+                      <span className="text-[8px] bg-lime-400 text-black px-2 py-0.5 rounded-full font-black uppercase tracking-tighter shadow-sm animate-pulse">Manual Override</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lime-700 opacity-50 text-lg">R$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="w-full pl-12 pr-4 py-3 bg-white border-2 border-lime-500 rounded-xl text-slate-900 font-black text-2xl focus:ring-4 focus:ring-lime-600/20 transition-all outline-none shadow-inner"
+                        value={formData.balance}
+                        onChange={e => setFormData({ ...formData, balance: Number(e.target.value) })}
+                      />
+                    </div>
+                    <p className="text-[8px] font-bold text-lime-600/80 uppercase mt-2 leading-tight flex items-start gap-1.5">
+                      <ShieldAlert className="w-3 h-3 shrink-0" />
+                      Atenção: Este valor será o novo saldo total. O sistema continuará aplicando/revertendo faltas a partir deste número no próximo sincronismo.
+                    </p>
                   </div>
 
                   <div>

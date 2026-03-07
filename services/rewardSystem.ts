@@ -36,6 +36,26 @@ const getLocalDate = () => {
   return `${year}-${month}-${day}`;
 };
 
+// Helper to get all Mon-Fri dates between two ISO strings
+export const getBusinessDays = (start: string, end: string) => {
+  const days = [];
+  let current = new Date(start);
+  const finish = new Date(end);
+
+  // Ensure we don't go into an infinite loop or check future
+  const now = new Date();
+  const actualEnd = finish > now ? now : finish;
+
+  while (current <= actualEnd) {
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sat or Sun
+      days.push(current.toISOString().split('T')[0]);
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return days;
+};
+
 export const runWeeklyPenaltyCheck = async () => {
   const today = getLocalDate();
   const weekDays = getWeekDays();
@@ -218,10 +238,33 @@ const parseDate = (dateVal: any): Date | null => {
   return isNaN(d.getTime()) ? null : d;
 };
 
-export const syncUserAbsences = async (userId: string): Promise<boolean> => {
+export const syncUserAbsences = async (userId: string, fullSync: boolean = false): Promise<boolean> => {
   const today = getLocalDate();
-  const weekDays = getWeekDays();
-  const daysToCheck = weekDays.filter(d => d < today); // Strictly past days of current week
+  let daysToCheck: string[] = [];
+
+  if (fullSync) {
+    // 1. Fetch user first to get registration date
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    if (!userDoc.exists()) return false;
+    const user = { id: userDoc.id, ...userDoc.data() } as User;
+
+    const registrationDate = parseDate(user.createdAt);
+    if (registrationDate) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const registrationStr = registrationDate.toISOString().split('T')[0];
+      daysToCheck = getBusinessDays(registrationStr, yesterdayStr);
+    } else {
+      // Fallback to current week if no registration date
+      const weekDays = getWeekDays();
+      daysToCheck = weekDays.filter(d => d < today);
+    }
+  } else {
+    const weekDays = getWeekDays();
+    daysToCheck = weekDays.filter(d => d < today); // Strictly past days of current week
+  }
 
   if (daysToCheck.length === 0) return false;
 
@@ -363,14 +406,13 @@ export const syncUserAbsences = async (userId: string): Promise<boolean> => {
 
     // Final balance update
     if (balanceAdjustment !== 0 || itemsToDelete.length > 0 || missingPenaltyDays.length > 0) {
-      // We re-fetch user balance to avoid race conditions if possible
       const freshSnap = await getDoc(userRef);
       const freshBalance = freshSnap.data()?.balance || 0;
-
-      console.log(`[SYNC] Corrigindo saldo de ${user.name}: ${freshBalance} -> ${freshBalance + balanceAdjustment}`);
+      const newBalance = Math.max(0, freshBalance + balanceAdjustment);
+      console.log(`[SYNC] Corrigindo saldo de ${user.name}: ${freshBalance} -> ${newBalance}`);
 
       await safeUpdateDoc('users', userId, {
-        balance: freshBalance + balanceAdjustment,
+        balance: newBalance,
         weeklyMisses: Math.max(0, Array.from(penaltyDaysMap.keys()).filter(d => !itemsToDelete.includes(penaltyDaysMap.get(d)!)).length + missingPenaltyDays.length)
       });
       return true;
@@ -383,15 +425,15 @@ export const syncUserAbsences = async (userId: string): Promise<boolean> => {
   }
 };
 
-export const syncAllUsersAbsences = async () => {
+export const syncAllUsersAbsences = async (fullSync: boolean = false) => {
   try {
     const usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', UserStatus.ACTIVE)));
     const activeUsers = usersSnap.docs.map(doc => doc.id);
 
-    console.log(`Syncing absences for ${activeUsers.length} users...`);
+    console.log(`Syncing absences for ${activeUsers.length} users (FullSync: ${fullSync})...`);
     let adjustedCount = 0;
     for (const userId of activeUsers) {
-      const wasAdjusted = await syncUserAbsences(userId);
+      const wasAdjusted = await syncUserAbsences(userId, fullSync);
       if (wasAdjusted) adjustedCount++;
     }
     return { success: true, count: activeUsers.length, adjustedCount };
