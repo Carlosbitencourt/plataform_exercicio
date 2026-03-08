@@ -5,6 +5,12 @@ export enum UserStatus {
   PENDING = 'analise'
 }
 
+export enum WithdrawalStatus {
+  PENDING = 'pendente',
+  APPROVED = 'aprovado',
+  REJECTED = 'rejeitado'
+}
+
 export interface User {
   id: string;
   name: string;
@@ -81,6 +87,18 @@ export interface Distribution {
   amount: number;
   date: string;
   reason: string;
+}
+
+export interface Withdrawal {
+  id: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  status: WithdrawalStatus;
+  pixKey: string;
+  requestedAt: string;
+  processedAt?: string;
+  rejectionReason?: string;
 }
 
 export interface Database {

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserStatus, TimeSlot, CheckIn, Distribution } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
-import { runWeeklyPenaltyCheck, runWeeklyDistribution, syncUserAbsences } from '../../services/rewardSystem';
+import { runWeeklyPenaltyCheck, syncUserAbsences } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
-import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell, Wallet, X } from 'lucide-react';
 import { sendCheckInConfirmation } from '../../services/whatsapp';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -35,6 +35,9 @@ const CheckInPage: React.FC = () => {
   const [lastCheckInId, setLastCheckInId] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
 
   // Ranking Positions
   const [positions, setPositions] = useState({ daily: '-', weekly: '-', general: '-' });
@@ -300,6 +303,38 @@ const CheckInPage: React.FC = () => {
     }
   };
 
+  const handleWithdrawalRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    const amount = parseFloat(withdrawAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Por favor, insira um valor válido.");
+      return;
+    }
+    if (amount > (user.balance || 0)) {
+      alert("Saldo insuficiente.");
+      return;
+    }
+    if (!user.pixKey) {
+      alert("Por favor, cadastre sua chave PIX no seu perfil antes de solicitar o resgate.");
+      setIsWithdrawModalOpen(false);
+      return;
+    }
+
+    setIsSubmittingWithdraw(true);
+    try {
+      const { requestWithdrawal } = await import('../../services/db');
+      await requestWithdrawal(user.id, user.name, amount, user.pixKey);
+      alert("Solicitação de resgate enviada com sucesso! O valor foi reservado do seu saldo.");
+      setIsWithdrawModalOpen(false);
+      setWithdrawAmount('');
+    } catch (error: any) {
+      alert("Erro ao solicitar resgate: " + error.message);
+    } finally {
+      setIsSubmittingWithdraw(false);
+    }
+  };
+
   const userCheckIns = checkIns.filter(c => c.userId === user?.id).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const todayChecked = user?.id ? checkIns.some(c => c.userId === user.id && c.date === getTodayISO()) : false;
 
@@ -344,11 +379,11 @@ const CheckInPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="p-6 space-y-6 animate-in fade-in duration-500 pb-20">
       {/* Featured Balance Card */}
       <section className="relative overflow-hidden group">
         <div className="absolute inset-0 bg-gradient-to-br from-lime-500/20 via-transparent to-transparent rounded-[1.5rem] blur-3xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
-        <div className="relative bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/50 p-6 rounded-[1.5rem] space-y-6 shadow-2xl">
+        <div className="relative bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/50 p-5 rounded-[1.5rem] space-y-4 shadow-2xl">
           <div className="flex items-center justify-between">
             <div className="bg-lime-400/10 p-3 rounded-2xl border border-lime-400/20">
               <Zap className="w-6 h-6 text-lime-400" />
@@ -368,45 +403,42 @@ const CheckInPage: React.FC = () => {
                 </span>
                 <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20 shadow-[0_0_15px_rgba(163,230,53,0.1)]">LIVE</span>
               </div>
+              <button
+                onClick={() => setIsWithdrawModalOpen(true)}
+                className="mt-2 py-2 px-4 bg-lime-400 text-black rounded-xl font-black uppercase tracking-widest text-[9px] hover:scale-[1.05] active:scale-95 transition-all shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 relative z-10 w-fit"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                Resgatar Saldo
+              </button>
             </div>
 
-            {/* Breakdown Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-              <div className="bg-black/40 border border-zinc-800/50 p-4 rounded-2xl">
-                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-1">Depósito Inicial</p>
-                <p className="text-xl font-black text-white font-sport italic leading-none">
-                  R$ {user?.depositedValue?.toFixed(2) || '0.00'}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="bg-lime-400/5 border border-lime-400/20 p-4 rounded-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-1 opacity-20">
+                  <Award className="w-4 h-4 text-lime-400" />
+                </div>
+                <p className="text-[8px] font-black text-lime-600/60 uppercase tracking-widest mb-1">Lucro Gerado</p>
+                <p className="text-xl font-black text-lime-400 font-sport italic leading-none">
+                  {(() => {
+                    const userDist = distributions.filter(d => d.userId === user?.id);
+                    const positiveProfit = userDist.filter(d => d.amount > 0).reduce((acc, d) => acc + d.amount, 0);
+                    return `R$ ${positiveProfit.toFixed(2)}`;
+                  })()}
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 md:col-span-2">
-                <div className="bg-lime-400/5 border border-lime-400/20 p-4 rounded-2xl relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-1 opacity-20">
-                    <Award className="w-4 h-4 text-lime-400" />
-                  </div>
-                  <p className="text-[8px] font-black text-lime-600/60 uppercase tracking-widest mb-1">Lucro Gerado</p>
-                  <p className="text-xl font-black text-lime-400 font-sport italic leading-none">
-                    {(() => {
-                      const userDist = distributions.filter(d => d.userId === user?.id);
-                      const positiveProfit = userDist.filter(d => d.amount > 0).reduce((acc, d) => acc + d.amount, 0);
-                      return `R$ ${positiveProfit.toFixed(2)}`;
-                    })()}
-                  </p>
+              <div className="bg-rose-500/5 border border-rose-500/20 p-4 rounded-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-1 opacity-20">
+                  <AlertCircle className="w-4 h-4 text-rose-500" />
                 </div>
-
-                <div className="bg-rose-500/5 border border-rose-500/20 p-4 rounded-2xl relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-1 opacity-20">
-                    <AlertCircle className="w-4 h-4 text-rose-500" />
-                  </div>
-                  <p className="text-[8px] font-black text-rose-500/60 uppercase tracking-widest mb-1">Penalidades (Faltas)</p>
-                  <p className="text-xl font-black text-rose-500 font-sport italic leading-none">
-                    {(() => {
-                      const userDist = distributions.filter(d => d.userId === user?.id);
-                      const penalties = userDist.filter(d => d.amount < 0).reduce((acc, d) => acc + d.amount, 0);
-                      return `R$ ${Math.abs(penalties).toFixed(2)}`;
-                    })()}
-                  </p>
-                </div>
+                <p className="text-[8px] font-black text-rose-500/60 uppercase tracking-widest mb-1">Penalidades (Faltas)</p>
+                <p className="text-xl font-black text-rose-500 font-sport italic leading-none">
+                  {(() => {
+                    const userDist = distributions.filter(d => d.userId === user?.id);
+                    const penalties = userDist.filter(d => d.amount < 0).reduce((acc, d) => acc + d.amount, 0);
+                    return `R$ ${Math.abs(penalties).toFixed(2)}`;
+                  })()}
+                </p>
               </div>
             </div>
           </div>
@@ -414,7 +446,7 @@ const CheckInPage: React.FC = () => {
       </section>
 
       {/* Weekly Progress Bar (Segunda a Sexta) */}
-      <section className="bg-zinc-900 border border-zinc-800 p-6 rounded-[1.5rem] space-y-4 relative overflow-hidden">
+      <section className="bg-zinc-900 border border-zinc-800 p-5 rounded-[1.5rem] space-y-3 relative overflow-hidden">
         <div className="flex items-center justify-between relative z-10">
           <div>
             <p className="text-xs font-black text-white uppercase tracking-tighter italic font-sport">Frequência Semanal</p>
@@ -623,6 +655,69 @@ const CheckInPage: React.FC = () => {
           )}
         </div>
       </section>
+
+      {/* Withdrawal Modal */}
+      {isWithdrawModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300 p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsWithdrawModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 space-y-8 animate-in slide-in-from-bottom-full duration-500 mb-20 shadow-2xl">
+            <header className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter">Resgatar Saldo</h2>
+                <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Solicitar transferência PIX</p>
+              </div>
+              <button
+                onClick={() => setIsWithdrawModalOpen(false)}
+                className="p-3 bg-zinc-800 text-zinc-400 rounded-2xl hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </header>
+
+            <form onSubmit={handleWithdrawalRequest} className="space-y-6">
+              <div className="bg-black/40 border border-zinc-800/50 p-6 rounded-3xl space-y-2">
+                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Saldo Disponível</p>
+                <p className="text-2xl font-black text-lime-400 font-sport italic tracking-tighter">
+                  R$ {user?.balance?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Valor do Resgate</label>
+                <div className="relative">
+                  <span className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">R$</span>
+                  <input
+                    required
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={user?.balance || 0}
+                    placeholder="0,00"
+                    className="w-full pl-14 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all"
+                    value={withdrawAmount}
+                    onChange={e => setWithdrawAmount(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1">
+                <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Atenção</p>
+                <p className="text-[10px] text-amber-200/60 font-medium">
+                  O valor será enviado para sua chave PIX cadastrada: <span className="text-amber-400 font-bold">{user?.pixKey || 'NÃO CADASTRADA'}</span>
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingWithdraw || (user?.balance || 0) <= 0}
+                className="w-full py-5 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-lime-400/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSubmittingWithdraw ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Solicitação'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

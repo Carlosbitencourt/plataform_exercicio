@@ -1,5 +1,5 @@
 import React from 'react';
-import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon, Loader2, Camera } from 'lucide-react';
+import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon, Loader2, Camera, Wallet } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
 import { syncUserAbsences } from '../../services/rewardSystem';
@@ -16,6 +16,9 @@ const AthleteProfile: React.FC = () => {
     const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
+    const [isWithdrawModalOpen, setIsWithdrawModalOpen] = React.useState(false);
+    const [withdrawAmount, setWithdrawAmount] = React.useState('');
+    const [isSubmittingWithdraw, setIsSubmittingWithdraw] = React.useState(false);
     const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
     const [editForm, setEditForm] = React.useState({
         name: '',
@@ -139,6 +142,39 @@ const AthleteProfile: React.FC = () => {
         }
     };
 
+    const handleWithdrawalRequest = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!userData) return;
+        const amount = parseFloat(withdrawAmount);
+        if (isNaN(amount) || amount <= 0) {
+            alert("Por favor, insira um valor válido.");
+            return;
+        }
+        if (amount > (userData.balance || 0)) {
+            alert("Saldo insuficiente.");
+            return;
+        }
+        if (!userData.pixKey) {
+            alert("Por favor, cadastre sua chave PIX no perfil antes de solicitar o resgate.");
+            setIsWithdrawModalOpen(false);
+            setIsEditModalOpen(true);
+            return;
+        }
+
+        setIsSubmittingWithdraw(true);
+        try {
+            const { requestWithdrawal } = await import('../../services/db');
+            await requestWithdrawal(userData.id, userData.name, amount, userData.pixKey);
+            alert("Solicitação de resgate enviada com sucesso! O valor foi reservado do seu saldo.");
+            setIsWithdrawModalOpen(false);
+            setWithdrawAmount('');
+        } catch (error: any) {
+            alert("Erro ao solicitar resgate: " + error.message);
+        } finally {
+            setIsSubmittingWithdraw(false);
+        }
+    };
+
     const menuItems = [
         {
             icon: History,
@@ -200,11 +236,15 @@ const AthleteProfile: React.FC = () => {
                         {`R$ ${userData?.balance?.toFixed(2) || '0.00'}`}
                     </p>
 
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-800/50">
-                        <div>
-                            <p className="text-[7px] font-black text-zinc-600 uppercase tracking-widest mb-1">Depósito</p>
-                            <p className="text-xs font-black text-zinc-300 font-sport italic">R$ {userData?.depositedValue?.toFixed(2) || '0.00'}</p>
-                        </div>
+                    <button
+                        onClick={() => setIsWithdrawModalOpen(true)}
+                        className="mt-4 w-full py-3 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 relative z-10"
+                    >
+                        <Wallet className="w-3 h-3" />
+                        Resgatar Saldo
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/50">
                         <div>
                             <p className="text-[7px] font-black text-zinc-600 uppercase tracking-widest mb-1">Lucro</p>
                             <p className="text-xs font-black text-lime-400 font-sport italic">R$ {distributions.filter(d => d.amount > 0).reduce((acc, d) => acc + d.amount, 0).toFixed(2)}</p>
@@ -214,6 +254,16 @@ const AthleteProfile: React.FC = () => {
                             <p className="text-xs font-black text-rose-500 font-sport italic">R$ {Math.abs(distributions.filter(d => d.amount < 0).reduce((acc, d) => acc + d.amount, 0)).toFixed(2)}</p>
                         </div>
                     </div>
+                </div>
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-4 relative overflow-hidden group hover:border-lime-500/30 transition-all">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+                        <Wallet className="w-12 h-12 text-zinc-500" />
+                    </div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Depósito Inicial</p>
+                    <p className="text-3xl font-black text-white font-sport italic tracking-tighter relative z-10 leading-none">
+                        R$ {userData?.depositedValue?.toFixed(2) || '0.00'}
+                    </p>
+                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest leading-none mt-1">Investimento</p>
                 </div>
                 <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-2 relative overflow-hidden group hover:border-amber-500/30 transition-all">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
@@ -443,6 +493,69 @@ const AthleteProfile: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Withdrawal Modal */}
+            {isWithdrawModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsWithdrawModalOpen(false)}></div>
+                    <div className="relative w-full max-w-lg bg-zinc-900 border-t border-zinc-800 rounded-t-[3rem] p-8 space-y-8 animate-in slide-in-from-bottom-full duration-500">
+                        <header className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter">Resgatar Saldo</h2>
+                                <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Solicitar transferência PIX</p>
+                            </div>
+                            <button
+                                onClick={() => setIsWithdrawModalOpen(false)}
+                                className="p-3 bg-zinc-800 text-zinc-400 rounded-2xl hover:text-white transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </header>
+
+                        <form onSubmit={handleWithdrawalRequest} className="space-y-6 pb-12">
+                            <div className="bg-black/40 border border-zinc-800/50 p-6 rounded-3xl space-y-2">
+                                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Saldo Disponível</p>
+                                <p className="text-2xl font-black text-lime-400 font-sport italic tracking-tighter">
+                                    R$ {userData?.balance?.toFixed(2) || '0.00'}
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Valor do Resgate</label>
+                                <div className="relative">
+                                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">R$</span>
+                                    <input
+                                        required
+                                        type="number"
+                                        step="0.01"
+                                        min="0.01"
+                                        max={userData?.balance || 0}
+                                        placeholder="0,00"
+                                        className="w-full pl-14 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all"
+                                        value={withdrawAmount}
+                                        onChange={e => setWithdrawAmount(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1">
+                                <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Atenção</p>
+                                <p className="text-[10px] text-amber-200/60 font-medium">
+                                    O valor será enviado para sua chave PIX cadastrada: <span className="text-amber-400 font-bold">{userData?.pixKey || 'NÃO CADASTRADA'}</span>
+                                </p>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isSubmittingWithdraw || (userData?.balance || 0) <= 0}
+                                className="w-full py-5 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-lime-400/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {isSubmittingWithdraw ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Solicitação'}
+                            </button>
+                        </form>
                     </div>
                 </div>
             )}

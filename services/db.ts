@@ -16,7 +16,7 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { safeAddDoc, safeUpdateDoc } from './firebaseGuard';
-import { User, TimeSlot, CheckIn, Distribution, QRCodeData, UserStatus, Category } from '../types';
+import { User, TimeSlot, CheckIn, Distribution, QRCodeData, UserStatus, Category, Withdrawal, WithdrawalStatus } from '../types';
 
 // Collections
 const USERS_COLLECTION = 'users';
@@ -25,6 +25,7 @@ const CHECKINS_COLLECTION = 'checkIns';
 const DISTRIBUTIONS_COLLECTION = 'distributions';
 const QRCODES_COLLECTION = 'qrCodes';
 const CATEGORIES_COLLECTION = 'categories';
+const WITHDRAWALS_COLLECTION = 'withdrawals';
 
 // --- Users ---
 
@@ -269,4 +270,67 @@ export const updateCategory = async (category: Category) => {
 
 export const deleteCategory = async (id: string) => {
     await deleteDoc(doc(db, CATEGORIES_COLLECTION, id));
+};
+
+// --- Withdrawals ---
+
+export const subscribeToWithdrawals = (callback: (withdrawals: Withdrawal[]) => void) => {
+    const q = query(collection(db, WITHDRAWALS_COLLECTION), orderBy('requestedAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+        const withdrawals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Withdrawal));
+        callback(withdrawals);
+    });
+};
+
+export const requestWithdrawal = async (userId: string, userName: string, amount: number, pixKey: string) => {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) throw new Error("Usuário não encontrado.");
+    const userData = userSnap.data() as User;
+
+    if (userData.balance < amount) throw new Error("Saldo insuficiente.");
+
+    // 1. Create withdrawal request
+    const withdrawal: Omit<Withdrawal, 'id'> = {
+        userId,
+        userName,
+        amount,
+        pixKey,
+        status: WithdrawalStatus.PENDING,
+        requestedAt: new Date().toISOString()
+    };
+
+    const withdrawalRef = await safeAddDoc(WITHDRAWALS_COLLECTION, withdrawal);
+
+    // 2. Deduct from balance immediately
+    await updateDoc(userRef, {
+        balance: parseFloat((userData.balance - amount).toFixed(2))
+    });
+
+    return withdrawalRef.id;
+};
+
+export const updateWithdrawalStatus = async (withdrawal: Withdrawal, newStatus: WithdrawalStatus, rejectionReason?: string) => {
+    const { id, ...data } = withdrawal;
+    const withdrawalRef = doc(db, WITHDRAWALS_COLLECTION, id);
+
+    // If rejecting, refund the user
+    if (newStatus === WithdrawalStatus.REJECTED) {
+        const userRef = doc(db, USERS_COLLECTION, withdrawal.userId);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+            const userData = userSnap.data() as User;
+            await updateDoc(userRef, {
+                balance: parseFloat((userData.balance + withdrawal.amount).toFixed(2))
+            });
+        }
+    }
+
+    await updateDoc(withdrawalRef, {
+        status: newStatus,
+        processedAt: new Date().toISOString(),
+        rejectionReason: rejectionReason || ''
+    });
 };
