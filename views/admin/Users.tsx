@@ -338,7 +338,7 @@ const Users: React.FC = () => {
       </div>
 
       {/* Athletes List - Bordas e Sombras Reforçadas */}
-      <div className="bg-transparent md:bg-white rounded-[1.25rem] md:border-2 md:border-slate-300 overflow-hidden md:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
+      <div className="bg-transparent md:bg-white rounded-[1.25rem] md:border-2 md:border-slate-300 overflow-x-auto md:shadow-[0_10px_30px_rgba(0,0,0,0.05)]">
 
         {/* Mobile View - Cards */}
         <div className="md:hidden space-y-4">
@@ -426,11 +426,11 @@ const Users: React.FC = () => {
         <table className="min-w-full divide-y-2 divide-slate-200 hidden md:table">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Perfil do Atleta</th>
-              <th className="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Identificação</th>
-              <th className="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Métricas Financeiras</th>
-              <th className="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
-              <th className="px-4 py-3 text-right text-[10px] font-black text-slate-500 uppercase tracking-widest">Gestão</th>
+              <th className="px-3 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Perfil do Atleta</th>
+              <th className="px-3 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Identificação</th>
+              <th className="px-3 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Métricas</th>
+              <th className="px-3 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap text-center">Status</th>
+              <th className="px-3 py-3 text-right text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Gestão</th>
             </tr>
           </thead>
           <tbody className="divide-y-2 divide-slate-100">
@@ -483,9 +483,9 @@ const Users: React.FC = () => {
                     {getStatusLabel(user.status)}
                   </span>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-right">
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => openEdit(user)} className="p-1.5 bg-white text-slate-400 hover:text-black hover:border-black rounded-md transition-all border border-slate-200 shadow-sm" title="Editar Perfil">
+                <td className="px-3 py-3 whitespace-nowrap text-right min-w-[140px]">
+                  <div className="flex justify-end gap-1.5">
+                    <button onClick={() => openEdit(user)} className="p-1 bg-white text-slate-400 hover:text-black hover:border-black rounded-md transition-all border border-slate-200 shadow-sm" title="Editar Perfil">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
@@ -493,14 +493,14 @@ const Users: React.FC = () => {
                         impersonate(user);
                         navigate('/checkin');
                       }}
-                      className="p-1.5 bg-black text-lime-400 hover:scale-[1.1] rounded-md transition-all border border-zinc-800 shadow-sm"
+                      className="p-1 bg-black text-lime-400 hover:scale-[1.1] rounded-md transition-all border border-zinc-800 shadow-sm"
                       title="Acessar Conta do Atleta"
                     >
                       <LogIn className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => toggleStatus(user)}
-                      className={`p-1.5 rounded-md transition-all border shadow-sm ${user.status === UserStatus.ACTIVE
+                      className={`p-1 rounded-md transition-all border shadow-sm ${user.status === UserStatus.ACTIVE
                         ? 'bg-white text-slate-400 hover:text-rose-600 hover:border-rose-400 border-slate-200'
                         : user.status === UserStatus.PENDING
                           ? 'bg-white text-slate-400 hover:text-lime-600 hover:border-lime-400 border-slate-200'
@@ -512,14 +512,14 @@ const Users: React.FC = () => {
                     </button>
                     <button
                       onClick={() => handleSyncAccount(user)}
-                      className="p-1.5 bg-white text-slate-400 hover:text-amber-500 hover:border-amber-400 rounded-md transition-all border border-slate-200 shadow-sm"
+                      className="p-1 bg-white text-slate-400 hover:text-amber-500 hover:border-amber-400 rounded-md transition-all border border-slate-200 shadow-sm"
                       title="Sincronizar e Corrigir Penalidades"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(user)}
-                      className="p-1.5 bg-white text-slate-400 hover:text-red-600 hover:border-red-400 rounded-md transition-all border border-slate-200 shadow-sm"
+                      className="p-1 bg-white text-slate-400 hover:text-red-600 hover:border-red-400 rounded-md transition-all border border-slate-200 shadow-sm"
                       title="Apagar Atleta"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
