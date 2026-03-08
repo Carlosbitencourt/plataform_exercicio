@@ -197,11 +197,7 @@ const AthleteProfile: React.FC = () => {
                     </div>
                     <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Saldo Total (Portfólio)</p>
                     <p className="text-4xl font-black text-white font-sport italic tracking-tighter relative z-10">
-                        {(() => {
-                            const netProfit = distributions.reduce((acc, d) => acc + d.amount, 0);
-                            const total = (userData?.depositedValue || 0) + netProfit;
-                            return `R$ ${total.toFixed(2)}`;
-                        })()}
+                        {`R$ ${userData?.balance?.toFixed(2) || '0.00'}`}
                     </p>
 
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-800/50">

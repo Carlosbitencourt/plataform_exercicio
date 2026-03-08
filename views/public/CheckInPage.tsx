@@ -364,12 +364,7 @@ const CheckInPage: React.FC = () => {
               <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Saldo Total (Portfólio)</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-6xl font-black text-white font-sport italic tracking-tighter text-shadow-glow">
-                  {(() => {
-                    const userDist = distributions.filter(d => d.userId === user?.id);
-                    const netProfit = userDist.reduce((acc, d) => acc + d.amount, 0);
-                    const totalValue = (user?.depositedValue || 0) + netProfit;
-                    return `R$ ${totalValue.toFixed(2)}`;
-                  })()}
+                  {`R$ ${user?.balance?.toFixed(2) || '0.00'}`}
                 </span>
                 <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20 shadow-[0_0_15px_rgba(163,230,53,0.1)]">LIVE</span>
               </div>

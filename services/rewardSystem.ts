@@ -367,13 +367,31 @@ export const syncUserAbsences = async (userId: string, fullSync: boolean = false
         isInvalid = true;
       }
 
-      // 2. Check if penalty is for a day before registration
+      // 3. Check if penalty is for a weekend (competition is Mon-Fri)
+      const [y, m, d] = pDate.split('-').map(Number);
+      const dayDate = new Date(y, m - 1, d);
+      const dayOfWeek = dayDate.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        console.log(`[SYNC] Penalidade INVÁLIDA para ${pDate}: Final de semana.`);
+        isInvalid = true;
+      }
+
+      // 4. Check if penalty is before or on registration date (inclusive)
       if (registrationDate) {
-        const [y, m, d] = pDate.split('-').map(Number);
-        const dayDate = new Date(y, m - 1, d);
-        dayDate.setHours(0, 0, 0, 0);
-        if (dayDate < registrationDate) {
-          console.log(`[SYNC] Penalidade INVÁLIDA para ${pDate}: Antes do cadastro.`);
+        const dayDateForReg = new Date(y, m - 1, d);
+        dayDateForReg.setHours(0, 0, 0, 0);
+        if (dayDateForReg <= registrationDate) {
+          console.log(`[SYNC] Penalidade INVÁLIDA para ${pDate}: Dia do cadastro ou anterior.`);
+          isInvalid = true;
+        }
+      }
+
+      // 5. Check if it's the very first week and user hasn't check-in yet
+      // This is a safety measure for phantom penalties created by old scripts
+      if (!isInvalid && presentDays.size > 0) {
+        const firstCheckIn = Array.from(presentDays).sort()[0];
+        if (pDate < firstCheckIn) {
+          console.log(`[SYNC] Penalidade INVÁLIDA para ${pDate}: Antes do primeiro check-in (${firstCheckIn}).`);
           isInvalid = true;
         }
       }
@@ -483,48 +501,66 @@ export const fixWeeklyDistribution = async (
   newPool: number
 ) => {
   const totalScore = participants.reduce((sum, p) => sum + p.score, 0);
-  const today = new Date().toISOString().split('T')[0];
 
-  console.log(`[FIX] Starting correction: ${oldPool} -> ${newPool} (Total Score: ${totalScore})`);
+  // MANUALLY PROVIDED BASELINE BY USER (Values BEFORE this week's profit)
+  const forcedBaseline: Record<string, number> = {
+    'vMz5zZ8h7UCsCasrhf0J': 0.00,  // Carlos
+    'pNXIpvSjrrCj6p5unzjf': 0.00,  // Jully
+    '6G69zd715eTcnOxnyLIQ': 30.00, // Vinicius
+    'l7AKmMYmMnmGsKzIdkNn': 30.00, // Gustavo
+    'oNcUUFt9SxUb1Cok9XmY': 50.00, // Jutai
+    'AqkajUq09u0nFdGtIH1R': 10.00, // Luiz
+    'KK2gZj4OOUYvKrf74x9A': 10.00  // Cintia
+  };
+
+  console.log(`[FIX_FINAL] Starting forced reconciliation: ${oldPool} -> ${newPool} (Total Score: ${totalScore})`);
 
   for (const p of participants) {
-    const oldShare = parseFloat((p.score * (oldPool / totalScore)).toFixed(2));
+    console.log(`[FIX_FINAL] Processing ${p.name}...`);
     const newShare = parseFloat((p.score * (newPool / totalScore)).toFixed(2));
-    const diff = parseFloat((newShare - oldShare).toFixed(2));
 
-    const { doc, getDoc, updateDoc, collection, query, where, getDocs } = await import('firebase/firestore');
+    const { doc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp } = await import('firebase/firestore');
     const { db } = await import('./firebase');
-    
-    const userRef = doc(db, 'users', p.id);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) continue;
 
-    const currentBalance = userSnap.data().balance || 0;
-    
-    // 1. Update Distribution Records for today
-    const distQuery = query(
-      collection(db, 'distributions'),
-      where('userId', '==', p.id),
-      where('date', '==', today),
-      where('amount', '==', oldShare)
-    );
+    // 1. Audit and Clean Distributions (Weekend Penalties and Previous Failed Rewards)
+    const distQuery = query(collection(db, 'distributions'), where('userId', '==', p.id));
     const distSnap = await getDocs(distQuery);
-    
-    let distUpdated = false;
+
     for (const dDoc of distSnap.docs) {
-      await updateDoc(doc(db, 'distributions', dDoc.id), {
-        amount: newShare,
-        reason: `DISTRIBUIÇÃO PROPORCIONAL (${p.score} pts) - CORRIGIDA`
-      });
-      distUpdated = true;
+      const d = dDoc.data();
+      const dateObj = new Date(d.date + 'T12:00:00');
+      const day = dateObj.getDay();
+
+      const isWeekend = (day === 0 || day === 6);
+      const isRewardToFix = (d.date === '2026-03-08' && d.amount > 0);
+
+      if (isWeekend || isRewardToFix) {
+        console.log(`[FIX_FINAL] Deleting record: ${d.date} | ${d.amount} | ${d.reason}`);
+        await deleteDoc(doc(db, 'distributions', dDoc.id));
+      }
     }
 
-    // 2. Update User Balance if needed
-    if (distUpdated || Math.abs(currentBalance - (oldShare + 10)) < 1) {
-       const newBalance = Math.max(0, currentBalance + diff);
-       await updateDoc(userRef, { balance: newBalance });
-       console.log(`[FIX] Updated ${p.name}: Balance ${currentBalance} -> ${newBalance}`);
-    }
+    // 2. Add corrected reward
+    await addDoc(collection(db, 'distributions'), {
+      userId: p.id,
+      amount: newShare,
+      date: '2026-03-08',
+      reason: `DISTRIBUIÇÃO PROPORCIONAL CORRIGIDA (90.00 pool) - ${p.score} pts`,
+      createdAt: serverTimestamp()
+    });
+
+    // 3. APPLY FORCED BASELINE + NEW SHARE
+    const userRef = doc(db, 'users', p.id);
+    const baselineBeforeReward = forcedBaseline[p.id] ?? 0;
+    const finalBalance = parseFloat((baselineBeforeReward + newShare).toFixed(2));
+
+    await updateDoc(userRef, {
+      balance: finalBalance,
+      weeklyScore: 0,
+      weeklyMisses: 0
+    });
+
+    console.log(`[FIX_FINAL] ${p.name}: Forced Sync -> Baseline(${baselineBeforeReward}) + Reward(${newShare}) = ${finalBalance}`);
   }
   return true;
 };
