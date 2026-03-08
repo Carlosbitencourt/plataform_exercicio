@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where, Timestamp, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, Timestamp, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { safeUpdateDoc } from './firebaseGuard';
 import { addDistribution } from './db';
@@ -69,9 +69,11 @@ export const runWeeklyPenaltyCheck = async () => {
   const penalizedUsers: string[] = [];
 
   try {
-    // 1. Fetch active users
-    const usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', UserStatus.ACTIVE)));
-    const activeUsers: User[] = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+    // 1. Fetch active users (handle multiple possible "active" status strings)
+    const usersSnapForPenalty = await getDocs(collection(db, 'users'));
+    const activeUsers: User[] = usersSnapForPenalty.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as User))
+      .filter(u => (u.status as string) === UserStatus.ACTIVE || (u.status as string) === 'ativo' || (u.status as string) === 'active');
 
     // 2. Fetch all check-ins for the relevant days
     const checkInsSnap = await getDocs(query(collection(db, 'checkIns'), where('date', 'in', daysToCheck)));
@@ -84,11 +86,15 @@ export const runWeeklyPenaltyCheck = async () => {
       }
 
       const activeDaysToCheck = daysToCheck.filter(day => {
+        // Removido o filtro de data de cadastro para que o pool da semana seja completo para todos os ativos
+        /*
         if (!registrationDate) return true;
         const [y, m, d] = day.split('-').map(Number);
         const dayDate = new Date(y, m - 1, d);
         dayDate.setHours(0, 0, 0, 0);
         return dayDate >= registrationDate;
+        */
+        return true;
       });
 
       if (activeDaysToCheck.length === 0) continue;
@@ -146,82 +152,105 @@ export const runWeeklyPenaltyCheck = async () => {
   }
 };
 
-export const runWeeklyDistribution = async () => {
+export const closeWeeklySession = async () => {
   const today = getLocalDate();
 
   try {
-    // 1. Fetch active users
-    const usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', UserStatus.ACTIVE)));
-    const activeUsers: User[] = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+    // 1. First, sync all absences to ensure all penalties are applied before we calculate the pool
+    // This uses the existing logic that checks business days up to yesterday
+    console.log("[CLOSE_WEEKLY] Syncing all absences...");
+    await syncAllUsersAbsences(false);
 
-    // Calcular o Pool (Soma das penalidades da semana)
-    // O Pool é a diferença entre o que foi depositado e o saldo atual dos ativos
-    // Alternativa: Somar da colecao distributions. Mas A matemática básica Deposited - Balance já compõe o pool perfeitamente nessa regra.
-    const totalDeposited = activeUsers.reduce((acc, u) => acc + u.depositedValue, 0);
-    const currentTotalBalance = activeUsers.reduce((acc, u) => acc + u.balance, 0);
+    // 2. Fetch fresh user data after penalties
+    const weekDays = getWeekDays();
+    const usersSnapForPool = await getDocs(collection(db, 'users'));
+    const activeUsers: User[] = usersSnapForPool.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as User))
+      .filter(u => (u.status as string) === UserStatus.ACTIVE || (u.status as string) === 'ativo' || (u.status as string) === 'active');
 
-    const weeklyPool = totalDeposited - currentTotalBalance;
+    // 3. Calculate Pool based on penalties applied this week
+    // We get all distributions from this week that are negative (penalties)
+    const weekStart = weekDays[0];
+    const distQuery = query(
+      collection(db, 'distributions'),
+      where('date', '>=', weekStart),
+      where('date', '<=', today)
+    );
+    const distSnapForPool = await getDocs(distQuery);
+    const weeklyPool = distSnapForPool.docs
+      .map(doc => doc.data() as Distribution)
+      .filter(d => d.amount < 0)
+      .reduce((acc, d) => acc + Math.abs(d.amount), 0);
+
+    console.log(`[CLOSE_WEEKLY] Pool calculated from penalties: R$ ${weeklyPool.toFixed(2)}`);
 
     if (weeklyPool <= 0.01) {
-      // Ninguem perdeu pontos/dinheiro. Reset geral
-      const resetPromises = activeUsers.map(user =>
-        safeUpdateDoc('users', user.id, { weeklyMisses: 0, weeklyScore: 0 })
-      );
-      await Promise.all(resetPromises);
-      return { message: "Nenhum valor no pool para distribuir. Semana reiniciada." };
+      // No money to distribute. Just reset.
+      console.log("[CLOSE_WEEKLY] Empty pool. Resetting scores only.");
+      for (const user of activeUsers) {
+        await safeUpdateDoc('users', user.id, { weeklyMisses: 0, weeklyScore: 0 });
+      }
+      return { message: "Sem saldo no pool para distribuir. Semana reiniciada.", poolDistributed: 0 };
     }
 
-    // Distribuição baseada em WEEKLY SCORE (Pontos > 0)
+    // 4. Identify eligible users (those who scored points)
     const eligibleUsers = activeUsers.filter(u => (u.weeklyScore || 0) > 0);
 
     if (eligibleUsers.length === 0) {
-      // Pool retido (Casa ganha ou Acumula)
-      const resetPromises = activeUsers.map(user =>
-        safeUpdateDoc('users', user.id, { weeklyMisses: 0, weeklyScore: 0 })
-      );
-      await Promise.all(resetPromises);
-      return { message: "Nenhum atleta pontuou na semana. Pool retido e semana reiniciada." };
+      console.log("[CLOSE_WEEKLY] No eligible users. Resetting scores.");
+      for (const user of activeUsers) {
+        await safeUpdateDoc('users', user.id, { weeklyMisses: 0, weeklyScore: 0 });
+      }
+      return { message: "Nenhum atleta pontuou. Pool retido e semana reiniciada.", poolDistributed: 0 };
     }
 
+    // 5. Calculate proportional distribution
     const totalWeeklyScore = eligibleUsers.reduce((acc, u) => acc + (u.weeklyScore || 0), 0);
     const valuePerPoint = weeklyPool / totalWeeklyScore;
 
-    for (const user of eligibleUsers) {
+    console.log(`[CLOSE_WEEKLY] Distributing to ${eligibleUsers.length} users. Value per point: R$ ${valuePerPoint.toFixed(4)}`);
+    for (const user of activeUsers) {
+      const isEligible = (user.weeklyScore || 0) > 0;
       const userScore = user.weeklyScore || 0;
-      const share = userScore * valuePerPoint;
+      const share = isEligible ? userScore * valuePerPoint : 0;
 
-      await safeUpdateDoc('users', user.id, {
-        balance: user.balance + share,
-        weeklyScore: 0, // Reset for next week
-        weeklyMisses: 0
-      });
+      if (share > 0) {
+        // Update balance (points are reset for everyone below)
+        await safeUpdateDoc('users', user.id, {
+          balance: (user.balance || 0) + share
+        });
 
-      await addDistribution({
-        userId: user.id,
-        amount: share,
-        date: today,
-        reason: `DISTRIBUIÇÃO SEMANAL (${userScore} pts)`,
-        createdAt: new Date().toISOString()
-      } as any);
+        await addDistribution({
+          userId: user.id,
+          amount: share,
+          date: today,
+          reason: `DISTRIBUIÇÃO PROPORCIONAL (${userScore} pts)`,
+          createdAt: new Date().toISOString()
+        } as any);
+      }
     }
 
-    // Reset the non-eligible users
-    const zeroScoreUsers = activeUsers.filter(u => (u.weeklyScore || 0) === 0);
-    for (const user of zeroScoreUsers) {
-      await safeUpdateDoc('users', user.id, { weeklyScore: 0, weeklyMisses: 0 });
+    // 6. Final Reset for ALL users (regardless of status, points, etc.)
+    // This ensures next week starts fresh for everyone.
+    const usersSnapForReset = await getDocs(collection(db, 'users'));
+    for (const uDoc of usersSnapForReset.docs) {
+      await safeUpdateDoc('users', uDoc.id, {
+        weeklyScore: 0,
+        weeklyMisses: 0
+      });
     }
 
     return {
-      message: "Distribuição Semanal Concluída!",
+      message: "Fechamento de semana concluído com sucesso!",
       poolDistributed: weeklyPool,
       recipientsCount: eligibleUsers.length
     };
-
   } catch (error) {
-    console.error("Error distributing pool:", error);
+    console.error("Error closing weekly session:", error);
     throw error;
   }
 };
+
 // Helper to parse dates from various formats (String, Timestamp, Date)
 const parseDate = (dateVal: any): Date | null => {
   if (!dateVal) return null;
@@ -275,7 +304,7 @@ export const syncUserAbsences = async (userId: string, fullSync: boolean = false
     if (!userDoc.exists()) return false;
     const user = { id: userDoc.id, ...userDoc.data() } as User;
 
-    if (user.status === UserStatus.ELIMINATED) return false;
+    if ((user.status as string) !== UserStatus.ACTIVE && (user.status as string) !== 'ativo' && (user.status as string) !== 'active') return false;
 
     // 2. Fetch ALL check-ins and distributions for the user
     // We use a broader query to ensure we have all history for consistency checks
@@ -367,13 +396,15 @@ export const syncUserAbsences = async (userId: string, fullSync: boolean = false
       // Skip if present
       if (presentDays.has(day)) continue;
 
-      // Skip if before registration
+      // Removido filtro de data de cadastro para sincronização semanal completa
+      /*
       if (registrationDate) {
         const [y, m, d] = day.split('-').map(Number);
         const dayDate = new Date(y, m - 1, d);
         dayDate.setHours(0, 0, 0, 0);
         if (dayDate < registrationDate) continue;
       }
+      */
 
       missingPenaltyDays.push(day);
     }
@@ -427,8 +458,11 @@ export const syncUserAbsences = async (userId: string, fullSync: boolean = false
 
 export const syncAllUsersAbsences = async (fullSync: boolean = false) => {
   try {
-    const usersSnap = await getDocs(query(collection(db, 'users'), where('status', '==', UserStatus.ACTIVE)));
-    const activeUsers = usersSnap.docs.map(doc => doc.id);
+    const usersSnapForSyncAll = await getDocs(collection(db, 'users'));
+    const activeUsers = usersSnapForSyncAll.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as User))
+      .filter(u => (u.status as string) === UserStatus.ACTIVE || (u.status as string) === 'ativo' || (u.status as string) === 'active')
+      .map(u => u.id);
 
     console.log(`Syncing absences for ${activeUsers.length} users (FullSync: ${fullSync})...`);
     let adjustedCount = 0;
@@ -441,4 +475,56 @@ export const syncAllUsersAbsences = async (fullSync: boolean = false) => {
     console.error("Error syncing all users absences:", error);
     throw error;
   }
+};
+
+export const fixWeeklyDistribution = async (
+  participants: { id: string, score: number, name: string }[],
+  oldPool: number,
+  newPool: number
+) => {
+  const totalScore = participants.reduce((sum, p) => sum + p.score, 0);
+  const today = new Date().toISOString().split('T')[0];
+
+  console.log(`[FIX] Starting correction: ${oldPool} -> ${newPool} (Total Score: ${totalScore})`);
+
+  for (const p of participants) {
+    const oldShare = parseFloat((p.score * (oldPool / totalScore)).toFixed(2));
+    const newShare = parseFloat((p.score * (newPool / totalScore)).toFixed(2));
+    const diff = parseFloat((newShare - oldShare).toFixed(2));
+
+    const { doc, getDoc, updateDoc, collection, query, where, getDocs } = await import('firebase/firestore');
+    const { db } = await import('./firebase');
+    
+    const userRef = doc(db, 'users', p.id);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) continue;
+
+    const currentBalance = userSnap.data().balance || 0;
+    
+    // 1. Update Distribution Records for today
+    const distQuery = query(
+      collection(db, 'distributions'),
+      where('userId', '==', p.id),
+      where('date', '==', today),
+      where('amount', '==', oldShare)
+    );
+    const distSnap = await getDocs(distQuery);
+    
+    let distUpdated = false;
+    for (const dDoc of distSnap.docs) {
+      await updateDoc(doc(db, 'distributions', dDoc.id), {
+        amount: newShare,
+        reason: `DISTRIBUIÇÃO PROPORCIONAL (${p.score} pts) - CORRIGIDA`
+      });
+      distUpdated = true;
+    }
+
+    // 2. Update User Balance if needed
+    if (distUpdated || Math.abs(currentBalance - (oldShare + 10)) < 1) {
+       const newBalance = Math.max(0, currentBalance + diff);
+       await updateDoc(userRef, { balance: newBalance });
+       console.log(`[FIX] Updated ${p.name}: Balance ${currentBalance} -> ${newBalance}`);
+    }
+  }
+  return true;
 };

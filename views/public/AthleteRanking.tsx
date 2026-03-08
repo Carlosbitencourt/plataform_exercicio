@@ -59,17 +59,11 @@ const AthleteRanking: React.FC = () => {
         startOfWeek.setHours(0, 0, 0, 0);
 
         const weeklyUsers = users
-            .map(user => {
-                const userCheckIns = checkIns.filter(c => c.userId === user.id);
-                const weeklyScore = userCheckIns.reduce((acc, c) => {
-                    const [year, month, day] = c.date.split('-').map(Number);
-                    const cDate = new Date(year, month - 1, day);
-                    cDate.setHours(12, 0, 0, 0);
-                    return cDate >= startOfWeek ? acc + (c.score || 0) : acc;
-                }, 0);
-                return { ...user, weeklyScore };
-            })
-            .filter(u => u.weeklyScore > 0 || u.status === 'ativo' || u.status === UserStatus.ACTIVE || u.status === 'active')
+            .map(user => ({
+                ...user,
+                weeklyScore: user.weeklyScore || 0
+            }))
+            .filter(u => u.weeklyScore > 0 || u.status === 'ativo' || u.status === UserStatus.ACTIVE || u.status === 'active' || u.status === 'competicao')
             .sort((a, b) => b.weeklyScore - a.weeklyScore);
 
         setWeeklyRanking(weeklyUsers);
@@ -86,7 +80,7 @@ const AthleteRanking: React.FC = () => {
                 }
                 return { ...user, totalScore: finalTotalScore };
             })
-            .filter(u => (u.totalScore || 0) > 0 || u.status === 'ativo' || u.status === 'active')
+            .filter(u => (u.totalScore || 0) > 0 || u.status === 'ativo' || u.status === 'active' || u.status === 'competicao')
             .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 
         setGeneralRanking(usersWithScores as (UserType & { totalScore: number })[]);

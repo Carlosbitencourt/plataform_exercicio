@@ -36,7 +36,8 @@ const Users: React.FC = () => {
     photoUrl: '',
     email: '',
     password: '',
-    balance: 0
+    balance: 0,
+    status: UserStatus.ACTIVE
   });
 
   const generateUniqueCode = () => {
@@ -121,7 +122,8 @@ const Users: React.FC = () => {
         photoUrl: '',
         email: '',
         password: '',
-        balance: 0
+        balance: 0,
+        status: UserStatus.ACTIVE
       });
       setEditingUser(null);
       setIsModalOpen(false);
@@ -146,7 +148,8 @@ const Users: React.FC = () => {
       photoUrl: user.photoUrl || '',
       email: user.email || '',
       password: '',
-      balance: user.balance || 0
+      balance: user.balance || 0,
+      status: user.status || UserStatus.ACTIVE
     });
     setIsModalOpen(true);
   };
@@ -154,9 +157,11 @@ const Users: React.FC = () => {
   const toggleStatus = async (user: User) => {
     try {
       let newStatus: UserStatus;
-      if (user.status === UserStatus.PENDING) {
+      const currentStatus = user.status as string;
+
+      if (currentStatus === UserStatus.PENDING || currentStatus === 'pending' || currentStatus === 'analise') {
         newStatus = UserStatus.ACTIVE;
-      } else if (user.status === UserStatus.ACTIVE) {
+      } else if (currentStatus === UserStatus.ACTIVE || currentStatus === 'active' || currentStatus === 'ativo' || currentStatus === 'competicao') {
         newStatus = UserStatus.ELIMINATED;
       } else {
         newStatus = UserStatus.ACTIVE;
@@ -225,6 +230,46 @@ const Users: React.FC = () => {
     }
   };
 
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case UserStatus.ACTIVE:
+      case 'active':
+      case 'ativo':
+      case 'competicao':
+        return 'Em Competição';
+      case UserStatus.PENDING:
+      case 'pending':
+      case 'analise':
+        return 'Em Análise';
+      case UserStatus.ELIMINATED:
+      case 'eliminated':
+      case 'eliminado':
+        return 'Eliminado';
+      default:
+        return 'Em Competição'; // Default to active if unknown
+    }
+  };
+
+  const getStatusClass = (status?: string) => {
+    switch (status) {
+      case UserStatus.ACTIVE:
+      case 'active':
+      case 'ativo':
+      case 'competicao':
+        return 'bg-lime-400 text-black border-lime-500';
+      case UserStatus.PENDING:
+      case 'pending':
+      case 'analise':
+        return 'bg-amber-100 text-amber-700 border-amber-200';
+      case UserStatus.ELIMINATED:
+      case 'eliminated':
+      case 'eliminado':
+        return 'bg-rose-50 text-rose-600 border-rose-200';
+      default:
+        return 'bg-lime-400 text-black border-lime-500';
+    }
+  };
+
   const filteredUsers = users.filter(u =>
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.cpf.includes(searchTerm) ||
@@ -279,7 +324,8 @@ const Users: React.FC = () => {
                 photoUrl: '',
                 email: '',
                 password: '',
-                balance: 0
+                balance: 0,
+                status: UserStatus.ACTIVE
               });
               setIsModalOpen(true);
             }}
@@ -298,11 +344,8 @@ const Users: React.FC = () => {
         <div className="md:hidden space-y-4">
           {filteredUsers.map((user) => (
             <div key={user.id} className="bg-white rounded-2xl p-4 border-2 border-slate-200 shadow-sm relative overflow-hidden">
-              <div className={`absolute top-0 right-0 px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-bl-xl border-b-2 border-l-2 ${user.status === UserStatus.ACTIVE ? 'bg-lime-400 text-black border-lime-500' :
-                user.status === UserStatus.PENDING ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                  'bg-rose-50 text-rose-600 border-rose-200'
-                }`}>
-                {user.status === UserStatus.ACTIVE ? 'Em Competição' : user.status === UserStatus.PENDING ? 'Em Análise' : 'Eliminado'}
+              <div className={`absolute top-0 right-0 px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-bl-xl border-b-2 border-l-2 ${getStatusClass(user.status)}`}>
+                {getStatusLabel(user.status)}
               </div>
 
               <div className="flex items-center gap-4 mt-2">
@@ -366,7 +409,7 @@ const Users: React.FC = () => {
                     : 'bg-lime-50 text-lime-600 border-lime-200'
                     }`}
                 >
-                  {user.status === UserStatus.ACTIVE ? 'Eliminar' : 'Aprovar/Ativar'}
+                  {user.status === UserStatus.ACTIVE ? 'Eliminar' : 'Ativar Competição'}
                 </button>
                 <button
                   onClick={() => handleDelete(user)}
@@ -436,13 +479,8 @@ const Users: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <span className={`px-2 py-0.5 inline-flex text-[9px] font-black rounded-full uppercase tracking-widest italic border shadow-sm ${user.status === UserStatus.ACTIVE
-                    ? 'bg-lime-400 text-black border-lime-500'
-                    : user.status === UserStatus.PENDING
-                      ? 'bg-amber-100 text-amber-700 border-amber-200'
-                      : 'bg-rose-50 text-rose-600 border-rose-200'
-                    }`}>
-                    {user.status === UserStatus.ACTIVE ? 'Em Competição' : user.status === UserStatus.PENDING ? 'Em Análise' : 'Eliminado'}
+                  <span className={`px-2 py-0.5 inline-flex text-[9px] font-black rounded-full uppercase tracking-widest italic border shadow-sm ${getStatusClass(user.status)}`}>
+                    {getStatusLabel(user.status)}
                   </span>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-right">
@@ -618,6 +656,23 @@ const Users: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Status do Atleta</label>
+                    <select
+                      className={`w-full px-4 py-3 border-2 rounded-xl text-slate-900 font-bold focus:ring-2 transition-all outline-none text-xs appearance-none cursor-pointer ${formData.status === UserStatus.ACTIVE ? 'bg-lime-50 border-lime-200 focus:ring-lime-400' :
+                        formData.status === UserStatus.PENDING ? 'bg-amber-50 border-amber-200 focus:ring-amber-400' :
+                          'bg-rose-50 border-rose-200 focus:ring-rose-400'
+                        }`}
+                      value={formData.status}
+                      onChange={e => setFormData({ ...formData, status: e.target.value as UserStatus })}
+                    >
+                      <option value={UserStatus.ACTIVE}>EM COMPETIÇÃO (ATIVO)</option>
+                      <option value={UserStatus.PENDING}>EM ANÁLISE (PENDENTE)</option>
+                      <option value={UserStatus.ELIMINATED}>ELIMINADO (INATIVO)</option>
+                    </select>
+                  </div>
+
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Telefone</label>

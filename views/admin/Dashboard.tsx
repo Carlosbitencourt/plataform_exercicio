@@ -11,12 +11,13 @@ import {
     Calendar,
     MapPin,
     X,
-    UserMinus
+    UserMinus,
+    Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
+import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions, addCheckIn } from '../../services/db';
 import { User, CheckIn, Distribution, UserStatus } from '../../types';
-import { runWeeklyPenaltyCheck, runWeeklyDistribution, getWeekDays } from '../../services/rewardSystem';
+import { runWeeklyPenaltyCheck, getWeekDays, syncUserAbsences } from '../../services/rewardSystem';
 
 type FilterType = 'week' | 'month' | 'custom';
 
@@ -27,7 +28,8 @@ const Dashboard: React.FC = () => {
     const [filterType, setFilterType] = useState<FilterType>('week');
     const [customRange, setCustomRange] = useState({ start: '', end: '' });
     const [showAbsenceModal, setShowAbsenceModal] = useState(false);
-    const [absenceDetails, setAbsenceDetails] = useState<{ userName: string, date: string }[]>([]);
+    const [absenceDetails, setAbsenceDetails] = useState<{ userName: string, userId: string, date: string }[]>([]);
+    const [isExcusing, setIsExcusing] = useState<string | null>(null);
 
     useEffect(() => {
         const unsubUsers = subscribeToUsers(setUsers);
@@ -78,6 +80,7 @@ const Dashboard: React.FC = () => {
     const activeUsersList = users.filter(u =>
         u.status === UserStatus.ACTIVE ||
         u.status === 'ativo' ||
+        u.status === 'competicao' ||
         u.status === 'active'
     );
     const activeUsersCount = activeUsersList.length;
@@ -104,7 +107,7 @@ const Dashboard: React.FC = () => {
     // Calculate Absences (Faltas) for the period
     const getAbsencesDetails = () => {
         const weekdaysInRange: string[] = [];
-        const details: { userName: string, date: string }[] = [];
+        const details: { userName: string, userId: string, date: string }[] = [];
 
         const current = new Date(startDate);
         const todayAtStart = new Date();
@@ -128,10 +131,23 @@ const Dashboard: React.FC = () => {
                     .map(c => c.date)
             );
 
+            const registrationDate = user.createdAt ? new Date(user.createdAt) : null;
+            if (registrationDate) {
+                registrationDate.setHours(0, 0, 0, 0);
+            }
+
             weekdaysInRange.forEach(date => {
+                // Removido o filtro de data de cadastro para alinhar com as expectativas de faltas semanais do usuário
+                /*
+                if (registrationDate) {
+                    const regDateISO = registrationDate.toISOString().split('T')[0];
+                    if (date < regDateISO) return;
+                }
+                */
+
                 if (!userCheckInDates.has(date)) {
                     totalMisses++;
-                    details.push({ userName: user.name, date });
+                    details.push({ userName: user.name, userId: user.id, date });
                 }
             });
         });
@@ -157,6 +173,35 @@ const Dashboard: React.FC = () => {
 
     // Recent Activity (Top 5 Check-ins)
     const recentCheckIns = [...checkIns].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 5);
+
+    const handleExcuseAbsence = async (userId: string, date: string, userName: string) => {
+        if (!window.confirm(`DESEJA JUSTIFICAR A FALTA DE ${userName.toUpperCase()} NO DIA ${new Date(date + 'T12:00:00').toLocaleDateString('pt-BR')}?\n\nISSO IRÁ CRIAR UM CHECK-IN MANUAL E CORRIGIR O SALDO CASO TENHA SIDO PENALIZADO.`)) return;
+
+        setIsExcusing(`${userId}-${date}`);
+        try {
+            // 1. Criar Check-in manual (justificativa)
+            await addCheckIn({
+                userId,
+                date,
+                time: '08:00', // Horário padrão para justificativa
+                score: 0,      // Justificativa não dá pontos
+                latitude: 0,
+                longitude: 0,
+                timeSlotId: 'JUSTIFICATIVA',
+                address: 'JUSTIFICATIVA MANUAL (ADMIN)'
+            });
+
+            // 2. Sincronizar faltas para este usuário (isso remove a penalidade se existir)
+            await syncUserAbsences(userId, true); // Full sync to be safe
+
+            alert(`FALTA DE ${userName.toUpperCase()} JUSTIFICADA COM SUCESSO!`);
+        } catch (error) {
+            console.error("Error excusing absence:", error);
+            alert("ERRO AO JUSTIFICAR FALTA.");
+        } finally {
+            setIsExcusing(null);
+        }
+    };
 
     return (
         <div className="space-y-12 animate-in fade-in duration-700">
@@ -474,8 +519,22 @@ const Dashboard: React.FC = () => {
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="px-2 py-0.5 bg-rose-50 text-rose-500 rounded text-[8px] font-black uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
-                                            FALTA
+                                        <div className="flex items-center gap-2">
+                                            <div className="px-2 py-0.5 bg-rose-50 text-rose-500 rounded text-[8px] font-black uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
+                                                FALTA
+                                            </div>
+                                            <button
+                                                onClick={() => handleExcuseAbsence(absence.userId, absence.date, absence.userName)}
+                                                disabled={isExcusing === `${absence.userId}-${absence.date}`}
+                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                title="Apagar Falta / Justificar"
+                                            >
+                                                {isExcusing === `${absence.userId}-${absence.date}` ? (
+                                                    <div className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="w-4 h-4" />
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
                                 ))

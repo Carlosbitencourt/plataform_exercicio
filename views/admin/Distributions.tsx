@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Users, DollarSign, Calendar, Play, CheckCircle2, Zap, AlertTriangle, Trash2 } from 'lucide-react';
 import { subscribeToDistributions, subscribeToUsers, subscribeToCheckIns, deleteDistribution } from '../../services/db';
-import { runWeeklyPenaltyCheck, runWeeklyDistribution, syncAllUsersAbsences } from '../../services/rewardSystem';
+import {
+  addDistribution,
+  closeWeeklySession,
+  getDistributions,
+  syncAllUsersAbsences
+} from '../../services/rewardSystem';
 import { Distribution, User, CheckIn, UserStatus } from '../../types';
 
 const Distributions: React.FC = () => {
@@ -30,36 +35,16 @@ const Distributions: React.FC = () => {
     }
   };
 
-  const handleWeeklyCheck = async () => {
-    if (!window.confirm("Confirmar verificação automática de penalidades (Segunda a Ontem)?")) return;
+  const handleWeeklyClose = async () => {
+    if (!window.confirm("ATENÇÃO: Este é o fechamento FINAL da semana.\n\nO sistema irá:\n1. Aplicar penalidades de faltas (Seg-Sex)\n2. Calcular o Pool de lucro\n3. Distribuir proporcionalmente aos pontos\n4. ZERAR pontos e faltas para a nova semana.\n\nDeseja continuar?")) return;
 
     setIsProcessing(true);
     setLastResult(null);
     try {
-      const result = await syncAllUsersAbsences();
-      setLastResult({
-        type: 'penalty',
-        message: `Sincronização concluída para ${result.count} usuários.`,
-        absentCount: result.count
-      });
-    } catch (error: any) {
-      console.error("Weekly check failed:", error);
-      alert(`Erro: ${error.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleWeeklyDistribution = async () => {
-    if (!window.confirm("ATENÇÃO: Confirmar distribuição SEMANAL? Isso irá distribuir o pool acumulado e ZERAR as faltas da semana.")) return;
-
-    setIsProcessing(true);
-    setLastResult(null);
-    try {
-      const result = await runWeeklyDistribution();
+      const result = await closeWeeklySession();
       setLastResult({ type: 'distribution', ...result });
     } catch (error: any) {
-      console.error("Weekly distribution failed:", error);
+      console.error("Weekly close failed:", error);
       alert(`Erro: ${error.message}`);
     } finally {
       setIsProcessing(false);
@@ -67,9 +52,9 @@ const Distributions: React.FC = () => {
   };
 
   const activeUsers = users.filter(u => u.status === UserStatus.ACTIVE);
-  const totalDeposited = activeUsers.reduce((acc, u) => acc + u.depositedValue, 0);
-  const currentTotalBalance = activeUsers.reduce((acc, u) => acc + u.balance, 0);
-  const currentPool = totalDeposited - currentTotalBalance;
+  const totalDeposited = activeUsers.reduce((acc, u) => acc + (u.depositedValue || 0), 0);
+  const currentTotalBalance = activeUsers.reduce((acc, u) => acc + (u.balance || 0), 0);
+  const currentPool = Math.max(0, totalDeposited - currentTotalBalance);
 
   const totalDistributed = distributions
     .filter(d => d.amount > 0)
@@ -83,8 +68,8 @@ const Distributions: React.FC = () => {
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
             <DollarSign className="w-16 h-16 text-slate-900" />
           </div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Pool Acumulado (Semana)</p>
-          <h3 className="text-3xl font-black text-slate-900 italic font-sport tracking-tight">R$ {Math.max(0, currentPool).toFixed(2)}</h3>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Pool Estimado (Semana)</p>
+          <h3 className="text-3xl font-black text-slate-900 italic font-sport tracking-tight">R$ {currentPool.toFixed(2)}</h3>
           <div className="mt-3 h-1.5 w-10 bg-lime-400 rounded-full border border-lime-500"></div>
         </div>
 
@@ -110,44 +95,51 @@ const Distributions: React.FC = () => {
         </div>
       </div>
 
-      {/* Control Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Daily Penalty Action */}
-        <div className="bg-white rounded-[1.5rem] border-2 border-slate-200 p-6 flex flex-col justify-between shadow-lg relative overflow-hidden">
-          <div className="z-10 relative">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-rose-100 text-rose-700 text-[8px] font-black uppercase tracking-widest rounded-full italic mb-3">
-              <AlertTriangle className="w-2 h-2 fill-current" /> Ação Semanal
-            </div>
-            <h3 className="text-2xl font-black text-slate-900 italic uppercase font-sport tracking-widest leading-none mb-2">Processar Faltas</h3>
-            <p className="text-slate-500 text-xs font-medium mb-6">Verifica check-ins de Seg-Sex e aplica R$ 10,00 de multa por dia perdido. Valor vai para o Pool.</p>
-            <button
-              onClick={handleWeeklyCheck}
-              disabled={isProcessing}
-              className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-black text-sm uppercase italic tracking-tighter hover:bg-black hover:scale-[1.02] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
-            >
-              {isProcessing ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <AlertTriangle className="w-4 h-4" />}
-              Aplicar Penalidades
-            </button>
-          </div>
-        </div>
-
-        {/* Weekly Distribution Action */}
-        <div className="bg-black rounded-[1.5rem] p-6 flex flex-col justify-between shadow-[0_10px_40px_rgba(132,204,22,0.2)] relative overflow-hidden group">
+      {/* Unified Weekly Action */}
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-black rounded-[2rem] p-8 flex flex-col items-center text-center shadow-[0_20px_60px_rgba(132,204,22,0.3)] relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none"></div>
-          <div className="z-10 relative">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-lime-400 text-black text-[8px] font-black uppercase tracking-widest rounded-full italic mb-3 shadow-lg">
-              <Zap className="w-2 h-2 fill-current" /> Fim da Semana
+
+          <div className="z-10 relative space-y-6">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-lime-400 text-black text-[10px] font-black uppercase tracking-widest rounded-full italic shadow-xl animate-pulse">
+              <Zap className="w-3 h-3 fill-current" /> Altamente Recomendado
             </div>
-            <h3 className="text-2xl font-black text-white italic uppercase font-sport tracking-widest leading-none mb-2">Distribuir Pool</h3>
-            <p className="text-zinc-400 text-xs font-medium mb-6">Redistribui todo o valor acumulado no Pool para os atletas elegíveis e reinicia a contagem de faltas da semana.</p>
-            <button
-              onClick={handleWeeklyDistribution}
-              disabled={isProcessing}
-              className="w-full py-3.5 bg-lime-400 text-black rounded-xl font-black text-sm uppercase italic tracking-tighter hover:bg-white hover:scale-[1.02] active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2"
-            >
-              {isProcessing ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div> : <Play className="w-4 h-4 fill-current" />}
-              Finalizar Semana
-            </button>
+
+            <div className="space-y-2">
+              <h3 className="text-4xl font-black text-white italic uppercase font-sport tracking-widest leading-none">Processar e Fechar Semana</h3>
+              <p className="text-zinc-400 text-sm font-medium max-w-lg mx-auto">
+                Execução completa: aplica multas de faltas, calcula o lucro proporcional aos pontos de cada atleta e reseta o ranking para a próxima semana.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 w-full justify-center pt-4">
+              <button
+                onClick={handleWeeklyClose}
+                disabled={isProcessing}
+                className="px-12 py-5 bg-lime-400 text-black rounded-2xl font-black text-lg uppercase italic tracking-tighter hover:bg-white hover:scale-[1.05] active:scale-95 transition-all shadow-2xl flex items-center justify-center gap-3 group/btn"
+              >
+                {isProcessing ? (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
+                ) : (
+                  <>
+                    <Play className="w-6 h-6 fill-current group-hover/btn:scale-110 transition-transform" />
+                    <span>Iniciar Fechamento</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="pt-2 flex items-center justify-center gap-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-lime-500" /> Penalidades
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-lime-500" /> Distribuição
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-lime-500" /> Reset Geral
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -214,8 +206,8 @@ const Distributions: React.FC = () => {
                   {dist.date}
                 </div>
                 <span className={`text-sm font-black font-sport italic tracking-tighter px-2.5 py-0.5 rounded-lg border shadow-sm ${dist.amount >= 0
-                  ? 'text-lime-600 bg-lime-50 border-lime-200'
-                  : 'text-rose-600 bg-rose-50 border-rose-200'
+                    ? 'text-lime-600 bg-lime-50 border-lime-200'
+                    : 'text-rose-600 bg-rose-50 border-rose-200'
                   }`}>
                   {dist.amount > 0 ? '+' : ''} R$ {dist.amount.toFixed(2)}
                 </span>
@@ -244,6 +236,7 @@ const Distributions: React.FC = () => {
                 <th className="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Atleta</th>
                 <th className="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Motivo</th>
                 <th className="px-5 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Crédito / Débito</th>
+                <th className="px-5 py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y-2 divide-slate-100">
@@ -265,8 +258,8 @@ const Distributions: React.FC = () => {
                   </td>
                   <td className="px-5 py-3 whitespace-nowrap text-right">
                     <span className={`text-base font-black font-sport italic tracking-tighter px-2.5 py-0.5 rounded-lg border shadow-sm ${dist.amount >= 0
-                      ? 'text-lime-600 bg-lime-50 border-lime-200'
-                      : 'text-rose-600 bg-rose-50 border-rose-200'
+                        ? 'text-lime-600 bg-lime-50 border-lime-200'
+                        : 'text-rose-600 bg-rose-50 border-rose-200'
                       }`}>
                       {dist.amount > 0 ? '+' : ''} R$ {dist.amount.toFixed(2)}
                     </span>

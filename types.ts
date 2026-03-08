@@ -1,6 +1,6 @@
 
 export enum UserStatus {
-  ACTIVE = 'ativo',
+  ACTIVE = 'competicao',
   ELIMINATED = 'eliminado',
   PENDING = 'analise'
 }

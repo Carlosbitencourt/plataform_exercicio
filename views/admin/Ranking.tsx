@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, Search, Timer, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Trophy, Clock, Search, Timer, CheckCircle2, AlertCircle, Medal, Crown, TrendingUp, Info, Users, ArrowUpRight, ArrowDownRight, RotateCcw } from 'lucide-react';
 import { subscribeToUsers, subscribeToCheckIns, updateUser, addCheckIn } from '../../services/db';
+import { fixWeeklyDistribution } from '../../services/rewardSystem';
 import { User as UserType, CheckIn, UserStatus } from '../../types';
 
 interface RankedUser {
@@ -78,26 +79,14 @@ const Ranking: React.FC = () => {
     startOfWeek.setHours(0, 0, 0, 0);
 
     const weeklyUsers = users
-      .map(user => {
-        // STRICT CALCULATION: Ignore user.weeklyScore from DB
-        const userCheckIns = checkIns.filter(c => c.userId === user.id);
-
-        const weeklyScore = userCheckIns.reduce((acc, c) => {
-          // Parse check-in date (YYYY-MM-DD)
-          const [year, month, day] = c.date.split('-').map(Number);
-          const cDate = new Date(year, month - 1, day);
-          cDate.setHours(12, 0, 0, 0); // Avoid timezone boundary issues
-
-          return cDate >= startOfWeek ? acc + (c.score || 0) : acc;
-        }, 0);
-
-        return { ...user, weeklyScore };
-      })
+      .map(user => ({
+        ...user,
+        weeklyScore: user.weeklyScore || 0
+      }))
       .filter(u => {
-        // Show if they have score OR are active (but 0 score will be at bottom)
         const hasScore = u.weeklyScore > 0;
         if (hasScore) return true;
-        return u.status === 'ativo' || u.status === UserStatus.ACTIVE || u.status === 'active';
+        return u.status === 'ativo' || u.status === UserStatus.ACTIVE || u.status === 'active' || u.status === 'competicao';
       })
       .sort((a, b) => b.weeklyScore - a.weeklyScore);
 
@@ -130,7 +119,7 @@ const Ranking: React.FC = () => {
       .filter(u => {
         const hasScore = (u.totalScore || 0) > 0;
         if (hasScore) return true;
-        return u.status === 'ativo' || u.status === UserStatus.ACTIVE || u.status === 'active';
+        return u.status === 'ativo' || u.status === UserStatus.ACTIVE || u.status === 'active' || u.status === 'competicao';
       })
       .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 
@@ -402,8 +391,8 @@ const Ranking: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-slate-50 px-8 py-4 border-t-2 border-slate-100 flex justify-center">
-            <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2">
+          <div className="bg-slate-50 px-8 py-4 border-t-2 border-slate-100 flex flex-col items-center gap-4">
+            <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2 text-center">
               <AlertCircle className="w-3 h-3" />
               {view === 'daily'
                 ? 'Critério de Desempate: Horário do Check-in (Mais cedo = Melhor posição)'
@@ -412,10 +401,38 @@ const Ranking: React.FC = () => {
                   : 'Ranking baseado no saldo total acumulado na temporada.'
               }
             </p>
+
+            {/* Botão de Emergência para Corrigir Pool (110 -> 90) */}
+            <button
+              id="temp-revert-btn"
+              onClick={async () => {
+                const participants = [
+                  { id: 'pNXIpvSjrrCj6p5unzjf', score: 30, name: 'Jully' },
+                  { id: 'KK2gZj4OOUYvKrf74x9A', score: 30, name: 'Cintia' },
+                  { id: 'oNcUUFt9SxUb1Cok9XmY', score: 50, name: 'Jutai' },
+                  { id: 'l7AKmMYmMnmGsKzIdkNn', score: 50, name: 'Gustavo' },
+                  { id: '6G69zd715eTcnOxnyLIQ', score: 40, name: 'Vinicius' },
+                  { id: 'AqkajUq09u0nFdGtIH1R', score: 40, name: 'Luiz' },
+                  { id: 'vMz5zZ8h7UCsCasrhf0J', score: 20, name: 'Carlos' }
+                ];
+                if (window.confirm('Corrigir distribuição de hoje para R$ 90.00? (Irá ajustar saldos e registros de hoje)')) {
+                  try {
+                    await fixWeeklyDistribution(participants, 110, 90);
+                    alert('Distribuição corrigida com sucesso!');
+                  } catch (e: any) {
+                    alert('Erro ao corrigir: ' + e.message);
+                  }
+                }
+              }}
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20"
+            >
+              <RotateCcw className="w-3 h-3" /> Corrigir Pool (110 &rarr; 90)
+            </button>
+
           </div>
         </div>
       </div>
-    </div >
+    </div>
   );
 };
 
