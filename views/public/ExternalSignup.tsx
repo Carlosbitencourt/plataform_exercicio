@@ -242,7 +242,7 @@ const ExternalSignup: React.FC = () => {
                 ...formData,
                 uniqueCode,
                 status: 'analise' as any
-            } as any);
+            } as any, currentUser?.uid);
 
             setGeneratedId(uniqueCode);
             setStep('success');
