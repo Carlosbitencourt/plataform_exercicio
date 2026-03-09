@@ -18,8 +18,9 @@ import AppShell from './components/AppShell';
 import AthleteLocations from './views/public/AthleteLocations';
 import AthleteProfile from './views/public/AthleteProfile';
 import AthleteRanking from './views/public/AthleteRanking';
-import Integrations from './views/admin/Integrations';
 import Withdrawals from './views/admin/Withdrawals';
+import Integrations from './views/admin/Integrations';
+import Settings from './views/admin/Settings';
 
 // Componente para proteger rotas administrativas
 const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -99,6 +100,12 @@ const App: React.FC = () => {
             <Route path="/admin/integracoes" element={
               <ProtectedAdminRoute>
                 <Integrations />
+              </ProtectedAdminRoute>
+            } />
+
+            <Route path="/admin/configuracoes" element={
+              <ProtectedAdminRoute>
+                <Settings />
               </ProtectedAdminRoute>
             } />
 

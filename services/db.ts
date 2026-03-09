@@ -15,11 +15,11 @@ import {
     limit,
     Timestamp
 } from 'firebase/firestore';
-import { safeAddDoc, safeUpdateDoc } from './firebaseGuard';
+import { safeAddDoc, safeUpdateDoc, safeSetDoc, ensureAuth } from './firebaseGuard';
 import {
     User, UserStatus, TimeSlot, QRCodeData,
     CheckIn, Distribution, Withdrawal, WithdrawalStatus,
-    Notification, Absence, Penalty, Category
+    Notification, Absence, Penalty, Category, SystemSettings
 } from '../types';
 
 // Collections
@@ -33,6 +33,7 @@ const WITHDRAWALS_COLLECTION = 'withdrawals';
 const NOTIFICATIONS_COLLECTION = 'notifications';
 const ABSENCES_COLLECTION = 'absences';
 const PENALTIES_COLLECTION = 'penalties';
+const SETTINGS_COLLECTION = 'settings';
 
 // --- Users ---
 
@@ -162,6 +163,43 @@ export const subscribeToAbsences = (callback: (data: Absence[]) => void) => {
 
 export const deleteAbsence = async (id: string) => {
     await deleteDoc(doc(db, ABSENCES_COLLECTION, id));
+};
+
+// --- Settings ---
+
+export const subscribeToSettings = (callback: (settings: SystemSettings | null) => void) => {
+    // There should only be one settings document, but we'll use 'system' as ID
+    return onSnapshot(doc(db, SETTINGS_COLLECTION, 'system'),
+        (snapshot) => {
+            if (snapshot.exists()) {
+                callback({ id: snapshot.id, ...snapshot.data() } as SystemSettings);
+            } else {
+                callback(null);
+            }
+        },
+        (error) => {
+            console.error("Error subscribing to settings:", error);
+            callback(null); // Ensure loading finishes even on error
+        }
+    );
+};
+
+export const updateSettings = async (settings: Partial<SystemSettings>) => {
+    await ensureAuth();
+    const settingsRef = doc(db, SETTINGS_COLLECTION, 'system');
+    const snap = await getDoc(settingsRef);
+
+    if (snap.exists()) {
+        await safeUpdateDoc(SETTINGS_COLLECTION, 'system', {
+            ...settings,
+            lastUpdated: new Date().toISOString()
+        });
+    } else {
+        await safeSetDoc(SETTINGS_COLLECTION, 'system', {
+            ...settings,
+            lastUpdated: new Date().toISOString()
+        });
+    }
 };
 
 export const deleteCheckIn = async (id: string) => {

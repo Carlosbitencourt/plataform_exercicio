@@ -126,10 +126,17 @@ export interface Notification {
   read: boolean;
 }
 
+export interface SystemSettings {
+  id: string;
+  dailyLossAmount: number;
+  lastUpdated?: string;
+}
+
 export interface Database {
   users: User[];
   qrCodes: QRCodeData[];
   checkIns: CheckIn[];
   distributions: Distribution[];
   timeSlots: TimeSlot[];
+  settings: SystemSettings[];
 }

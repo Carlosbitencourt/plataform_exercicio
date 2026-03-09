@@ -72,6 +72,12 @@ export const runWeeklyPenaltyCheck = async () => {
   const today = getLocalDate();
   const weekDays = getWeekDays();
 
+  // Fetch settings
+  const settingsRef = doc(db, 'settings', 'system');
+  const settingsSnap = await getDoc(settingsRef);
+  const settings = settingsSnap.exists() ? settingsSnap.data() : { dailyLossAmount: 10.0 };
+  const dailyPenalty = settings.dailyLossAmount ?? 10.0;
+
   // Filter only days up to today (inclusive) to avoid future penalties if run mid-week
   const daysToCheck = weekDays.filter(d => d <= today);
 
@@ -120,7 +126,7 @@ export const runWeeklyPenaltyCheck = async () => {
 
       let actualPenalty = 0;
       if (misses > 0) {
-        const penaltyValue = misses * 10.0; // Fixed penalty R$ 10.00 per missing day
+        const penaltyValue = misses * dailyPenalty; // Dynamic penalty from settings
         actualPenalty = Math.min(user.balance, penaltyValue);
 
         if (actualPenalty > 0) {
@@ -448,8 +454,13 @@ export const syncUserAbsences = async (userId: string, fullSync: boolean = false
     }
 
     // Process additions
+    const settingsRef = doc(db, 'settings', 'system');
+    const settingsSnap = await getDoc(settingsRef);
+    const settings = settingsSnap.exists() ? settingsSnap.data() : { dailyLossAmount: 10.0 };
+    const dailyPenalty = settings.dailyLossAmount ?? 10.0;
+
     for (const day of missingPenaltyDays) {
-      const penalty = 10.0;
+      const penalty = dailyPenalty;
       balanceAdjustment -= penalty;
       await addDistribution({
         userId: userId,
