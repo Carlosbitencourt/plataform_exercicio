@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Clock, CheckCircle2, XCircle, DollarSign, User, CreditCard, Calendar, Filter, Search } from 'lucide-react';
 import { subscribeToWithdrawals, updateWithdrawalStatus, subscribeToUsers } from '../../services/db';
 import { Withdrawal, WithdrawalStatus, User as AppUser } from '../../types';
+import { QRCodeSVG } from 'qrcode.react';
+import { generatePixPayload } from '../../services/pix';
 
 const Withdrawals: React.FC = () => {
     const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -9,6 +11,8 @@ const Withdrawals: React.FC = () => {
     const [filter, setFilter] = useState<WithdrawalStatus | 'ALL'>('ALL');
     const [searchTerm, setSearchTerm] = useState('');
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
+    const [selectedWithdrawal, setSelectedWithdrawal] = useState<Withdrawal | null>(null);
+    const [showQRModal, setShowQRModal] = useState(false);
 
     useEffect(() => {
         const unsubWithdrawals = subscribeToWithdrawals((data) => {
@@ -26,7 +30,13 @@ const Withdrawals: React.FC = () => {
     }, []);
 
     const handleStatusUpdate = async (withdrawal: Withdrawal, status: WithdrawalStatus) => {
-        const action = status === WithdrawalStatus.APPROVED ? 'aprovar' : 'rejeitar';
+        if (status === WithdrawalStatus.APPROVED) {
+            setSelectedWithdrawal(withdrawal);
+            setShowQRModal(true);
+            return;
+        }
+
+        const action = 'rejeitar';
         if (!window.confirm(`Tem certeza que deseja ${action} este saque?`)) return;
 
         setIsProcessing(withdrawal.id);
@@ -35,6 +45,22 @@ const Withdrawals: React.FC = () => {
         } catch (error) {
             console.error("Error updating withdrawal status:", error);
             alert("Erro ao atualizar status do saque.");
+        } finally {
+            setIsProcessing(null);
+        }
+    };
+
+    const confirmPayment = async () => {
+        if (!selectedWithdrawal) return;
+
+        setIsProcessing(selectedWithdrawal.id);
+        try {
+            await updateWithdrawalStatus(selectedWithdrawal, WithdrawalStatus.APPROVED);
+            setShowQRModal(false);
+            setSelectedWithdrawal(null);
+        } catch (error) {
+            console.error("Error updating withdrawal status:", error);
+            alert("Erro ao confirmar pagamento.");
         } finally {
             setIsProcessing(null);
         }
@@ -239,6 +265,81 @@ const Withdrawals: React.FC = () => {
                     </table>
                 </div>
             </div>
+            {/* QR Code Modal for Payment Confirmation */}
+            {showQRModal && selectedWithdrawal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowQRModal(false)}></div>
+                    <div className="relative w-full max-w-md bg-white rounded-[2.5rem] p-8 shadow-2xl border-2 border-slate-200 animate-in zoom-in-95 duration-300 text-center">
+                        <header className="mb-6">
+                            <h2 className="text-2xl font-black italic font-sport text-slate-900 uppercase tracking-tighter">Confirmar Pagamento</h2>
+                            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-1 text-center">Escaneie para pagar via PIX</p>
+                        </header>
+
+                        <div className="flex flex-col items-center gap-6">
+                            <div className="p-6 bg-slate-50 rounded-[2rem] border-2 border-slate-100 shadow-inner group relative">
+                                <QRCodeSVG
+                                    value={generatePixPayload({
+                                        key: selectedWithdrawal.pixKey,
+                                        merchantName: 'App Exercicio',
+                                        merchantCity: 'SAO PAULO',
+                                        amount: selectedWithdrawal.amount,
+                                        description: `Resgate ${selectedWithdrawal.userName}`
+                                    })}
+                                    size={200}
+                                    level="H"
+                                    includeMargin={true}
+                                />
+                                <button
+                                    onClick={() => {
+                                        const payload = generatePixPayload({
+                                            key: selectedWithdrawal.pixKey,
+                                            merchantName: 'App Exercicio',
+                                            merchantCity: 'SAO PAULO',
+                                            amount: selectedWithdrawal.amount,
+                                            description: `Resgate ${selectedWithdrawal.userName}`
+                                        });
+                                        navigator.clipboard.writeText(payload);
+                                        alert('Código PIX Copiado!');
+                                    }}
+                                    className="absolute inset-0 w-full h-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 rounded-[2rem] text-white"
+                                >
+                                    <CreditCard className="w-8 h-8" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Copiar Código PIX</span>
+                                </button>
+                            </div>
+
+                            <div className="w-full space-y-3">
+                                <div className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 text-left">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Dados da Transferência</p>
+                                    <div className="flex justify-between items-end">
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-black text-slate-900 uppercase">{selectedWithdrawal.userName}</p>
+                                            <p className="text-[10px] font-mono text-slate-500">{selectedWithdrawal.pixKey}</p>
+                                        </div>
+                                        <p className="text-xl font-black font-sport italic text-slate-900">R$ {selectedWithdrawal.amount.toFixed(2)}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 w-full">
+                                <button
+                                    onClick={() => setShowQRModal(false)}
+                                    className="py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-200 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={confirmPayment}
+                                    disabled={isProcessing === selectedWithdrawal.id}
+                                    className="py-4 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-lime-400/20"
+                                >
+                                    {isProcessing === selectedWithdrawal.id ? 'Processando...' : 'Confirmei o Pagamento'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

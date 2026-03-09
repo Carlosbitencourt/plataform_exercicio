@@ -1,11 +1,13 @@
 import React from 'react';
-import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon, Loader2, Camera, Wallet } from 'lucide-react';
+import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon, Loader2, Camera, Wallet, Bell, ArrowDownToLine, Info } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
+import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions, subscribeToPenalties, registerCheckIn, subscribeToAbsences, requestWithdrawal, subscribeToNotifications, subscribeToUserWithdrawals } from '../../services/db';
 import { syncUserAbsences } from '../../services/rewardSystem';
-import { User, UserStatus, CheckIn } from '../../types';
+import { User, UserStatus, CheckIn, Penalty, Absence, WithdrawalStatus, Notification, Withdrawal } from '../../types';
 import { auth as firebaseAuth } from '../../services/firebase';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const AthleteProfile: React.FC = () => {
     const { currentUser } = useAuth();
@@ -16,7 +18,10 @@ const AthleteProfile: React.FC = () => {
     const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
-    const [isWithdrawModalOpen, setIsWithdrawModalOpen] = React.useState(false);
+    const [absences, setAbsences] = React.useState<Absence[]>([]);
+    const [notifications, setNotifications] = React.useState<Notification[]>([]);
+    const [withdrawalHistory, setWithdrawalHistory] = React.useState<Withdrawal[]>([]);
+    const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = React.useState(false);
     const [withdrawAmount, setWithdrawAmount] = React.useState('');
     const [isSubmittingWithdraw, setIsSubmittingWithdraw] = React.useState(false);
     const [uploadingPhoto, setUploadingPhoto] = React.useState(false);
@@ -75,10 +80,36 @@ const AthleteProfile: React.FC = () => {
             }
         });
 
+        const unsubAbsences = subscribeToAbsences((allAbsences) => {
+            if (userData?.id) {
+                const userAbsences = allAbsences.filter(a => a.userId === userData.id);
+                setAbsences(userAbsences);
+            }
+        });
+
+        if (currentUser) {
+            const unsubNotifications = subscribeToNotifications(currentUser.uid, (data) => {
+                setNotifications(data);
+            });
+            const unsubWithdrawals = subscribeToUserWithdrawals(currentUser.uid, (data) => {
+                setWithdrawalHistory(data);
+            });
+
+            return () => {
+                unsubUsers();
+                unsubCheckIns();
+                unsubDist();
+                unsubAbsences();
+                unsubNotifications();
+                unsubWithdrawals();
+            };
+        }
+
         return () => {
             unsubUsers();
             unsubCheckIns();
             unsubDist();
+            unsubAbsences();
         };
     }, [currentUser, userData?.id]);
 
@@ -156,7 +187,7 @@ const AthleteProfile: React.FC = () => {
         }
         if (!userData.pixKey) {
             alert("Por favor, cadastre sua chave PIX no perfil antes de solicitar o resgate.");
-            setIsWithdrawModalOpen(false);
+            setIsWithdrawalModalOpen(false);
             setIsEditModalOpen(true);
             return;
         }
@@ -166,7 +197,7 @@ const AthleteProfile: React.FC = () => {
             const { requestWithdrawal } = await import('../../services/db');
             await requestWithdrawal(userData.id, userData.name, amount, userData.pixKey);
             alert("Solicitação de resgate enviada com sucesso! O valor foi reservado do seu saldo.");
-            setIsWithdrawModalOpen(false);
+            setIsWithdrawalModalOpen(false);
             setWithdrawAmount('');
         } catch (error: any) {
             alert("Erro ao solicitar resgate: " + error.message);
@@ -196,6 +227,93 @@ const AthleteProfile: React.FC = () => {
         <div className="p-6 space-y-8 animate-in slide-in-from-bottom-4 duration-500">
             <header className="flex flex-col items-center text-center space-y-4 py-4">
                 <div className="relative">
+                    {/* Notifications Section */}
+                    {notifications.length > 0 && (
+                        <div className="bg-white rounded-[2rem] p-6 border-2 border-slate-200 shadow-xl mb-6">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-3 bg-amber-100 rounded-2xl">
+                                    <Bell className="w-6 h-6 text-amber-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black italic font-sport text-slate-900 uppercase tracking-tighter">Notificações</h3>
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Avisos importantes</p>
+                                </div>
+                            </div>
+                            <div className="space-y-3">
+                                {notifications.map(notification => (
+                                    <div
+                                        key={notification.id}
+                                        className={`p-4 rounded-2xl border-2 flex items-start gap-4 transition-all ${notification.type === 'SUCCESS'
+                                            ? 'bg-lime-50 border-lime-100'
+                                            : 'bg-rose-50 border-rose-100'
+                                            }`}
+                                    >
+                                        <div className={`p-2 rounded-xl flex-shrink-0 ${notification.type === 'SUCCESS' ? 'bg-lime-200' : 'bg-rose-200'
+                                            }`}>
+                                            <Info className={`w-4 h-4 ${notification.type === 'SUCCESS' ? 'text-lime-700' : 'text-rose-700'
+                                                }`} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-xs font-black text-slate-900 uppercase mb-1">{notification.title}</p>
+                                            <p className="text-[10px] font-bold text-slate-600">{notification.message}</p>
+                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-2">
+                                                {format(new Date(notification.createdAt), "dd MMM, HH:mm", { locale: ptBR })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Withdrawal History Section */}
+                    <div className="bg-white rounded-[2rem] p-6 border-2 border-slate-200 shadow-xl mb-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-3 bg-slate-100 rounded-2xl">
+                                <History className="w-6 h-6 text-slate-900" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black italic font-sport text-slate-900 uppercase tracking-tighter">Histórico de Saques</h3>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Seu fluxo financeiro</p>
+                            </div>
+                        </div>
+
+                        {withdrawalHistory.length === 0 ? (
+                            <div className="py-12 text-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhum saque solicitado ainda</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {withdrawalHistory.map((w) => (
+                                    <div key={w.id} className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                                <ArrowDownToLine className="w-4 h-4 text-slate-900" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-black text-slate-900 uppercase tracking-tight">Saque PIX</p>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                    {format(new Date(w.createdAt), "dd 'de' MMMM", { locale: ptBR })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-md font-black font-sport italic text-slate-900">R$ {w.amount.toFixed(2)}</p>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${w.status === WithdrawalStatus.APPROVED
+                                                ? 'bg-lime-50 text-lime-600 border-lime-200'
+                                                : w.status === WithdrawalStatus.PENDING
+                                                    ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                                    : 'bg-rose-50 text-rose-600 border-rose-200'
+                                                }`}>
+                                                {w.status === WithdrawalStatus.APPROVED ? 'Completado' : w.status === WithdrawalStatus.PENDING ? 'Pendente' : 'Rejeitado'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="w-28 h-28 rounded-3xl bg-zinc-900 border-2 border-zinc-800 p-1 group overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
                         {userData?.photoUrl || currentUser?.photoURL ? (
                             <img
@@ -237,7 +355,7 @@ const AthleteProfile: React.FC = () => {
                     </p>
 
                     <button
-                        onClick={() => setIsWithdrawModalOpen(true)}
+                        onClick={() => setIsWithdrawalModalOpen(true)}
                         className="mt-4 w-full py-3 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 relative z-10"
                     >
                         <Wallet className="w-3 h-3" />
@@ -498,9 +616,9 @@ const AthleteProfile: React.FC = () => {
             )}
 
             {/* Withdrawal Modal */}
-            {isWithdrawModalOpen && (
+            {isWithdrawalModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsWithdrawModalOpen(false)}></div>
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsWithdrawalModalOpen(false)}></div>
                     <div className="relative w-full max-w-lg bg-zinc-900 border-t border-zinc-800 rounded-t-[3rem] p-8 space-y-8 animate-in slide-in-from-bottom-full duration-500">
                         <header className="flex items-center justify-between">
                             <div>
@@ -508,7 +626,7 @@ const AthleteProfile: React.FC = () => {
                                 <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Solicitar transferência PIX</p>
                             </div>
                             <button
-                                onClick={() => setIsWithdrawModalOpen(false)}
+                                onClick={() => setIsWithdrawalModalOpen(false)}
                                 className="p-3 bg-zinc-800 text-zinc-400 rounded-2xl hover:text-white transition-colors"
                             >
                                 <X className="w-6 h-6" />

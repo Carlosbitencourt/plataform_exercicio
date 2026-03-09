@@ -97,8 +97,33 @@ export interface Withdrawal {
   status: WithdrawalStatus;
   pixKey: string;
   requestedAt: string;
+  createdAt: string; // added to match AthleteProfile usage
   processedAt?: string;
   rejectionReason?: string;
+}
+
+export interface Absence {
+  id: string;
+  userId: string;
+  date: string;
+  reason?: string;
+}
+
+export interface Penalty {
+  id: string;
+  userId: string;
+  date: string;
+  amount: number;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'SUCCESS' | 'ERROR';
+  createdAt: string;
+  read: boolean;
 }
 
 export interface Database {

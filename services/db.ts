@@ -16,7 +16,11 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { safeAddDoc, safeUpdateDoc } from './firebaseGuard';
-import { User, TimeSlot, CheckIn, Distribution, QRCodeData, UserStatus, Category, Withdrawal, WithdrawalStatus } from '../types';
+import {
+    User, UserStatus, TimeSlot, QRCodeData,
+    CheckIn, Distribution, Withdrawal, WithdrawalStatus,
+    Notification, Absence, Penalty, Category
+} from '../types';
 
 // Collections
 const USERS_COLLECTION = 'users';
@@ -26,6 +30,9 @@ const DISTRIBUTIONS_COLLECTION = 'distributions';
 const QRCODES_COLLECTION = 'qrCodes';
 const CATEGORIES_COLLECTION = 'categories';
 const WITHDRAWALS_COLLECTION = 'withdrawals';
+const NOTIFICATIONS_COLLECTION = 'notifications';
+const ABSENCES_COLLECTION = 'absences';
+const PENALTIES_COLLECTION = 'penalties';
 
 // --- Users ---
 
@@ -133,6 +140,26 @@ export const addCheckIn = async (checkInData: Omit<CheckIn, 'id'>) => {
     return checkInRef;
 };
 
+export const registerCheckIn = async (checkIn: Omit<CheckIn, 'id'>) => {
+    return await addCheckIn(checkIn);
+};
+
+export const subscribeToPenalties = (callback: (data: Penalty[]) => void) => {
+    const q = query(collection(db, PENALTIES_COLLECTION), orderBy('date', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Penalty));
+        callback(data);
+    });
+};
+
+export const subscribeToAbsences = (callback: (data: Absence[]) => void) => {
+    const q = query(collection(db, ABSENCES_COLLECTION), orderBy('date', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Absence));
+        callback(data);
+    });
+};
+
 export const deleteCheckIn = async (id: string) => {
     const checkInRef = doc(db, CHECKINS_COLLECTION, id);
     const checkInSnap = await getDoc(checkInRef);
@@ -203,7 +230,7 @@ export const deleteDistribution = async (id: string) => {
 export const getTodayActiveQRCode = (callback: (qr: QRCodeData | null) => void) => {
     const today = new Date().toLocaleDateString('pt-BR');
     // Note: Storing date as DD/MM/YYYY might be problematic for sorting, but good for equality checks if consistent.
-    // Ideally use ISO YYYY-MM-DD. existing storage used getLocalDate() which returned YYYY-MM-DD probably? 
+    // Ideally use ISO YYYY-MM-DD. existing storage used getLocalDate() which returned YYYY-MM-DD probably?
     // Let's stick to YYYY-MM-DD for storage to be safe.
 
     // Actually the existing `getLocalDate` in `storage.ts` (which we can't see but assuming standard) usually does YYYY-MM-DD.
@@ -298,7 +325,8 @@ export const requestWithdrawal = async (userId: string, userName: string, amount
         amount,
         pixKey,
         status: WithdrawalStatus.PENDING,
-        requestedAt: new Date().toISOString()
+        requestedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString()
     };
 
     const withdrawalRef = await safeAddDoc(WITHDRAWALS_COLLECTION, withdrawal);
@@ -311,26 +339,79 @@ export const requestWithdrawal = async (userId: string, userName: string, amount
     return withdrawalRef.id;
 };
 
-export const updateWithdrawalStatus = async (withdrawal: Withdrawal, newStatus: WithdrawalStatus, rejectionReason?: string) => {
-    const { id, ...data } = withdrawal;
-    const withdrawalRef = doc(db, WITHDRAWALS_COLLECTION, id);
-
-    // If rejecting, refund the user
-    if (newStatus === WithdrawalStatus.REJECTED) {
-        const userRef = doc(db, USERS_COLLECTION, withdrawal.userId);
-        const userSnap = await getDoc(userRef);
-
-        if (userSnap.exists()) {
-            const userData = userSnap.data() as User;
-            await updateDoc(userRef, {
-                balance: parseFloat((userData.balance + withdrawal.amount).toFixed(2))
-            });
-        }
-    }
-
-    await updateDoc(withdrawalRef, {
-        status: newStatus,
-        processedAt: new Date().toISOString(),
-        rejectionReason: rejectionReason || ''
+export const subscribeToUserWithdrawals = (userId: string, callback: (withdrawals: Withdrawal[]) => void) => {
+    const q = query(
+        collection(db, WITHDRAWALS_COLLECTION),
+        where("userId", "==", userId),
+        orderBy("requestedAt", "desc")
+    );
+    return onSnapshot(q, (snapshot) => {
+        const withdrawals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Withdrawal));
+        callback(withdrawals);
     });
+};
+
+export const subscribeToNotifications = (userId: string, callback: (notifications: Notification[]) => void) => {
+    const q = query(collection(db, NOTIFICATIONS_COLLECTION), where("userId", "==", userId), orderBy("createdAt", "desc"));
+    return onSnapshot(q, (snapshot) => {
+        const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        callback(notifications);
+    });
+};
+
+export const addNotification = async (userId: string, title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    try {
+        await addDoc(collection(db, "notifications"), {
+            userId,
+            title,
+            message,
+            type,
+            read: false,
+            createdAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error("Error adding notification:", error);
+    }
+};
+
+export const updateWithdrawalStatus = async (withdrawal: Withdrawal, status: WithdrawalStatus, rejectionReason?: string) => {
+    try {
+        const withdrawalRef = doc(db, WITHDRAWALS_COLLECTION, withdrawal.id);
+        const updates: any = {
+            status,
+            processedAt: new Date().toISOString()
+        };
+        if (rejectionReason) updates.rejectionReason = rejectionReason;
+
+        await updateDoc(withdrawalRef, updates);
+
+        if (status === WithdrawalStatus.APPROVED) {
+            await addNotification(
+                withdrawal.userId,
+                "Transferência Confirmada",
+                `Seu PIX no valor de R$ ${withdrawal.amount.toFixed(2)} foi enviado com sucesso!`,
+                'success'
+            );
+        } else if (status === WithdrawalStatus.REJECTED) {
+            // Refund balance if rejected
+            const userRef = doc(db, USERS_COLLECTION, withdrawal.userId);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                await updateDoc(userRef, {
+                    balance: (userData.balance || 0) + withdrawal.amount
+                });
+
+                await addNotification(
+                    withdrawal.userId,
+                    "Solicitação de Resgate Rejeitada",
+                    `Seu pedido de resgate de R$ ${withdrawal.amount.toFixed(2)} foi rejeitado. O valor foi estornado ao seu saldo.`,
+                    'error'
+                );
+            }
+        }
+    } catch (error) {
+        console.error("Error updating withdrawal status:", error);
+        throw error;
+    }
 };
