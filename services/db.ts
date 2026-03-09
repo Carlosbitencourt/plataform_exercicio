@@ -160,6 +160,10 @@ export const subscribeToAbsences = (callback: (data: Absence[]) => void) => {
     });
 };
 
+export const deleteAbsence = async (id: string) => {
+    await deleteDoc(doc(db, ABSENCES_COLLECTION, id));
+};
+
 export const deleteCheckIn = async (id: string) => {
     const checkInRef = doc(db, CHECKINS_COLLECTION, id);
     const checkInSnap = await getDoc(checkInRef);

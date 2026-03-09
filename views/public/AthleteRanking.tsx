@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Clock, Timer, CheckCircle2, AlertCircle, Award, Star, Zap, TrendingUp } from 'lucide-react';
 import { subscribeToUsers, subscribeToCheckIns } from '../../services/db';
+import { getEffectiveMonday } from '../../services/rewardSystem';
 import { User as UserType, CheckIn, UserStatus } from '../../types';
 
 interface RankedUser {
@@ -53,10 +54,7 @@ const AthleteRanking: React.FC = () => {
 
     useEffect(() => {
         if (users.length === 0) return;
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
+        const startOfWeek = getEffectiveMonday();
 
         const weeklyUsers = users
             .map(user => ({

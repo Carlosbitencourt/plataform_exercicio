@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserStatus, TimeSlot, CheckIn, Distribution } from '../../types';
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
-import { runWeeklyPenaltyCheck, syncUserAbsences } from '../../services/rewardSystem';
+import { runWeeklyPenaltyCheck, syncUserAbsences, getEffectiveMonday } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell, Wallet, X } from 'lucide-react';
 import { sendCheckInConfirmation } from '../../services/whatsapp';
@@ -92,10 +92,7 @@ const CheckInPage: React.FC = () => {
           const dailyPos = uniqueDailyAtletes.indexOf(foundUser.id) + 1;
 
           // 2. Weekly Position
-          const now = new Date();
-          const startOfWeek = new Date(now);
-          startOfWeek.setDate(now.getDate() - now.getDay());
-          startOfWeek.setHours(0, 0, 0, 0);
+          const startOfWeek = getEffectiveMonday();
 
           const weeklyRank = users
             .map(u => {
@@ -460,12 +457,7 @@ const CheckInPage: React.FC = () => {
                 };
 
                 const now = new Date();
-                const currentDay = now.getDay() === 0 ? 7 : now.getDay();
-
-                // Obter segunda-feira da semana atual
-                const monday = new Date(now);
-                monday.setDate(now.getDate() - (currentDay - 1));
-                monday.setHours(0, 0, 0, 0);
+                const monday = getEffectiveMonday(now);
 
                 let completedCount = 0;
                 for (let i = 0; i < 5; i++) {
@@ -486,23 +478,23 @@ const CheckInPage: React.FC = () => {
         <div className="flex gap-2 relative z-10">
           {[1, 2, 3, 4, 5].map((day) => {
             const now = new Date();
-            const currentDayNum = now.getDay() === 0 ? 7 : now.getDay();
-
-            // Monday of current week
-            const monday = new Date(now);
-            monday.setDate(now.getDate() - (currentDayNum - 1));
-            monday.setHours(0, 0, 0, 0);
+            const monday = getEffectiveMonday(now);
 
             const targetDate = new Date(monday);
             targetDate.setDate(monday.getDate() + day - 1);
+            targetDate.setHours(0, 0, 0, 0);
+
+            const todayStart = new Date(now);
+            todayStart.setHours(0, 0, 0, 0);
+
             const toLocalISO = (d: Date) => {
               return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             };
             const targetDateStr = toLocalISO(targetDate);
 
             const hasCheckIn = userCheckIns.some(ci => ci.date === targetDateStr);
-            const isToday = currentDayNum === day;
-            const isPast = currentDayNum > day;
+            const isToday = targetDate.getTime() === todayStart.getTime();
+            const isPast = targetDate.getTime() < todayStart.getTime();
             const isMissed = isPast && !hasCheckIn;
 
             return (

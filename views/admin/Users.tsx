@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw, Wallet, PiggyBank } from 'lucide-react';
-import { subscribeToUsers, addUser, updateUser, deleteUser } from '../../services/db';
+import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw, Wallet, PiggyBank, History, Calendar, Clock, Star } from 'lucide-react';
+import { subscribeToUsers, addUser, updateUser, deleteUser, subscribeToCheckIns, subscribeToAbsences, deleteCheckIn, deleteAbsence } from '../../services/db';
 import { auth, functions } from '../../services/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { safeUploadFile } from '../../services/firebaseGuard';
-import { User, UserStatus } from '../../types';
+import { User, UserStatus, CheckIn, Absence } from '../../types';
 
 const Users: React.FC = () => {
   const { impersonate } = useAuth();
@@ -22,6 +22,10 @@ const Users: React.FC = () => {
   const [pixCopied, setPixCopied] = useState(false);
   const [idCopied, setIdCopied] = useState(false);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+  const [selectedUserForActivity, setSelectedUserForActivity] = useState<User | null>(null);
+  const [allCheckIns, setAllCheckIns] = useState<CheckIn[]>([]);
+  const [allAbsences, setAllAbsences] = useState<Absence[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -50,10 +54,20 @@ const Users: React.FC = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = subscribeToUsers((data) => {
+    const unsubscribeUsers = subscribeToUsers((data) => {
       setUsers(data);
     });
-    return () => unsubscribe();
+    const unsubscribeCheckIns = subscribeToCheckIns((data) => {
+      setAllCheckIns(data);
+    });
+    const unsubscribeAbsences = subscribeToAbsences((data) => {
+      setAllAbsences(data);
+    });
+    return () => {
+      unsubscribeUsers();
+      unsubscribeCheckIns();
+      unsubscribeAbsences();
+    };
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -277,6 +291,35 @@ const Users: React.FC = () => {
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const selectedUserActivities = [
+    ...allCheckIns
+      .filter(c => c.userId === selectedUserForActivity?.id)
+      .map(c => ({ ...c, type: 'checkin' as const })),
+    ...allAbsences
+      .filter(a => a.userId === selectedUserForActivity?.id)
+      .map(a => ({ ...a, type: 'absence' as const }))
+  ].sort((a, b) => {
+    const dateA = new Date(`${a.date}${'time' in a ? 'T' + a.time : ''}`);
+    const dateB = new Date(`${b.date}${'time' in b ? 'T' + b.time : ''}`);
+    return dateB.getTime() - dateA.getTime();
+  });
+
+  const handleDeleteActivity = async (activity: (CheckIn | Absence) & { type: 'checkin' | 'absence' }) => {
+    const typeLabel = activity.type === 'checkin' ? 'CHECK-IN' : 'FALTA';
+    if (!window.confirm(`TEM CERTEZA QUE DESEJA APAGAR ESTE ${typeLabel}? ESTA AÇÃO NÃO PODE SER DESFEITA.`)) return;
+
+    try {
+      if (activity.type === 'checkin') {
+        await deleteCheckIn(activity.id);
+      } else {
+        await deleteAbsence(activity.id);
+      }
+    } catch (error) {
+      console.error("Error deleting activity:", error);
+      alert("Erro ao apagar atividade.");
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Search and Action Bar - Bordas mais escuras */}
@@ -391,6 +434,16 @@ const Users: React.FC = () => {
                 </button>
                 <button onClick={() => handleSyncAccount(user)} className="p-2 bg-white text-amber-500 hover:bg-amber-50 rounded-lg border border-slate-200 transition-all shadow-sm" title="Sincronizar">
                   <RefreshCw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedUserForActivity(user);
+                    setIsActivityModalOpen(true);
+                  }}
+                  className="p-2 bg-white text-indigo-500 hover:bg-indigo-50 rounded-lg border border-slate-200 transition-all shadow-sm"
+                  title="Histórico de Atividades"
+                >
+                  <History className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => {
@@ -516,6 +569,16 @@ const Users: React.FC = () => {
                       title="Sincronizar e Corrigir Penalidades"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedUserForActivity(user);
+                        setIsActivityModalOpen(true);
+                      }}
+                      className="p-1 bg-white text-slate-400 hover:text-indigo-500 hover:border-indigo-400 rounded-md transition-all border border-slate-200 shadow-sm"
+                      title="Histórico de Atividades"
+                    >
+                      <History className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDelete(user)}
@@ -826,6 +889,97 @@ const Users: React.FC = () => {
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center leading-relaxed">
                 Envie este link para que os atletas possam se cadastrar diretamente no sistema.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Activity Log Modal */}
+      {isActivityModalOpen && selectedUserForActivity && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-[2rem] border-4 border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-300">
+            <div className="p-6 bg-slate-50 border-b-2 border-slate-100 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-lg font-black italic uppercase font-sport text-slate-900 leading-tight">Histórico de Atividades</h3>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{selectedUserForActivity.name}</p>
+              </div>
+              <button onClick={() => {
+                setIsActivityModalOpen(false);
+                setSelectedUserForActivity(null);
+              }} className="p-2 text-slate-400 hover:text-slate-900 bg-white border border-slate-200 rounded-lg transition-all">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {selectedUserActivities.length === 0 ? (
+                <div className="text-center py-12">
+                  <History className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nenhuma atividade registrada.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedUserActivities.map((activity) => (
+                    <div
+                      key={activity.id}
+                      className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${activity.type === 'checkin'
+                          ? 'bg-lime-50 border-lime-100 hover:border-lime-300'
+                          : 'bg-rose-50 border-rose-100 hover:border-rose-300'
+                        }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`p-2.5 rounded-xl shadow-sm ${activity.type === 'checkin' ? 'bg-lime-400 text-black' : 'bg-rose-500 text-white'
+                          }`}>
+                          {activity.type === 'checkin' ? <CheckCircle className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-tighter italic text-slate-900">
+                              {activity.type === 'checkin' ? 'Check-In Concluído' : 'Falta Registrada'}
+                            </span>
+                            {'score' in activity && (
+                              <span className="px-1.5 py-0.5 bg-white rounded-md border border-lime-200 text-[9px] font-black text-lime-600">
+                                +{activity.score}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-1">
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(activity.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                            </div>
+                            {'time' in activity && (
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                                <Clock className="w-3 h-3" />
+                                {activity.time}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleDeleteActivity(activity)}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-white rounded-lg transition-all border border-transparent hover:border-red-100"
+                        title="Apagar Registro"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t-2 border-slate-100 shrink-0">
+              <button
+                onClick={() => {
+                  setIsActivityModalOpen(false);
+                  setSelectedUserForActivity(null);
+                }}
+                className="w-full py-3 bg-white text-slate-600 border-2 border-slate-200 rounded-xl font-black uppercase italic tracking-tighter hover:bg-slate-50 transition-all text-[10px]"
+              >
+                Fechar Histórico
+              </button>
             </div>
           </div>
         </div>

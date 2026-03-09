@@ -5,19 +5,31 @@ import { addDistribution } from './db';
 import { UserStatus, User, CheckIn, Distribution } from '../types';
 import { sendAbsenceNotification } from './whatsapp';
 
-// Helper to get Mon-Fri dates of current week (Monday to Friday)
-export const getWeekDays = () => {
-  const now = new Date();
+// Helper to get the "Effective Monday" of the current week
+// Adjusts to the NEXT week if it's Sunday after 22:00
+export const getEffectiveMonday = (now: Date = new Date()) => {
   const day = now.getDay(); // Sun=0, Mon=1...
+  const hours = now.getHours();
 
-  // Calculate Monday of current week
-  // If today is Sunday (0), we go back 6 days to Monday
-  const diffToMonday = day === 0 ? -6 : 1 - day;
+  // If it's Sunday after 22:00, we treat it as if the new week has already started
+  const isAfterReset = day === 0 && hours >= 22;
+
+  let diffToMonday;
+  if (day === 0) {
+    diffToMonday = isAfterReset ? 1 : -6;
+  } else {
+    diffToMonday = 1 - day;
+  }
 
   const monday = new Date(now);
   monday.setDate(now.getDate() + diffToMonday);
   monday.setHours(0, 0, 0, 0);
+  return monday;
+};
 
+// Helper to get Mon-Fri dates of current week (Monday to Friday)
+export const getWeekDays = () => {
+  const monday = getEffectiveMonday();
   const days = [];
   for (let i = 0; i < 5; i++) {
     const d = new Date(monday);
