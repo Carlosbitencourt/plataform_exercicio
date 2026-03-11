@@ -69,18 +69,10 @@ const CheckInPage: React.FC = () => {
     const unsubDist = subscribeToDistributions(setDistributions);
     const unsubSettings = subscribeToSettings(setSettings);
 
-    // Direct subscription to personal user document for immediate updates
-    let unsubUserDoc = () => { };
-    if (currentUser?.uid) {
-      unsubUserDoc = onSnapshot(doc(db, 'users', currentUser.uid), (snap: any) => {
-        if (snap.exists()) {
-          const userData = { id: snap.id, ...snap.data() } as User;
-          setUser(userData);
-        }
-      }, (error: any) => {
-        console.error("Error subscribing to personal user doc:", error);
-      });
-    }
+    /* 
+    Legacy/Direct subscription removed - now handled by fallback lookup in users array effect below 
+    to support mismatched UIDs.
+    */
 
     // Initial Permission Check
     if (navigator.permissions && navigator.permissions.query) {
@@ -99,9 +91,8 @@ const CheckInPage: React.FC = () => {
       unsubCheckIns();
       unsubDist();
       unsubSettings();
-      unsubUserDoc();
     };
-  }, []);
+  }, [currentUser]);
 
   // Load manual PIX config from integrations
   useEffect(() => {
@@ -189,6 +180,9 @@ const CheckInPage: React.FC = () => {
             weekly: weeklyPos > 0 ? `#${weeklyPos}` : '-',
             general: generalPos > 0 ? `#${generalPos}` : '-'
           });
+
+          // CRITICAL: Update user state with the found record (fixes balance/history display)
+          setUser(foundUser);
         }
       } else {
         // If logged in but not an athlete, reset positions

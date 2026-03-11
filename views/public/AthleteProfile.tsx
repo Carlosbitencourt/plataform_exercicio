@@ -57,54 +57,45 @@ const AthleteProfile: React.FC = () => {
                           users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
             if (found) {
                 setUserData(found);
-                syncUserAbsences(found.id);
             }
         });
 
+        return () => unsubUsers();
+    }, [currentUser]);
+
+    React.useEffect(() => {
+        if (!userData?.id) return;
+
+        syncUserAbsences(userData.id);
+
         const unsubCheckIns = subscribeToCheckIns((allChecks) => {
-            if (userData?.id) {
-                const userChecks = allChecks
-                    .filter(c => c.userId === userData.id)
-                    .sort((a, b) => b.date.localeCompare(a.date));
-                setCheckIns(userChecks);
-            }
+            const userChecks = allChecks
+                .filter(c => c.userId === userData.id)
+                .sort((a, b) => b.date.localeCompare(a.date));
+            setCheckIns(userChecks);
         });
 
         const unsubDist = subscribeToDistributions((allDists) => {
-            if (userData?.id) {
-                const userDists = allDists.filter(d => d.userId === userData.id);
-                setDistributions(userDists);
-            }
+            const userDists = allDists.filter(d => d.userId === userData.id);
+            setDistributions(userDists);
         });
 
         const unsubAbsences = subscribeToAbsences((allAbsences) => {
-            if (userData?.id) {
-                const userAbsences = allAbsences.filter(a => a.userId === userData.id);
-                setAbsences(userAbsences);
-            }
+            const userAbsences = allAbsences.filter(a => a.userId === userData.id);
+            setAbsences(userAbsences);
         });
 
-        if (currentUser) {
-            const unsubNotifications = subscribeToNotifications(currentUser.uid, (data) => {
-                setNotifications(data);
-            });
-
-            return () => {
-                unsubUsers();
-                unsubCheckIns();
-                unsubDist();
-                unsubAbsences();
-                unsubNotifications();
-            };
-        }
+        const unsubNotifications = subscribeToNotifications(userData.id, (data) => {
+            setNotifications(data);
+        });
 
         return () => {
-            unsubUsers();
             unsubCheckIns();
             unsubDist();
             unsubAbsences();
+            unsubNotifications();
         };
-    }, [currentUser, userData?.id]);
+    }, [userData?.id]);
 
     React.useEffect(() => {
         if (userData && !isEditModalOpen) {
