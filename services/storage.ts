@@ -1,5 +1,5 @@
 
-import { Database, User, QRCodeData, CheckIn, Distribution, UserStatus, TimeSlot } from '../types';
+import { Database, User, QRCodeData, CheckIn, Distribution, UserStatus, TimeSlot, SystemSettings } from '../types';
 
 const STORAGE_KEY = 'fitreward_db';
 
@@ -20,6 +20,17 @@ const defaultTimeSlots: TimeSlot[] = [
   { id: 't5', name: 'Noite', startTime: '18:00', endTime: '19:00', weight: 1, days: [1, 2, 3, 4, 5], locationName: 'Default', latitude: 0, longitude: 0, radius: 100 },
 ];
 
+const defaultSettings: SystemSettings[] = [
+  {
+    id: 'system',
+    dailyLossAmount: 5.0,
+    welcomeMessage: 'Seja bem-vindo(a) ao Impulso Club, {name}! 🎉 Seu cadastro foi realizado com sucesso. \n\nSeu ID Único de Atleta: *{athleteId}* \n\nUtilize este código para realizar seus check-ins diários. Vamos pra cima! 🔥',
+    absenceMessage: 'Olá {name}! 🏋️‍♂️ Notamos que você não realizou seu check-in hoje ({date}). Conforme as regras do Impulso Club, uma penalidade de R$ {penaltyAmount} foi aplicada ao seu saldo. Não desanime, amanhã é um novo dia para treinar! 💪',
+    checkInMessage: 'Check-in realizado com sucesso! ✅\n\nAtleta: {name}\nHorário: {time}\n\nBom treino! Continue focado nos seus objetivos. 🚀',
+    lastUpdated: new Date().toISOString()
+  }
+];
+
 const initialData: Database = {
   users: [
     {
@@ -37,7 +48,8 @@ const initialData: Database = {
   qrCodes: [],
   checkIns: [],
   distributions: [],
-  timeSlots: defaultTimeSlots
+  timeSlots: defaultTimeSlots,
+  settings: defaultSettings
 };
 
 export const getDB = (): Database => {
@@ -45,6 +57,7 @@ export const getDB = (): Database => {
   if (!data) return initialData;
   const parsed = JSON.parse(data);
   if (!parsed.timeSlots) parsed.timeSlots = defaultTimeSlots;
+  if (!parsed.settings) parsed.settings = defaultSettings;
   return parsed;
 };
 

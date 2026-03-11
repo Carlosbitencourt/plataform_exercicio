@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { User, UserStatus, SystemSettings } from '../../types';
 import { subscribeToSettings } from '../../services/db';
 import { Loader2, Check, User as UserIcon, Mail, Phone, MapPin, Camera, Zap, Copy, ExternalLink, QrCode, ArrowLeft, ArrowRight, UserPlus, Upload, Activity, CheckCircle2, CreditCard, RefreshCw, Clock } from 'lucide-react';
@@ -963,43 +963,45 @@ const ExternalSignup: React.FC = () => {
                             )}
 
                             {/* Navigation Buttons */}
-                            <div className="pt-4 flex gap-4">
-                                {currentSubStep > 1 && !paymentData && (
-                                    <button
-                                        type="button"
-                                        onClick={prevStep}
-                                        className="flex-1 py-5 bg-zinc-800 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <ArrowLeft className="w-4 h-4" /> Voltar
-                                    </button>
-                                )}
+                            {!paymentConfirmed && (
+                                <div className="pt-4 flex gap-4">
+                                    {currentSubStep > 1 && !paymentData && !depositPending && (
+                                        <button
+                                            type="button"
+                                            onClick={prevStep}
+                                            className="flex-1 py-5 bg-zinc-800 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <ArrowLeft className="w-4 h-4" /> Voltar
+                                        </button>
+                                    )}
 
-                                {currentSubStep < 3 ? (
-                                    <button
-                                        type="button"
-                                        onClick={nextStep}
-                                        className="flex-[2] py-5 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2 italic font-sport border-b-4 border-lime-600 shadow-xl shadow-lime-900/10"
-                                    >
-                                        Avançar <ArrowRight className="w-6 h-6" />
-                                    </button>
-                                ) : paymentData ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => navigate('/analise')}
-                                        className="flex-1 py-6 bg-lime-400 text-black rounded-2xl font-black text-xl shadow-[0_20px_40px_rgba(163,230,53,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-tighter italic font-sport border-b-4 border-lime-600"
-                                    >
-                                        <Check className="w-6 h-6" /> Já Paguei
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="submit"
-                                        disabled={loading || uploadingPhoto}
-                                        className="flex-[2] py-6 bg-lime-400 text-black rounded-2xl font-black text-xl shadow-[0_20px_40px_rgba(163,230,53,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-tighter italic font-sport border-b-4 border-lime-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><UserPlus className="w-6 h-6" /> Concluir</>}
-                                    </button>
-                                )}
-                            </div>
+                                    {currentSubStep < 3 ? (
+                                        <button
+                                            type="button"
+                                            onClick={nextStep}
+                                            className="flex-[2] py-5 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2 italic font-sport border-b-4 border-lime-600 shadow-xl shadow-lime-900/10"
+                                        >
+                                            Avançar <ArrowRight className="w-6 h-6" />
+                                        </button>
+                                    ) : paymentData || depositPending ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/analise')}
+                                            className="flex-1 py-6 bg-lime-400 text-black rounded-2xl font-black text-xl shadow-[0_20px_40px_rgba(163,230,53,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-tighter italic font-sport border-b-4 border-lime-600"
+                                        >
+                                            <Check className="w-6 h-6" /> {depositPending ? 'Concluir' : 'Já Paguei'}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="submit"
+                                            disabled={loading || uploadingPhoto}
+                                            className="flex-[2] py-6 bg-lime-400 text-black rounded-2xl font-black text-xl shadow-[0_20px_40px_rgba(163,230,53,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-tighter italic font-sport border-b-4 border-lime-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <><UserPlus className="w-6 h-6" /> Concluir</>}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </form>
                     </div>
                 </div>
