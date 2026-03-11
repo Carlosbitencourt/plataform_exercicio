@@ -460,10 +460,10 @@ const CheckInPage: React.FC = () => {
                 </span>
                 <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20 shadow-[0_0_15px_rgba(163,230,53,0.1)]">LIVE</span>
               </div>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex gap-2 mt-2">
                 <button
                   onClick={() => setIsWithdrawModalOpen(true)}
-                  className="py-2 px-4 bg-lime-400 text-black rounded-xl font-black uppercase tracking-widest text-[9px] hover:scale-[1.05] active:scale-95 transition-all shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 relative z-10 w-fit"
+                  className="flex-1 py-2 px-4 bg-lime-400 text-black rounded-xl font-black uppercase tracking-widest text-[9px] hover:scale-[1.05] active:scale-95 transition-all shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 relative z-10"
                 >
                   <Wallet className="w-3.5 h-3.5" />
                   Resgatar Saldo
@@ -473,7 +473,7 @@ const CheckInPage: React.FC = () => {
                     setDepositPaymentData(null);
                     setIsDepositModalOpen(true);
                   }}
-                  className="py-2 px-4 bg-zinc-800 text-white border border-zinc-700 rounded-xl font-black uppercase tracking-widest text-[9px] hover:scale-[1.05] active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 w-fit"
+                  className="flex-1 py-2 px-4 bg-zinc-800 text-white border border-zinc-700 rounded-xl font-black uppercase tracking-widest text-[9px] hover:scale-[1.05] active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10"
                 >
                   <PlusCircle className="w-3.5 h-3.5 text-lime-400" />
                   Adicionar Saldo
