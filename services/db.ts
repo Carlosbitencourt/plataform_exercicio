@@ -47,8 +47,39 @@ export const subscribeToUsers = (callback: (users: User[]) => void) => {
         callback([]);
     });
 };
+/**
+ * Verify if a user already exists by email, phone or CPF.
+ * Throws specific errors if duplicates are found.
+ */
+export const checkUserExists = async (email?: string, phone?: string, cpf?: string, excludeUserId?: string) => {
+    const usersRef = collection(db, USERS_COLLECTION);
+    
+    if (email) {
+        const qEmail = query(usersRef, where("email", "==", email.toLowerCase()));
+        const snapEmail = await getDocs(qEmail);
+        const docs = snapEmail.docs.filter(d => d.id !== excludeUserId);
+        if (docs.length > 0) throw new Error("Este e-mail já está em uso por outro atleta.");
+    }
+
+    if (phone) {
+        const qPhone = query(usersRef, where("phone", "==", phone));
+        const snapPhone = await getDocs(qPhone);
+        const docs = snapPhone.docs.filter(d => d.id !== excludeUserId);
+        if (docs.length > 0) throw new Error("Este telefone já está cadastrado em outra conta.");
+    }
+
+    if (cpf) {
+        const qCpf = query(usersRef, where("cpf", "==", cpf));
+        const snapCpf = await getDocs(qCpf);
+        const docs = snapCpf.docs.filter(d => d.id !== excludeUserId);
+        if (docs.length > 0) throw new Error("Este CPF já está cadastrado no sistema.");
+    }
+};
 
 export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status' | 'balance'> & { status?: UserStatus }, customId?: string) => {
+    // 1. Prevent duplicates
+    await checkUserExists(userData.email, userData.phone, userData.cpf);
+
     const newUser: Omit<User, 'id'> = {
         ...userData,
         balance: 0,

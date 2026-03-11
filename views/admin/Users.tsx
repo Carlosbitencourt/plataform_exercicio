@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw, Wallet, PiggyBank, History, Calendar, Clock, Star } from 'lucide-react';
-import { subscribeToUsers, addUser, updateUser, deleteUser, subscribeToCheckIns, subscribeToAbsences, deleteCheckIn, deleteAbsence, subscribeToSettings } from '../../services/db';
+import { subscribeToUsers, addUser, updateUser, deleteUser, subscribeToCheckIns, subscribeToAbsences, deleteCheckIn, deleteAbsence, subscribeToSettings, checkUserExists } from '../../services/db';
 import { sendWelcomeMessage } from '../../services/whatsapp';
 import { auth, functions } from '../../services/firebase';
 import { httpsCallable } from 'firebase/functions';
@@ -123,6 +123,8 @@ const Users: React.FC = () => {
       const { password, ...userDataToSave } = formData;
 
       if (editingUser) {
+        // Validar unicidade antes de atualizar, excluindo o próprio usuário
+        await checkUserExists(userDataToSave.email, userDataToSave.phone, userDataToSave.cpf, editingUser.id);
         await updateUser({ ...editingUser, ...userDataToSave });
       } else {
         // Se criar sem senha (só email), ainda não temos UID do Auth
