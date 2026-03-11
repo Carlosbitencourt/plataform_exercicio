@@ -51,7 +51,7 @@ export const subscribeToUsers = (callback: (users: User[]) => void) => {
 export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status' | 'balance'> & { status?: UserStatus }, customId?: string) => {
     const newUser: Omit<User, 'id'> = {
         ...userData,
-        balance: userData.depositedValue,
+        balance: 0,
         status: userData.status || UserStatus.PENDING,
         createdAt: new Date().toISOString(),
         photoUrl: userData.photoUrl || ''
