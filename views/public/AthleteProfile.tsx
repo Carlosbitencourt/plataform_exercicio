@@ -53,7 +53,7 @@ const AthleteProfile: React.FC = () => {
         if (!currentUser?.email) return;
 
         const unsubUsers = subscribeToUsers((users) => {
-            const found = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
+            const found = users.find(u => u.id === currentUser.uid);
             if (found) {
                 setUserData(found);
                 syncUserAbsences(found.id);

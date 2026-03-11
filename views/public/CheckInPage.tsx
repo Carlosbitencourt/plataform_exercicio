@@ -145,8 +145,8 @@ const CheckInPage: React.FC = () => {
   }, [user?.balance, isDepositModalOpen, depositPaymentData]);
 
   useEffect(() => {
-    if (currentUser?.email && users.length > 0) {
-      const foundUser = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
+    if (currentUser?.uid && users.length > 0) {
+      const foundUser = users.find(u => u.id === currentUser.uid);
       if (foundUser) {
         if (foundUser.status !== UserStatus.ELIMINATED && foundUser.status !== 'eliminado') {
           syncUserAbsences(foundUser.id);

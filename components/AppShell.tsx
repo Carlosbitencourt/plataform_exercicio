@@ -29,7 +29,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         if (!currentUser?.email) return;
 
         return subscribeToUsers((users) => {
-            const found = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
+            const found = users.find(u => u.id === currentUser.uid);
             if (found) setUserData(found);
         });
     }, [currentUser]);
