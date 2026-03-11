@@ -21,6 +21,7 @@ import AthleteRanking from './views/public/AthleteRanking';
 import Withdrawals from './views/admin/Withdrawals';
 import Integrations from './views/admin/Integrations';
 import Settings from './views/admin/Settings';
+import UnderAnalysis from './views/public/UnderAnalysis';
 
 // Componente para proteger rotas administrativas
 const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -122,6 +123,7 @@ const App: React.FC = () => {
             <Route path="/perfil/atleta" element={<AppShell><AthleteProfile /></AppShell>} />
 
             <Route path="/inscrever" element={<ExternalSignup />} />
+            <Route path="/analise" element={<UnderAnalysis />} />
 
             {/* Default Redirects */}
             <Route path="/" element={<Navigate to="/checkin" replace />} />

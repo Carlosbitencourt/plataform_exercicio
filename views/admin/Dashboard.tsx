@@ -15,8 +15,8 @@ import {
     Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions, addCheckIn } from '../../services/db';
-import { User, CheckIn, Distribution, UserStatus } from '../../types';
+import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions, addCheckIn, subscribeToSettings } from '../../services/db';
+import { User, CheckIn, Distribution, UserStatus, SystemSettings } from '../../types';
 import { runWeeklyPenaltyCheck, getWeekDays, syncUserAbsences } from '../../services/rewardSystem';
 
 type FilterType = 'week' | 'month' | 'custom';
@@ -25,6 +25,7 @@ const Dashboard: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
     const [distributions, setDistributions] = useState<Distribution[]>([]);
+    const [settings, setSettings] = useState<SystemSettings | null>(null);
     const [filterType, setFilterType] = useState<FilterType>('week');
     const [customRange, setCustomRange] = useState({ start: '', end: '' });
     const [showAbsenceModal, setShowAbsenceModal] = useState(false);
@@ -35,11 +36,13 @@ const Dashboard: React.FC = () => {
         const unsubUsers = subscribeToUsers(setUsers);
         const unsubCheckIns = subscribeToCheckIns(setCheckIns);
         const unsubDist = subscribeToDistributions(setDistributions);
+        const unsubSettings = subscribeToSettings(setSettings);
 
         return () => {
             unsubUsers();
             unsubCheckIns();
             unsubDist();
+            unsubSettings();
         };
     }, []);
 
@@ -157,7 +160,7 @@ const Dashboard: React.FC = () => {
 
     const absencesResult = getAbsencesDetails();
     const totalAbsences = absencesResult.count;
-    const estimatedPool = totalAbsences * 10;
+    const estimatedPool = totalAbsences * 5; // Fixed at 5 per absence as requested
 
     const getTodayISO = () => {
         const d = new Date();

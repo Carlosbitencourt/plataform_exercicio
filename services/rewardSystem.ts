@@ -188,17 +188,8 @@ export const closeWeeklySession = async () => {
 
     // 3. Calculate Pool based on penalties applied this week
     // We get all distributions from this week that are negative (penalties)
-    const weekStart = weekDays[0];
-    const distQuery = query(
-      collection(db, 'distributions'),
-      where('date', '>=', weekStart),
-      where('date', '<=', today)
-    );
-    const distSnapForPool = await getDocs(distQuery);
-    const weeklyPool = distSnapForPool.docs
-      .map(doc => doc.data() as Distribution)
-      .filter(d => d.amount < 0)
-      .reduce((acc, d) => acc + Math.abs(d.amount), 0);
+    const totalWeeklyMisses = activeUsers.reduce((acc, u) => acc + (u.weeklyMisses || 0), 0);
+    const weeklyPool = totalWeeklyMisses * 5;
 
     console.log(`[CLOSE_WEEKLY] Pool calculated from penalties: R$ ${weeklyPool.toFixed(2)}`);
 
@@ -471,7 +462,7 @@ export const syncUserAbsences = async (userId: string, fullSync: boolean = false
       } as any);
 
       if (user.phone) {
-        sendAbsenceNotification(user.phone, user.name, day)
+        sendAbsenceNotification(user.phone, user.name, day, dailyPenalty, settings.absenceMessage)
           .catch(err => console.error(`Erro notificação ${user.name}:`, err));
       }
     }

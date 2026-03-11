@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Users, DollarSign, Calendar, Play, CheckCircle2, Zap, AlertTriangle, Trash2 } from 'lucide-react';
-import { subscribeToDistributions, subscribeToUsers, subscribeToCheckIns, deleteDistribution } from '../../services/db';
+import { subscribeToDistributions, subscribeToUsers, subscribeToCheckIns, deleteDistribution, addDistribution } from '../../services/db';
 import {
-  addDistribution,
   closeWeeklySession,
-  getDistributions,
   syncAllUsersAbsences
 } from '../../services/rewardSystem';
 import { Distribution, User, CheckIn, UserStatus } from '../../types';
@@ -52,9 +50,8 @@ const Distributions: React.FC = () => {
   };
 
   const activeUsers = users.filter(u => u.status === UserStatus.ACTIVE);
-  const totalDeposited = activeUsers.reduce((acc, u) => acc + (u.depositedValue || 0), 0);
-  const currentTotalBalance = activeUsers.reduce((acc, u) => acc + (u.balance || 0), 0);
-  const currentPool = Math.max(0, totalDeposited - currentTotalBalance);
+  const totalAbsences = activeUsers.reduce((acc, u) => acc + (u.weeklyMisses || 0), 0);
+  const currentPool = totalAbsences * 5; // Fixed at 5 per absence as requested
 
   const totalDistributed = distributions
     .filter(d => d.amount > 0)
@@ -206,8 +203,8 @@ const Distributions: React.FC = () => {
                   {dist.date}
                 </div>
                 <span className={`text-sm font-black font-sport italic tracking-tighter px-2.5 py-0.5 rounded-lg border shadow-sm ${dist.amount >= 0
-                    ? 'text-lime-600 bg-lime-50 border-lime-200'
-                    : 'text-rose-600 bg-rose-50 border-rose-200'
+                  ? 'text-lime-600 bg-lime-50 border-lime-200'
+                  : 'text-rose-600 bg-rose-50 border-rose-200'
                   }`}>
                   {dist.amount > 0 ? '+' : ''} R$ {dist.amount.toFixed(2)}
                 </span>
@@ -258,8 +255,8 @@ const Distributions: React.FC = () => {
                   </td>
                   <td className="px-5 py-3 whitespace-nowrap text-right">
                     <span className={`text-base font-black font-sport italic tracking-tighter px-2.5 py-0.5 rounded-lg border shadow-sm ${dist.amount >= 0
-                        ? 'text-lime-600 bg-lime-50 border-lime-200'
-                        : 'text-rose-600 bg-rose-50 border-rose-200'
+                      ? 'text-lime-600 bg-lime-50 border-lime-200'
+                      : 'text-rose-600 bg-rose-50 border-rose-200'
                       }`}>
                       {dist.amount > 0 ? '+' : ''} R$ {dist.amount.toFixed(2)}
                     </span>

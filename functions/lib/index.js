@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setUserAuth = exports.whatsappSender = void 0;
+exports.createAbacateBilling = exports.setUserAuth = exports.whatsappSender = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 // Initialize Admin SDK once
@@ -143,6 +143,83 @@ exports.setUserAuth = (0, https_1.onCall)({
     }
     catch (error) {
         console.error("Erro ao gerenciar usuário Auth:", error);
+        throw new https_1.HttpsError("internal", error.message);
+    }
+});
+/**
+ * Cloud Function to create a billing in AbacatePay.
+ * Securely handles the API key and avoids CORS issues.
+ */
+exports.createAbacateBilling = (0, https_1.onCall)({
+    region: "us-central1",
+}, async (request) => {
+    const { name, email, phone, cpf, amount } = request.data;
+    if (!name || !email || !amount) {
+        throw new https_1.HttpsError("invalid-argument", "Dados insuficientes para gerar faturamento.");
+    }
+    // 1. Fetch config from Firestore
+    let apiKey = "";
+    try {
+        const settingsSnap = await admin.firestore().doc("settings/integrations").get();
+        if (settingsSnap.exists) {
+            apiKey = settingsSnap.data()?.abacate?.apiKey || "";
+        }
+    }
+    catch (error) {
+        console.error("Error fetching AbacatePay API Key:", error);
+    }
+    if (!apiKey || apiKey.includes('•')) {
+        throw new https_1.HttpsError("failed-precondition", "AbacatePay API Key não configurada corretamente no painel Admin.");
+    }
+    // Sanitize API Key
+    const sanitizedApiKey = apiKey.trim().replace(/[^\x00-\x7F]/g, "");
+    // Use V1 pixQrCode/create for direct PIX data (compatible with user's V1 API Key)
+    const API_BASE = "https://api.abacatepay.com/v1";
+    try {
+        const billingAmount = Math.round(Number(amount) * 100);
+        // V1 pixQrCode/create allows sending customer data directly
+        const billingPayload = {
+            amount: billingAmount,
+            description: "Depósito Inicial - Impulso Club",
+            customer: {
+                name,
+                email,
+                taxId: cpf.replace(/\D/g, ""),
+                cellphone: phone.replace(/\D/g, "")
+            }
+        };
+        console.log(`[Abacate] Enviando payload V1 pixQrCode: ${JSON.stringify(billingPayload)}`);
+        const response = await fetch(`${API_BASE}/pixQrCode/create`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${sanitizedApiKey}`
+            },
+            body: JSON.stringify(billingPayload)
+        });
+        const result = await response.json().catch(() => ({}));
+        console.log(`[Abacate] Resposta V1 pixQrCode: ${JSON.stringify(result)}`);
+        if (!response.ok) {
+            console.error("[Abacate] Erro V1:", JSON.stringify(result));
+            const errorMsg = result.error || result.message || response.status;
+            throw new Error(`Falha ao gerar pagamento PIX: ${errorMsg}`);
+        }
+        // Map V1 response to the format expected by the frontend
+        // V1 returned data directly in result.data or root depending on exact success structure
+        const data = result.data || result;
+        return {
+            id: data.id,
+            amount: data.amount,
+            status: data.status,
+            url: data.url,
+            pix: {
+                qrcode: data.brCodeBase64,
+                payload: data.brCode
+            }
+        };
+    }
+    catch (error) {
+        console.error("AbacatePay Exception:", error);
         throw new https_1.HttpsError("internal", error.message);
     }
 });

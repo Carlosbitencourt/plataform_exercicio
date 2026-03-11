@@ -195,10 +195,16 @@ export const updateSettings = async (settings: Partial<SystemSettings>) => {
             lastUpdated: new Date().toISOString()
         });
     } else {
-        await safeSetDoc(SETTINGS_COLLECTION, 'system', {
+        // Initialize with default if missing
+        const newSettings = {
+            dailyLossAmount: 5.0,
+            welcomeMessage: 'Seja bem-vindo(a) ao Impulso Club, {name}! 🎉 Seu cadastro foi realizado com sucesso. \n\nSeu ID Único de Atleta: *{athleteId}* \n\nUtilize este código para realizar seus check-ins diários. Vamos pra cima! 🔥',
+            absenceMessage: 'Olá {name}! 🏋️‍♂️ Notamos que você não realizou seu check-in hoje ({date}). Conforme as regras do Impulso Club, uma penalidade de R$ {penaltyAmount} foi aplicada ao seu saldo. Não desanime, amanhã é um novo dia para treinar! 💪',
+            checkInMessage: 'Check-in realizado com sucesso! ✅\n\nAtleta: {name}\nHorário: {time}\n\nBom treino! Continue focado nos seus objetivos. 🚀',
             ...settings,
             lastUpdated: new Date().toISOString()
-        });
+        };
+        await safeSetDoc(SETTINGS_COLLECTION, 'system', newSettings);
     }
 };
 

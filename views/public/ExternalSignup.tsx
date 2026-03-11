@@ -1,23 +1,30 @@
-import React, { useState, useRef } from 'react';
-import { UserPlus, CheckCircle2, ArrowRight, ArrowLeft, Instagram, Phone, MapPin, Mail, CreditCard, User as UserIcon, Camera, Upload, Activity, Loader2, Copy, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Camera, Loader2, User as UserIcon, Phone, CreditCard, MapPin, Upload, UserPlus, ArrowRight, ArrowLeft, CheckCircle2, Activity, QrCode, Copy, ExternalLink, Mail, Check } from 'lucide-react';
 import { addUser } from '../../services/db';
 import { safeUploadFile } from '../../services/firebaseGuard';
 import { auth } from '../../services/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { sendWelcomeMessage } from '../../services/whatsapp';
+import { subscribeToSettings } from '../../services/db';
+import { SystemSettings } from '../../types';
+import { generateSignupPix } from '../../services/abacatePay';
 
 const ExternalSignup: React.FC = () => {
+    const navigate = useNavigate();
     const { currentUser, loading: authLoading } = useAuth();
-    const [step, setStep] = useState<'auth' | 'form' | 'success'>(currentUser ? 'form' : 'auth');
+    const [step, setStep] = useState<'auth' | 'form'>(currentUser ? 'form' : 'auth');
     const [currentSubStep, setCurrentSubStep] = useState(1);
     const [generatedId, setGeneratedId] = useState('');
+    const [paymentData, setPaymentData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [error, setError] = useState<string | null>(null);
+    const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
 
     // Efeito para preencher dados quando o usuário logar ou se já estiver logado
     React.useEffect(() => {
@@ -32,6 +39,14 @@ const ExternalSignup: React.FC = () => {
             }
         }
     }, [currentUser]);
+
+    // Fetch settings for welcome message
+    React.useEffect(() => {
+        const unsubscribe = subscribeToSettings((data) => {
+            if (data) setSystemSettings(data);
+        });
+        return () => unsubscribe();
+    }, []);
 
     const maskPhone = (value: string) => {
         return value
@@ -221,6 +236,29 @@ const ExternalSignup: React.FC = () => {
         );
     }
 
+    const handleCopyPix = async () => {
+        if (paymentData?.pix?.payload) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(paymentData.pix.payload);
+                } else {
+                    // Fallback using textarea
+                    const textArea = document.createElement("textarea");
+                    textArea.value = paymentData.pix.payload;
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                }
+                alert("Código PIX copiado com sucesso! Agora cole no seu aplicativo do banco.");
+            } catch (err) {
+                console.error('Falha ao copiar:', err);
+                alert("Não foi possível copiar automaticamente. Por favor, tente selecionar o código manualmente.");
+            }
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -234,10 +272,14 @@ const ExternalSignup: React.FC = () => {
             return;
         }
 
+        console.log("SIGNUP: Submitting form...", formData);
         setLoading(true);
+        setError(null);
 
         try {
             const uniqueCode = generateUniqueCode();
+
+            // 1. Salvar usuário no Firestore com status 'analise'
             await addUser({
                 ...formData,
                 uniqueCode,
@@ -245,18 +287,36 @@ const ExternalSignup: React.FC = () => {
             } as any, currentUser?.uid);
 
             setGeneratedId(uniqueCode);
-            setStep('success');
+
+            // 2. Gerar Cobrança no AbacatePay
+            try {
+                console.log("SIGNUP: Iniciando geração de PIX para", formData.name);
+                const billing = await generateSignupPix({
+                    name: formData.name,
+                    email: currentUser?.email || '',
+                    phone: formData.phone,
+                    cpf: formData.cpf,
+                    amount: formData.depositedValue
+                });
+                console.log("SIGNUP: PIX gerado com sucesso:", billing);
+                setPaymentData(billing);
+            } catch (payError: any) {
+                console.error("SIGNUP: Erro ao gerar pagamento:", payError);
+                // Mostrar erro específico para o usuário para não parecer que "não aconteceu nada"
+                alert("Erro ao gerar PIX: " + (payError.message || "Verifique as configurações do AbacatePay no Admin."));
+                // Se o pagamento falhar, talvez queiramos interromper ou permitir que o usuário tente novamente
+                // Por enquanto, vamos parar o loading para que ele possa clicar de novo.
+                setLoading(false);
+                return;
+            }
 
             // Enviar mensagem de boas-vindas via WhatsApp
             if (formData.phone) {
-                sendWelcomeMessage(formData.phone, formData.name, uniqueCode)
-                    .catch(err => console.error("Erro ao enviar boas-vindas WhatsApp:", err));
+                console.log("SIGNUP: Enviando mensagem de boas-vindas para", formData.phone);
+                sendWelcomeMessage(formData.phone, formData.name, uniqueCode, systemSettings?.welcomeMessage)
+                    .then(res => console.log("SIGNUP: Resultado envio WhatsApp:", res))
+                    .catch(err => console.error("SIGNUP: Erro ao enviar boas-vindas WhatsApp:", err));
             }
-
-            // Redireciona automaticamente após 5 segundos
-            setTimeout(() => {
-                window.location.href = '#/checkin';
-            }, 5000);
 
         } catch (error: any) {
             console.error("Error signing up:", error);
@@ -265,59 +325,6 @@ const ExternalSignup: React.FC = () => {
             setLoading(false);
         }
     };
-
-    if (step === 'success') {
-        return (
-            <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 font-sans relative overflow-hidden">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl aspect-square bg-lime-500/5 blur-[150px] rounded-full"></div>
-
-                <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-[3rem] p-12 text-center space-y-8 relative z-10 shadow-2xl">
-                    <div className="mx-auto w-24 h-24 bg-lime-400 rounded-[2rem] flex items-center justify-center shadow-[0_0_50px_rgba(163,230,53,0.3)] animate-bounce-slow">
-                        <CheckCircle2 className="w-12 h-12 text-black" />
-                    </div>
-
-                    <div className="space-y-2">
-                        <h2 className="text-3xl font-black italic uppercase font-sport tracking-tighter">Cadastro Realizado!</h2>
-                        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">Bem-vindo(a) ao Impulso Club</p>
-                    </div>
-
-                    <div className="bg-black border-2 border-zinc-800 p-8 rounded-[2rem] space-y-4">
-                        <p className="text-zinc-400 text-[9px] font-black uppercase tracking-widest">Seu ID Único de Atleta</p>
-                        <div className="text-6xl font-black italic font-sport text-lime-400 tracking-widest">
-                            {generatedId}
-                        </div>
-
-                        <button
-                            onClick={copyId}
-                            className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all ${copied
-                                ? 'bg-lime-400 text-black shadow-[0_10px_20px_rgba(163,230,53,0.3)]'
-                                : 'bg-zinc-800 text-white hover:bg-zinc-700 active:scale-95'
-                                }`}
-                        >
-                            {copied ? (
-                                <><Check className="w-4 h-4" /> COPIADO!</>
-                            ) : (
-                                <><Copy className="w-4 h-4" /> COPIAR CÓDIGO</>
-                            )}
-                        </button>
-
-                        <p className="text-zinc-500 text-[8px] font-bold uppercase tracking-widest leading-relaxed mt-4">
-                            Guarde este código! Você precisará dele para seus check-ins diários.
-                            <br />
-                            <span className="text-lime-400/50">Redirecionando para o check-in em instantes...</span>
-                        </p>
-                    </div>
-
-                    <button
-                        onClick={() => window.location.href = '#/checkin'}
-                        className="w-full py-5 bg-white text-black rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-[1.03] transition-all flex items-center justify-center gap-2"
-                    >
-                        IR PARA O CHECK-IN <ArrowRight className="w-4 h-4" />
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-black text-white p-4 md:p-6 font-sans relative overflow-hidden pb-20">
@@ -502,107 +509,159 @@ const ExternalSignup: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* STEP 3: INVESTIMENTO E PERFIL */}
+                            {/* STEP 3: INVESTIMENTO E PERFIL / PAYMENT */}
                             {currentSubStep === 3 && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                                    <div className="space-y-2 text-center">
-                                        <h2 className="text-xl font-black italic font-sport uppercase text-white">3. Finalização</h2>
-                                        <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">Sua foto e investimento de check-in.</p>
-                                    </div>
-
-                                    {/* Photo Upload Section */}
-                                    <div className="flex flex-col items-center space-y-4">
-                                        <div className="relative">
-                                            <div
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className={`relative w-32 h-32 rounded-[2rem] border-2 border-dashed transition-all cursor-pointer overflow-hidden flex items-center justify-center group ${formData.photoUrl
-                                                    ? 'border-lime-400 bg-lime-400/5'
-                                                    : 'border-zinc-800 bg-zinc-900 hover:border-lime-400/50'
-                                                    }`}
-                                            >
-                                                {photoPreview ? (
-                                                    <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="text-center space-y-1">
-                                                        <Camera className="w-8 h-8 mx-auto text-zinc-700 group-hover:text-lime-400 transition-colors" />
-                                                        <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest group-hover:text-lime-400">Sua Foto</span>
-                                                    </div>
-                                                )}
-
-                                                {uploadingPhoto && (
-                                                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                                                        <Loader2 className="w-6 h-6 text-lime-400 animate-spin" />
-                                                    </div>
-                                                )}
-
-                                                {formData.photoUrl && (
-                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <span className="text-[10px] font-black text-white uppercase tracking-widest">Trocar Foto</span>
-                                                    </div>
-                                                )}
+                                    {paymentData ? (
+                                        // PAGAMENTO INLINE
+                                        <div className="space-y-6">
+                                            <div className="space-y-2 text-center">
+                                                <h2 className="text-xl font-black italic font-sport uppercase text-lime-400">Pagamento PIX</h2>
+                                                <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">Aguardando seu depósito de R$ {formData.depositedValue},00</p>
                                             </div>
 
-                                            {!formData.photoUrl && !uploadingPhoto && (
-                                                <div
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                    className="absolute -bottom-2 -right-2 p-2.5 bg-lime-400 rounded-xl shadow-lg transform group-hover:scale-110 transition-transform cursor-pointer border-2 border-black"
-                                                >
-                                                    <Upload className="w-4 h-4 text-black" />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            onChange={handlePhotoChange}
-                                            accept="image/*"
-                                            hidden
-                                        />
-                                        <div className="text-center">
-                                            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
-                                                {formData.photoUrl ? 'Foto selecionada com sucesso!' : 'Anexe uma foto de rosto nítida (Obrigatório)'}
-                                            </p>
-                                        </div>
-                                    </div>
+                                            <div className="bg-black border-2 border-zinc-800 p-6 rounded-[2rem] space-y-6">
+                                                {paymentData?.pix?.qrcode ? (
+                                                    <div className="bg-white p-4 rounded-2xl mx-auto w-40 h-40 shadow-xl">
+                                                        <img src={paymentData.pix.qrcode} alt="QR Code PIX" className="w-full h-full" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="py-8 text-zinc-600 italic text-xs text-center flex items-center justify-center gap-2">
+                                                        <Loader2 className="w-4 h-4 animate-spin" /> Gerando QR Code...
+                                                    </div>
+                                                )}
 
-                                    <div className="space-y-6">
-                                        <div className="space-y-4">
-                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block text-center">Valor do deposito</label>
-                                            <div className="grid grid-cols-3 gap-3">
-                                                {[30, 40, 50].map(value => (
+                                                <div className="space-y-3">
                                                     <button
-                                                        key={value}
                                                         type="button"
-                                                        onClick={() => setFormData({ ...formData, depositedValue: value })}
-                                                        className={`py-3 rounded-xl font-black italic font-sport text-lg transition-all border-2 ${formData.depositedValue === value
-                                                            ? 'bg-lime-400 text-black border-lime-400 scale-[1.05] shadow-[0_0_20px_rgba(163,230,53,0.2)]'
-                                                            : 'bg-black text-zinc-700 border-zinc-800'
+                                                        onClick={handleCopyPix}
+                                                        className="w-full py-4 bg-zinc-800 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 border border-zinc-700"
+                                                    >
+                                                        <Copy className="w-4 h-4" /> Copiar Código PIX
+                                                    </button>
+
+                                                    {paymentData?.url && (
+                                                        <a
+                                                            href={paymentData.url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="w-full py-4 bg-lime-400/5 text-lime-400 border border-lime-400/20 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-lime-400/10 transition-all flex items-center justify-center gap-2"
+                                                        >
+                                                            <ExternalLink className="w-4 h-4" /> Abrir no Navegador
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="p-4 bg-lime-400/5 border border-lime-400/20 rounded-2xl">
+                                                <p className="text-[10px] font-bold text-zinc-400 uppercase leading-relaxed text-center">
+                                                    Escaneie o QR Code ou copie a chave para realizar o depósito. O sistema identificará automaticamente.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        // FORMULÁRIO STEP 3
+                                        <>
+                                            <div className="space-y-2 text-center">
+                                                <h2 className="text-xl font-black italic font-sport uppercase text-white">3. Finalização</h2>
+                                                <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">Sua foto e investimento de check-in.</p>
+                                            </div>
+
+                                            {/* Photo Upload Section */}
+                                            <div className="flex flex-col items-center space-y-4">
+                                                <div className="relative">
+                                                    <div
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                        className={`relative w-32 h-32 rounded-[2rem] border-2 border-dashed transition-all cursor-pointer overflow-hidden flex items-center justify-center group ${formData.photoUrl
+                                                            ? 'border-lime-400 bg-lime-400/5'
+                                                            : 'border-zinc-800 bg-zinc-900 hover:border-lime-400/50'
                                                             }`}
                                                     >
-                                                        {value}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
+                                                        {photoPreview ? (
+                                                            <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="text-center space-y-1">
+                                                                <Camera className="w-8 h-8 mx-auto text-zinc-700 group-hover:text-lime-400 transition-colors" />
+                                                                <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest group-hover:text-lime-400">Sua Foto</span>
+                                                            </div>
+                                                        )}
 
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Chave PIX (Para Recebimento)</label>
-                                            <input
-                                                required
-                                                type="text"
-                                                placeholder="CPF, EMAIL OU TELEFONE"
-                                                className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-base"
-                                                value={formData.pixKey}
-                                                onChange={e => setFormData({ ...formData, pixKey: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
+                                                        {uploadingPhoto && (
+                                                            <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                                                                <Loader2 className="w-6 h-6 text-lime-400 animate-spin" />
+                                                            </div>
+                                                        )}
+
+                                                        {formData.photoUrl && (
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                <span className="text-[10px] font-black text-white uppercase tracking-widest">Trocar Foto</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {!formData.photoUrl && !uploadingPhoto && (
+                                                        <div
+                                                            onClick={() => fileInputRef.current?.click()}
+                                                            className="absolute -bottom-2 -right-2 p-2.5 bg-lime-400 rounded-xl shadow-lg transform group-hover:scale-110 transition-transform cursor-pointer border-2 border-black"
+                                                        >
+                                                            <Upload className="w-4 h-4 text-black" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <input
+                                                    type="file"
+                                                    ref={fileInputRef}
+                                                    onChange={handlePhotoChange}
+                                                    accept="image/*"
+                                                    hidden
+                                                />
+                                                <div className="text-center">
+                                                    <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                                                        {formData.photoUrl ? 'Foto selecionada com sucesso!' : 'Anexe uma foto de rosto nítida (Obrigatório)'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-6">
+                                                <div className="space-y-4">
+                                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block text-center">Valor do deposito</label>
+                                                    <div className="grid grid-cols-3 gap-3">
+                                                        {[30, 40, 50].map(value => (
+                                                            <button
+                                                                key={value}
+                                                                type="button"
+                                                                onClick={() => setFormData({ ...formData, depositedValue: value })}
+                                                                className={`py-3 rounded-xl font-black italic font-sport text-lg transition-all border-2 ${formData.depositedValue === value
+                                                                    ? 'bg-lime-400 text-black border-lime-400 scale-[1.05] shadow-[0_0_20px_rgba(163,230,53,0.2)]'
+                                                                    : 'bg-black text-zinc-700 border-zinc-800'
+                                                                    }`}
+                                                            >
+                                                                {value}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Chave PIX (Para Recebimento)</label>
+                                                    <input
+                                                        required
+                                                        type="text"
+                                                        placeholder="CPF, EMAIL OU TELEFONE"
+                                                        className="w-full px-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-base"
+                                                        value={formData.pixKey}
+                                                        onChange={e => setFormData({ ...formData, pixKey: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
 
                             {/* Navigation Buttons */}
                             <div className="pt-4 flex gap-4">
-                                {currentSubStep > 1 && (
+                                {currentSubStep > 1 && !paymentData && (
                                     <button
                                         type="button"
                                         onClick={prevStep}
@@ -619,6 +678,14 @@ const ExternalSignup: React.FC = () => {
                                         className="flex-[2] py-5 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2 italic font-sport border-b-4 border-lime-600 shadow-xl shadow-lime-900/10"
                                     >
                                         Avançar <ArrowRight className="w-6 h-6" />
+                                    </button>
+                                ) : paymentData ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(`/analise/${generatedId}`)}
+                                        className="flex-1 py-6 bg-lime-400 text-black rounded-2xl font-black text-xl shadow-[0_20px_40px_rgba(163,230,53,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-tighter italic font-sport border-b-4 border-lime-600"
+                                    >
+                                        <CheckCircle2 className="w-6 h-6" /> Já Paguei
                                     </button>
                                 ) : (
                                     <button

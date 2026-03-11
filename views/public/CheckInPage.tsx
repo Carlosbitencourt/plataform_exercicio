@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserStatus, TimeSlot, CheckIn, Distribution } from '../../types';
-import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToDistributions } from '../../services/db';
+import { User, UserStatus, TimeSlot, CheckIn, Distribution, SystemSettings } from '../../types';
+import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToDistributions, subscribeToSettings } from '../../services/db';
 import { runWeeklyPenaltyCheck, syncUserAbsences, getEffectiveMonday } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell, Wallet, X } from 'lucide-react';
@@ -33,6 +33,7 @@ const CheckInPage: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [lastCheckInId, setLastCheckInId] = useState<string | null>(null);
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -51,6 +52,7 @@ const CheckInPage: React.FC = () => {
     const unsubSlots = subscribeToTimeSlots(setTimeSlots);
     const unsubCheckIns = subscribeToCheckIns(setCheckIns);
     const unsubDist = subscribeToDistributions(setDistributions);
+    const unsubSettings = subscribeToSettings(setSettings);
 
     // Initial Permission Check
     if (navigator.permissions && navigator.permissions.query) {
@@ -68,6 +70,7 @@ const CheckInPage: React.FC = () => {
       unsubSlots();
       unsubCheckIns();
       unsubDist();
+      unsubSettings();
     };
   }, []);
 
@@ -181,7 +184,7 @@ const CheckInPage: React.FC = () => {
       });
     });
 
-    if (!hasActiveSlot) return `JANELA FECHADA AGORA (${nowStr}).`;
+    if (!hasActiveSlot) return `JANELA FECHADA AGORA(${nowStr}).`;
     const today = getTodayISO();
     if (checkIns.some(c => c.userId === user?.id && c.date === today)) return 'CHECK-IN JÁ REALIZADO HOJE.';
     return null;
@@ -280,7 +283,7 @@ const CheckInPage: React.FC = () => {
 
     // Enviar confirmação via WhatsApp
     if (user && user.phone) {
-      sendCheckInConfirmation(user.phone, user.name, nowStr)
+      sendCheckInConfirmation(user.phone, user.name, nowStr, settings?.checkInMessage)
         .catch(err => console.error("Erro ao enviar confirmação WhatsApp:", err));
     }
   };

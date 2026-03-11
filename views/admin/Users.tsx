@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw, Wallet, PiggyBank, History, Calendar, Clock, Star } from 'lucide-react';
-import { subscribeToUsers, addUser, updateUser, deleteUser, subscribeToCheckIns, subscribeToAbsences, deleteCheckIn, deleteAbsence } from '../../services/db';
+import { subscribeToUsers, addUser, updateUser, deleteUser, subscribeToCheckIns, subscribeToAbsences, deleteCheckIn, deleteAbsence, subscribeToSettings } from '../../services/db';
+import { sendWelcomeMessage } from '../../services/whatsapp';
 import { auth, functions } from '../../services/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { safeUploadFile } from '../../services/firebaseGuard';
-import { User, UserStatus, CheckIn, Absence } from '../../types';
+import { User, UserStatus, CheckIn, Absence, SystemSettings } from '../../types';
 
 const Users: React.FC = () => {
   const { impersonate } = useAuth();
@@ -26,6 +27,7 @@ const Users: React.FC = () => {
   const [selectedUserForActivity, setSelectedUserForActivity] = useState<User | null>(null);
   const [allCheckIns, setAllCheckIns] = useState<CheckIn[]>([]);
   const [allAbsences, setAllAbsences] = useState<Absence[]>([]);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -63,10 +65,14 @@ const Users: React.FC = () => {
     const unsubscribeAbsences = subscribeToAbsences((data) => {
       setAllAbsences(data);
     });
+    const unsubscribeSettings = subscribeToSettings((settings) => {
+      setSystemSettings(settings);
+    });
     return () => {
       unsubscribeUsers();
       unsubscribeCheckIns();
       unsubscribeAbsences();
+      unsubscribeSettings();
     };
   }, []);
 
@@ -121,7 +127,16 @@ const Users: React.FC = () => {
       } else {
         // Se criar sem senha (só email), ainda não temos UID do Auth
         // Idealmente, pedir senha ou usar email como base
-        await addUser(userDataToSave, userIdMatch);
+        const finalUniqueCode = userDataToSave.uniqueCode || generateUniqueCode();
+        await addUser({ ...userDataToSave, uniqueCode: finalUniqueCode }, userIdMatch);
+
+        // Enviar mensagem de boas-vindas via WhatsApp
+        if (userDataToSave.phone) {
+          console.log("ADMIN: Enviando mensagem de boas-vindas para", userDataToSave.phone);
+          sendWelcomeMessage(userDataToSave.phone, userDataToSave.name, finalUniqueCode, systemSettings?.welcomeMessage)
+            .then(res => console.log("ADMIN: Resultado envio WhatsApp:", res))
+            .catch(err => console.error("ADMIN: Erro ao enviar boas-vindas WhatsApp:", err));
+        }
       }
       setFormData({
         name: '',
@@ -922,8 +937,8 @@ const Users: React.FC = () => {
                     <div
                       key={activity.id}
                       className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${activity.type === 'checkin'
-                          ? 'bg-lime-50 border-lime-100 hover:border-lime-300'
-                          : 'bg-rose-50 border-rose-100 hover:border-rose-300'
+                        ? 'bg-lime-50 border-lime-100 hover:border-lime-300'
+                        : 'bg-rose-50 border-rose-100 hover:border-rose-300'
                         }`}
                     >
                       <div className="flex items-center gap-4">

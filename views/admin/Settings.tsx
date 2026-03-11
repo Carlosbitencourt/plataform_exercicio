@@ -6,7 +6,10 @@ import { SystemSettings } from '../../types';
 const Settings: React.FC = () => {
     const [settings, setSettings] = useState<SystemSettings | null>(null);
     const [formData, setFormData] = useState({
-        dailyLossAmount: 10
+        dailyLossAmount: 5,
+        welcomeMessage: '',
+        absenceMessage: '',
+        checkInMessage: ''
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -17,7 +20,10 @@ const Settings: React.FC = () => {
             if (data) {
                 setSettings(data);
                 setFormData({
-                    dailyLossAmount: data.dailyLossAmount
+                    dailyLossAmount: data.dailyLossAmount,
+                    welcomeMessage: data.welcomeMessage || '',
+                    absenceMessage: data.absenceMessage || '',
+                    checkInMessage: data.checkInMessage || ''
                 });
             }
             setLoading(false);
@@ -32,7 +38,10 @@ const Settings: React.FC = () => {
 
         try {
             await updateSettings({
-                dailyLossAmount: formData.dailyLossAmount
+                dailyLossAmount: formData.dailyLossAmount,
+                welcomeMessage: formData.welcomeMessage,
+                absenceMessage: formData.absenceMessage,
+                checkInMessage: formData.checkInMessage
             });
             setMessage({ type: 'success', text: 'Configurações salvas com sucesso!' });
             setTimeout(() => setMessage(null), 3000);
@@ -115,6 +124,63 @@ const Settings: React.FC = () => {
                                     Última atualização: {settings?.lastUpdated ? new Date(settings.lastUpdated).toLocaleString('pt-BR') : 'Nunca'}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Welcome Message Section */}
+                <div className="bg-white rounded-[2.5rem] border-4 border-slate-200 shadow-2xl overflow-hidden mt-8">
+                    <div className="p-6 bg-slate-50 border-b-2 border-slate-100 flex items-center gap-3">
+                        <div className="p-2 bg-lime-500 text-white rounded-xl shadow-lg shadow-lime-500/20">
+                            <Clock className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="font-black italic uppercase font-sport text-slate-900 tracking-tight">Mensagens Automáticas</h3>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Configure os templates de WhatsApp</p>
+                        </div>
+                    </div>
+
+                    <div className="p-8 space-y-10">
+                        {/* Welcome */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Boas-vindas (Cadastro)</label>
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-2 py-1 bg-slate-100 rounded-md">Variáveis: {'{name}, {athleteId}'}</span>
+                            </div>
+                            <textarea
+                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-base font-bold text-slate-900 focus:ring-4 focus:ring-lime-400/10 focus:border-lime-500 outline-none transition-all shadow-inner min-h-[120px]"
+                                value={formData.welcomeMessage}
+                                onChange={(e) => setFormData({ ...formData, welcomeMessage: e.target.value })}
+                                placeholder="Olá {name}! Seja bem-vindo..."
+                            />
+                        </div>
+
+                        {/* Absence */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Notificação de Falta</label>
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-2 py-1 bg-slate-100 rounded-md">Variáveis: {'{name}, {date}, {penaltyAmount}'}</span>
+                            </div>
+                            <textarea
+                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-base font-bold text-slate-900 focus:ring-4 focus:ring-lime-400/10 focus:border-lime-500 outline-none transition-all shadow-inner min-h-[120px]"
+                                value={formData.absenceMessage}
+                                onChange={(e) => setFormData({ ...formData, absenceMessage: e.target.value })}
+                                placeholder="Olá {name}! Notamos que você faltou..."
+                            />
+                        </div>
+
+                        {/* Check-in */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Confirmação de Check-in</label>
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-2 py-1 bg-slate-100 rounded-md">Variáveis: {'{name}, {time}'}</span>
+                            </div>
+                            <textarea
+                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-base font-bold text-slate-900 focus:ring-4 focus:ring-lime-400/10 focus:border-lime-500 outline-none transition-all shadow-inner min-h-[120px]"
+                                value={formData.checkInMessage}
+                                onChange={(e) => setFormData({ ...formData, checkInMessage: e.target.value })}
+                                placeholder="Check-in realizado com sucesso, {name}!"
+                            />
                         </div>
                     </div>
                 </div>
