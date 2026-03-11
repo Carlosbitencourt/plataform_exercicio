@@ -4,7 +4,7 @@ import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeT
 import { runWeeklyPenaltyCheck, syncUserAbsences, getEffectiveMonday } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { db } from '../../services/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell, Wallet, X, PlusCircle, Copy, ExternalLink } from 'lucide-react';
 import { sendCheckInConfirmation } from '../../services/whatsapp';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +16,8 @@ import {
   safeUploadFile
 } from '../../services/firebaseGuard';
 import { LocationResult } from '../../services/geolocation';
+import { generatePixPayload, createDepositRequest } from '../../services/manualPix';
+import { QRCodeSVG } from 'qrcode.react';
 
 const CheckInPage: React.FC = () => {
   const { currentUser } = useAuth();
@@ -49,6 +51,9 @@ const CheckInPage: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
   const [prevBalance, setPrevBalance] = useState<number | null>(null);
+  const [manualPixConfig, setManualPixConfig] = useState<{ enabled: boolean; pixKey: string; recipientName: string } | null>(null);
+  const [manualPixPayload, setManualPixPayload] = useState<string | null>(null);
+  const [depositPending, setDepositPending] = useState(false);
 
   // Ranking Positions
   const [positions, setPositions] = useState({ daily: '-', weekly: '-', general: '-' });
@@ -96,6 +101,21 @@ const CheckInPage: React.FC = () => {
       unsubSettings();
       unsubUserDoc();
     };
+  }, []);
+
+  // Load manual PIX config from integrations
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'integrations'));
+        if (snap.exists() && snap.data().manualPix?.enabled) {
+          setManualPixConfig(snap.data().manualPix);
+        }
+      } catch (e) {
+        console.error('Failed to load integrations config', e);
+      }
+    };
+    load();
   }, []);
 
   // Persist deposit state
@@ -398,25 +418,30 @@ const CheckInPage: React.FC = () => {
     setIsGeneratingDeposit(true);
     setError(null);
 
-    console.log('DEBUG: Iniciando geração de PIX para depositAmount:', depositAmount);
     try {
-      const { generateSignupPix } = await import('../../services/abacatePay');
-      console.log('DEBUG: Chamando generateSignupPix com payload:', {
-        name: user.name,
-        email: user.email || '',
-        phone: user.phone || '',
-        cpf: user.cpf || '',
-        amount: amount
-      });
-      const data = await generateSignupPix({
-        name: user.name,
-        email: user.email || '',
-        phone: user.phone || '',
-        cpf: user.cpf || '',
-        amount: amount
-      });
-      console.log('DEBUG: Resposta AbacatePay:', data);
-      setDepositPaymentData(data);
+      if (manualPixConfig?.enabled && manualPixConfig.pixKey) {
+        // MANUAL PIX: gerar payload localmente
+        const payload = generatePixPayload(
+          manualPixConfig.pixKey,
+          manualPixConfig.recipientName || 'FAVORECIDO',
+          amount
+        );
+        setManualPixPayload(payload);
+        setDepositPending(false);
+      } else {
+        // ABACATEPAY
+        console.log('DEBUG: Iniciando geração de PIX para depositAmount:', depositAmount);
+        const { generateSignupPix } = await import('../../services/abacatePay');
+        const data = await generateSignupPix({
+          name: user.name,
+          email: user.email || '',
+          phone: user.phone || '',
+          cpf: user.cpf || '',
+          amount: amount
+        });
+        console.log('DEBUG: Resposta AbacatePay:', data);
+        setDepositPaymentData(data);
+      }
     } catch (err: any) {
       console.error('Erro ao gerar depósito:', err);
       setError(err.message || "Erro ao gerar cobrança PIX.");
@@ -853,7 +878,94 @@ const CheckInPage: React.FC = () => {
               </button>
             </header>
 
-            {!depositPaymentData ? (
+            {manualPixPayload ? (
+              // MANUAL PIX FLOW in deposit modal
+              <div className="space-y-6 animate-in zoom-in-95 duration-300">
+                {depositPending ? (
+                  <div className="text-center space-y-4 py-6">
+                    <div className="flex justify-center">
+                      <div className="w-16 h-16 bg-amber-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(251,191,36,0.4)] animate-pulse">
+                        <Clock className="w-8 h-8 text-black" />
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-black italic font-sport text-amber-400 uppercase">Aguardando Aprovação</h3>
+                    <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Seu pedido foi registrado!</p>
+                    <div className="p-4 bg-zinc-800/60 border border-zinc-700 rounded-2xl text-left space-y-2">
+                      <p className="text-zinc-400 text-xs">📋 Nossa equipe irá verificar e creditará seu saldo em breve.</p>
+                      <p className="text-zinc-400 text-xs">⏱️ Prazo médio: até 15 minutos em horário comercial.</p>
+                    </div>
+                    <button
+                      onClick={() => { setManualPixPayload(null); setDepositPending(false); setIsDepositModalOpen(false); }}
+                      className="w-full py-4 bg-zinc-800 text-zinc-400 rounded-2xl font-bold text-xs uppercase tracking-widest hover:text-white transition-all"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-center space-y-1">
+                      <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">Escaneie ou copie o código</p>
+                      <p className="text-2xl font-black text-white">R$ {parseFloat(depositAmount).toFixed(2).replace('.', ',')}</p>
+                    </div>
+
+                    <div className="bg-black border-2 border-zinc-800 p-6 rounded-[2rem] space-y-5">
+                      <div className="flex justify-center">
+                        <div className="bg-white p-4 rounded-2xl shadow-xl">
+                          <QRCodeSVG value={manualPixPayload} size={180} level="M" />
+                        </div>
+                      </div>
+
+                      {manualPixConfig?.recipientName && (
+                        <p className="text-zinc-500 text-[10px] text-center uppercase tracking-widest">
+                          Favorecido: <span className="text-white font-black">{manualPixConfig.recipientName}</span>
+                        </p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPix(manualPixPayload || '')}
+                        className="w-full py-4 bg-zinc-800 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 border border-zinc-700"
+                      >
+                        <Copy className="w-4 h-4" /> Copiar Código PIX
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!user?.id) return;
+                          try {
+                            await createDepositRequest(
+                              user.id,
+                              user.name,
+                              parseFloat(depositAmount),
+                              manualPixConfig?.pixKey || '',
+                              user.phone,
+                              'deposit'
+                            );
+                            setDepositPending(true);
+                          } catch (err: any) {
+                            alert('Erro ao registrar: ' + err.message);
+                          }
+                        }}
+                        className="w-full py-4 bg-lime-400 text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl shadow-lime-400/20"
+                      >
+                        <CheckCircle className="w-4 h-4" /> Já Paguei
+                      </button>
+                      <p className="text-zinc-600 text-[10px] text-center">
+                        Ao clicar em "Já Paguei", a equipe será notificada para aprovar seu depósito manualmente.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => { setManualPixPayload(null); setDepositPending(false); }}
+                      className="w-full text-[10px] font-black text-zinc-600 uppercase tracking-widest hover:text-white transition-colors"
+                    >
+                      Alterar Valor
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : !depositPaymentData ? (
               <form onSubmit={handleDepositRequest} className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Valor do Depósito (Mín. R$ {settings?.minDepositValue || 10})</label>
@@ -874,7 +986,9 @@ const CheckInPage: React.FC = () => {
                 <div className="p-4 bg-lime-400/5 border border-lime-400/20 rounded-2xl space-y-1">
                   <p className="text-[10px] font-black text-lime-400 uppercase tracking-widest">Informação</p>
                   <p className="text-[10px] text-zinc-400 font-medium">
-                    O saldo será creditado automaticamente após a confirmação do pagamento.
+                    {manualPixConfig?.enabled
+                      ? 'Gere o QR Code e pague. O saldo é creditado após aprovação manual da equipe.'
+                      : 'O saldo será creditado automaticamente após a confirmação do pagamento.'}
                   </p>
                 </div>
 

@@ -29,6 +29,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { path: '/admin/ranking', icon: Trophy, label: 'Ranking' },
     { path: '/admin/distribuicoes', icon: TrendingUp, label: 'Recompensas' },
     { path: '/admin/resgates', icon: DollarSign, label: 'Resgates' },
+    { path: '/admin/depositos', icon: DollarSign, label: 'Dep. Pendentes' },
     { path: '/admin/integracoes', icon: Puzzle, label: 'Integrações' },
     { path: '/admin/configuracoes', icon: SettingsIcon, label: 'Configurações' },
     { path: '/admin/perfil', icon: User, label: 'Meu Perfil' },

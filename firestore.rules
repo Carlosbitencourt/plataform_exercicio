@@ -67,5 +67,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // Deposit requests: authenticated users can create, admins manage
+    match /depositRequests/{requestId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
+    }
   }
 }

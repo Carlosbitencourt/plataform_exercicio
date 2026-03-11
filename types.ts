@@ -102,6 +102,20 @@ export interface Withdrawal {
   rejectionReason?: string;
 }
 
+export interface DepositRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userPhone?: string;
+  amount: number;
+  status: 'pendente' | 'aprovado' | 'rejeitado';
+  pixKey: string;
+  requestedAt: string;
+  processedAt?: string;
+  rejectionReason?: string;
+  source?: 'signup' | 'deposit'; // where the request came from
+}
+
 export interface Absence {
   id: string;
   userId: string;
@@ -134,6 +148,9 @@ export interface SystemSettings {
   absenceMessage?: string;
   checkInMessage?: string;
   lastUpdated?: string;
+  manualPixEnabled?: boolean;
+  manualPixKey?: string;
+  manualPixName?: string;
 }
 
 export interface Database {

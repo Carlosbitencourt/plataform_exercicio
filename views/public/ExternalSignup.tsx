@@ -2,16 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, UserStatus, SystemSettings } from '../../types';
 import { subscribeToSettings } from '../../services/db';
-import { Loader2, Check, User as UserIcon, Mail, Phone, MapPin, Camera, Zap, Copy, ExternalLink, QrCode, ArrowLeft, ArrowRight, UserPlus, Upload, Activity, CheckCircle2, CreditCard, RefreshCw } from 'lucide-react';
+import { Loader2, Check, User as UserIcon, Mail, Phone, MapPin, Camera, Zap, Copy, ExternalLink, QrCode, ArrowLeft, ArrowRight, UserPlus, Upload, Activity, CheckCircle2, CreditCard, RefreshCw, Clock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { generateSignupPix } from '../../services/abacatePay';
+import { generatePixPayload, createDepositRequest } from '../../services/manualPix';
 import { db } from '../../services/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { auth } from '../../services/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { addUser } from '../../services/db';
 import { safeUploadFile } from '../../services/firebaseGuard';
 import { sendWelcomeMessage } from '../../services/whatsapp';
+import { QRCodeSVG } from 'qrcode.react';
 
 const ExternalSignup: React.FC = () => {
     const navigate = useNavigate();
@@ -39,6 +41,9 @@ const ExternalSignup: React.FC = () => {
     const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
     const [paymentConfirmed, setPaymentConfirmed] = useState(false);
     const [balanceBeforePayment, setBalanceBeforePayment] = useState<number | null>(null);
+    const [manualPixConfig, setManualPixConfig] = useState<{ enabled: boolean; pixKey: string; recipientName: string } | null>(null);
+    const [manualPixPayload, setManualPixPayload] = useState<string | null>(null);
+    const [depositPending, setDepositPending] = useState(false); // waiting for admin approval
     const [formData, setFormData] = useState(() => {
         const saved = localStorage.getItem('signup_formData');
         return saved ? JSON.parse(saved) : {
@@ -75,6 +80,21 @@ const ExternalSignup: React.FC = () => {
             if (data) setSystemSettings(data);
         });
         return () => unsubscribe();
+    }, []);
+
+    // Load integrations config (manual PIX)
+    React.useEffect(() => {
+        const load = async () => {
+            try {
+                const snap = await getDoc(doc(db, 'settings', 'integrations'));
+                if (snap.exists() && snap.data().manualPix?.enabled) {
+                    setManualPixConfig(snap.data().manualPix);
+                }
+            } catch (e) {
+                console.error('Failed to load integrations config', e);
+            }
+        };
+        load();
     }, []);
 
     // Persist signup state
@@ -394,33 +414,42 @@ const ExternalSignup: React.FC = () => {
 
             setGeneratedId(uniqueCode);
 
-            // 2. Gerar Cobrança no AbacatePay
-            try {
-                const pixName = (formData.name || currentUser?.displayName || '').trim();
-                const pixEmail = (formData.email || currentUser?.email || '').trim();
+            // 2. Gerar pagamento
+            if (manualPixConfig?.enabled && manualPixConfig.pixKey) {
+                // MANUAL PIX: gerar payload localmente, sem AbacatePay
+                const payload = generatePixPayload(
+                    manualPixConfig.pixKey,
+                    manualPixConfig.recipientName || 'FAVORECIDO',
+                    numericAmount
+                );
+                setManualPixPayload(payload);
+                console.log('SIGNUP: PIX Manual gerado localmente');
+            } else {
+                // ABACATEPAY: gerar via cloud function
+                try {
+                    const pixName = (formData.name || currentUser?.displayName || '').trim();
+                    const pixEmail = (formData.email || currentUser?.email || '').trim();
 
-                if (!pixName || !pixEmail) {
-                    throw new Error("Nome e e-mail são obrigatórios para gerar o PIX. Volte e preencha seus dados.");
+                    if (!pixName || !pixEmail) {
+                        throw new Error("Nome e e-mail são obrigatórios para gerar o PIX. Volte e preencha seus dados.");
+                    }
+
+                    console.log("SIGNUP: Iniciando geração de PIX para", pixName);
+                    const billing = await generateSignupPix({
+                        name: pixName,
+                        email: pixEmail,
+                        phone: formData.phone || '',
+                        cpf: formData.cpf || '',
+                        amount: numericAmount
+                    });
+                    console.log("SIGNUP: PIX gerado com sucesso:", billing);
+                    setPaymentData(billing);
+                } catch (payError: any) {
+                    console.error("SIGNUP: Erro ao gerar pagamento:", payError);
+                    alert("Erro ao gerar PIX: " + (payError.message || "Verifique as configurações do AbacatePay no Admin."));
+                    setLoading(false);
+                    return;
                 }
-
-                console.log("SIGNUP: Iniciando geração de PIX para", pixName);
-                const billing = await generateSignupPix({
-                    name: pixName,
-                    email: pixEmail,
-                    phone: formData.phone || '',
-                    cpf: formData.cpf || '',
-                    amount: numericAmount
-                });
-                console.log("SIGNUP: PIX gerado com sucesso:", billing);
-                setPaymentData(billing);
-            } catch (payError: any) {
-                console.error("SIGNUP: Erro ao gerar pagamento:", payError);
-                // Mostrar erro específico para o usuário para não parecer que "não aconteceu nada"
-                alert("Erro ao gerar PIX: " + (payError.message || "Verifique as configurações do AbacatePay no Admin."));
-                // Se o pagamento falhar, talvez queiramos interromper ou permitir que o usuário tente novamente
-                // Por enquanto, vamos parar o loading para que ele possa clicar de novo.
-                setLoading(false);
-                return;
             }
 
             // Enviar mensagem de boas-vindas via WhatsApp
@@ -649,8 +678,104 @@ const ExternalSignup: React.FC = () => {
                                                 </button>
                                             </div>
                                         </div>
+                                    ) : manualPixPayload ? (
+                                        // MANUAL PIX FLOW
+                                        depositPending ? (
+                                            // Aguardando aprovação do admin
+                                            <div className="space-y-6 text-center py-10 animate-in zoom-in-95 duration-500">
+                                                <div className="flex justify-center">
+                                                    <div className="w-20 h-20 bg-amber-400 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(251,191,36,0.4)] animate-pulse">
+                                                        <Clock className="w-10 h-10 text-black" />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <h2 className="text-xl font-black italic font-sport uppercase text-amber-400">Aguardando Aprovação</h2>
+                                                    <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Seu comprovante foi registrado!</p>
+                                                </div>
+                                                <div className="p-5 bg-zinc-800/60 border border-zinc-700 rounded-2xl text-left space-y-3">
+                                                    <p className="text-zinc-400 text-xs leading-relaxed">
+                                                        📋 Nossa equipe irá verificar o pagamento e liberar seu acesso em breve.
+                                                    </p>
+                                                    <p className="text-zinc-400 text-xs leading-relaxed">
+                                                        ⏱️ Tempo médio de aprovação: até 15 minutos durante horário comercial.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            // QR Code local
+                                            <div className="space-y-6">
+                                                <div className="space-y-1 text-center">
+                                                    <h2 className="text-xl font-black italic font-sport uppercase text-lime-400">Pagamento PIX</h2>
+                                                    <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">Escaneie o QR Code ou copie o código</p>
+                                                    <p className="text-3xl font-black text-white">
+                                                        R$ {parseFloat(String(formData.depositedValue || '0').replace(',', '.')).toFixed(2).replace('.', ',')}
+                                                    </p>
+                                                </div>
+
+                                                <div className="bg-black border-2 border-zinc-800 p-6 rounded-[2rem] space-y-5">
+                                                    <div className="flex justify-center">
+                                                        <div className="bg-white p-4 rounded-2xl shadow-xl">
+                                                            <QRCodeSVG value={manualPixPayload} size={180} level="M" />
+                                                        </div>
+                                                    </div>
+
+                                                    {manualPixConfig?.recipientName && (
+                                                        <p className="text-zinc-500 text-[10px] text-center uppercase tracking-widest">
+                                                            Favorecido: <span className="text-white font-black">{manualPixConfig.recipientName}</span>
+                                                        </p>
+                                                    )}
+
+                                                    <button
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(manualPixPayload || '');
+                                                            setCopied(true);
+                                                            setTimeout(() => setCopied(false), 2000);
+                                                        }}
+                                                        className="w-full py-4 bg-zinc-800 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-700 flex items-center justify-center gap-2 transition-all"
+                                                    >
+                                                        {copied ? <Check className="w-4 h-4 text-lime-400" /> : <Copy className="w-4 h-4" />}
+                                                        {copied ? 'Copiado!' : 'Copiar Código PIX'}
+                                                    </button>
+
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!currentUser?.uid) return;
+                                                            const amount = parseFloat(String(formData.depositedValue || '0').replace(',', '.'));
+                                                            try {
+                                                                await createDepositRequest(
+                                                                    currentUser.uid,
+                                                                    formData.name || currentUser.displayName || 'Atleta',
+                                                                    amount,
+                                                                    manualPixConfig?.pixKey || '',
+                                                                    formData.phone,
+                                                                    'signup'
+                                                                );
+                                                                setDepositPending(true);
+                                                            } catch (err: any) {
+                                                                alert('Erro ao registrar: ' + err.message);
+                                                            }
+                                                        }}
+                                                        className="w-full py-4 bg-lime-400 text-black rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.03] active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <Check className="w-4 h-4" />
+                                                        Já Paguei
+                                                    </button>
+                                                    <p className="text-zinc-600 text-[10px] text-center">
+                                                        Ao clicar em "Já Paguei", sua solicitação será enviada para aprovação manual da equipe.
+                                                    </p>
+                                                </div>
+
+                                                <button
+                                                    onClick={resetRegistration}
+                                                    className="w-full py-3 border border-zinc-700 text-zinc-500 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:border-zinc-600 flex items-center justify-center gap-2 transition-all"
+                                                >
+                                                    <RefreshCw className="w-3.5 h-3.5" />
+                                                    Fazer novo cadastro do zero
+                                                </button>
+                                            </div>
+                                        )
                                     ) : paymentData ? (
-                                        // PAGAMENTO INLINE
+                                        // PAGAMENTO INLINE (AbacatePay)
                                         <div className="space-y-6">
                                             <div className="space-y-2 text-center">
                                                 <h2 className="text-xl font-black italic font-sport uppercase text-lime-400">Pagamento PIX</h2>

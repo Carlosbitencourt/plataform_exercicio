@@ -22,6 +22,7 @@ import Withdrawals from './views/admin/Withdrawals';
 import Integrations from './views/admin/Integrations';
 import Settings from './views/admin/Settings';
 import UnderAnalysis from './views/public/UnderAnalysis';
+import DepositRequests from './views/admin/DepositRequests';
 
 // Componente para proteger rotas administrativas
 const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -113,6 +114,12 @@ const App: React.FC = () => {
             <Route path="/admin/resgates" element={
               <ProtectedAdminRoute>
                 <Withdrawals />
+              </ProtectedAdminRoute>
+            } />
+
+            <Route path="/admin/depositos" element={
+              <ProtectedAdminRoute>
+                <DepositRequests />
               </ProtectedAdminRoute>
             } />
 

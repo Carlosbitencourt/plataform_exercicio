@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Puzzle, MessageCircle, CreditCard, ChevronRight, Save, ShieldCheck, Zap, Info, Bell, CheckCircle2, Activity, Globe, Send, Loader2 } from 'lucide-react';
+import { Puzzle, MessageCircle, CreditCard, ChevronRight, Save, ShieldCheck, Zap, Info, Bell, CheckCircle2, Activity, Globe, Send, Loader2, QrCode, ToggleLeft, ToggleRight, Key } from 'lucide-react';
 import { db } from '../../services/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { sendWhatsAppMessage } from '../../services/whatsapp';
@@ -32,6 +32,12 @@ const Integrations: React.FC = () => {
         webhookToken: '••••••••••••••••'
     });
 
+    const [manualPixConfig, setManualPixConfig] = useState({
+        enabled: false,
+        pixKey: '',
+        recipientName: ''
+    });
+
     // Estados para o teste de WhatsApp
     const [testPhone, setTestPhone] = useState('');
     const [testMessage, setTestMessage] = useState('🚀 Teste de conectividade do Impulso Club! Se você recebeu esta mensagem, sua integração com WhatsApp está funcionando corretamente.');
@@ -48,6 +54,7 @@ const Integrations: React.FC = () => {
                     if (data.whatsapp) setWhatsappConfig(prev => ({ ...prev, ...data.whatsapp }));
                     if (data.abacate) setAbacateConfig(prev => ({ ...prev, ...data.abacate }));
                     if (data.asaas) setAsaasConfig(prev => ({ ...prev, ...data.asaas }));
+                    if (data.manualPix) setManualPixConfig(prev => ({ ...prev, ...data.manualPix }));
                 }
             } catch (error) {
                 console.error("Erro ao carregar configurações:", error);
@@ -63,6 +70,7 @@ const Integrations: React.FC = () => {
                 whatsapp: whatsappConfig,
                 abacate: abacateConfig,
                 asaas: asaasConfig,
+                manualPix: manualPixConfig,
                 updatedAt: new Date().toISOString()
             });
             setSuccess(true);
@@ -97,7 +105,7 @@ const Integrations: React.FC = () => {
             } else {
                 // Se result.error existir, pode ser um erro da API (401, 404, etc)
                 // Se não, pode ser um erro de rede/CORS que retornamos no catch do service
-                const errorMsg = result.error?.message || result.error || result.status || 'Erro desconhecido';
+                const errorMsg = result.error?.message || result.error || 'Erro desconhecido';
                 setTestResult({ success: false, message: `Erro ao enviar: ${errorMsg}` });
             }
         } catch (error: any) {
@@ -416,6 +424,80 @@ const Integrations: React.FC = () => {
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Card PIX Manual */}
+            <div className={`bg-white rounded-[2rem] border-4 shadow-2xl overflow-hidden transition-all ${manualPixConfig.enabled ? 'border-lime-400' : 'border-slate-200'}`}>
+                <div className="p-6 bg-slate-50 border-b-4 border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 shadow-lg transition-all ${manualPixConfig.enabled ? 'bg-lime-400 border-lime-500' : 'bg-slate-200 border-slate-300'}`}>
+                            <QrCode className={`w-6 h-6 ${manualPixConfig.enabled ? 'text-black' : 'text-slate-400'}`} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-black italic uppercase font-sport text-slate-900 tracking-wider">PIX Manual</h3>
+                            <p className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full inline-block ${manualPixConfig.enabled ? 'text-black bg-lime-400' : 'text-slate-400 bg-slate-100'
+                                }`}>{manualPixConfig.enabled ? 'ATIVO — AbacatePay desativado' : 'Inativo'}</p>
+                        </div>
+                    </div>
+
+                    {/* Toggle */}
+                    <button
+                        onClick={() => setManualPixConfig(prev => ({ ...prev, enabled: !prev.enabled }))}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${manualPixConfig.enabled
+                            ? 'bg-lime-400 text-black hover:bg-lime-300'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            }`}
+                    >
+                        {manualPixConfig.enabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                        {manualPixConfig.enabled ? 'Ativo' : 'Inativo'}
+                    </button>
+                </div>
+
+                <div className="p-8 space-y-5">
+                    {manualPixConfig.enabled && (
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+                            <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-[9px] text-amber-700 font-bold leading-relaxed uppercase tracking-tight">
+                                Modo Manual ativo. O AbacatePay está desativado. Os depósitos precisarão de aprovação manual no painel Admin → Depósitos Pendentes.
+                            </p>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Chave PIX do Favorecido</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
+                                className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-xs"
+                                value={manualPixConfig.pixKey}
+                                onChange={e => setManualPixConfig({ ...manualPixConfig, pixKey: e.target.value })}
+                            />
+                            <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Nome do Favorecido (aparece no QR Code)</label>
+                        <input
+                            type="text"
+                            placeholder="Ex: IMPULSO CLUB"
+                            className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 transition-all outline-none text-xs uppercase"
+                            value={manualPixConfig.recipientName}
+                            onChange={e => setManualPixConfig({ ...manualPixConfig, recipientName: e.target.value.toUpperCase() })}
+                        />
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Como funciona</p>
+                        <ul className="list-disc list-inside space-y-1">
+                            <li className="text-[9px] text-slate-600 font-bold">O QR Code é gerado localmente no browser com a chave e valor escolhidos</li>
+                            <li className="text-[9px] text-slate-600 font-bold">Ao clicar "Já Paguei", o sistema registra a solicitação como pendente</li>
+                            <li className="text-[9px] text-slate-600 font-bold">O admin aprova manualmente em Admin → Depósitos Pendentes</li>
+                            <li className="text-[9px] text-slate-600 font-bold">Somente após aprovação o crédito é adicionado ao usuário</li>
+                        </ul>
                     </div>
                 </div>
             </div>
