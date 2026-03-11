@@ -146,7 +146,8 @@ const CheckInPage: React.FC = () => {
 
   useEffect(() => {
     if (currentUser?.uid && users.length > 0) {
-      const foundUser = users.find(u => u.id === currentUser.uid);
+      const foundUser = users.find(u => u.id === currentUser.uid) || 
+                        users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
       if (foundUser) {
         if (foundUser.status !== UserStatus.ELIMINATED && foundUser.status !== 'eliminado') {
           syncUserAbsences(foundUser.id);
