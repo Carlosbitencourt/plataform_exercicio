@@ -14,10 +14,20 @@ import { generateSignupPix } from '../../services/abacatePay';
 const ExternalSignup: React.FC = () => {
     const navigate = useNavigate();
     const { currentUser, loading: authLoading } = useAuth();
-    const [step, setStep] = useState<'auth' | 'form'>(currentUser ? 'form' : 'auth');
-    const [currentSubStep, setCurrentSubStep] = useState(1);
-    const [generatedId, setGeneratedId] = useState('');
-    const [paymentData, setPaymentData] = useState<any>(null);
+    const [step, setStep] = useState<'auth' | 'form'>(() => {
+        const saved = localStorage.getItem('signup_step');
+        if (saved) return saved as 'auth' | 'form';
+        return currentUser ? 'form' : 'auth';
+    });
+    const [currentSubStep, setCurrentSubStep] = useState(() => {
+        const saved = localStorage.getItem('signup_currentSubStep');
+        return saved ? parseInt(saved) : 1;
+    });
+    const [generatedId, setGeneratedId] = useState(() => localStorage.getItem('signup_generatedId') || '');
+    const [paymentData, setPaymentData] = useState<any>(() => {
+        const saved = localStorage.getItem('signup_paymentData');
+        return saved ? JSON.parse(saved) : null;
+    });
     const [loading, setLoading] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -25,6 +35,7 @@ const ExternalSignup: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [error, setError] = useState<string | null>(null);
     const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+    const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
     // Efeito para preencher dados quando o usuário logar ou se já estiver logado
     React.useEffect(() => {
@@ -48,6 +59,45 @@ const ExternalSignup: React.FC = () => {
         return () => unsubscribe();
     }, []);
 
+    // Persist signup state
+    React.useEffect(() => {
+        localStorage.setItem('signup_step', step);
+        localStorage.setItem('signup_currentSubStep', String(currentSubStep));
+        localStorage.setItem('signup_generatedId', generatedId);
+        if (paymentData) {
+            localStorage.setItem('signup_paymentData', JSON.stringify(paymentData));
+        } else {
+            localStorage.removeItem('signup_paymentData');
+        }
+        localStorage.setItem('signup_formData', JSON.stringify(formData));
+    }, [step, currentSubStep, generatedId, paymentData, formData]);
+
+    // Monitor payment status via user balance/status in real-time
+    React.useEffect(() => {
+        if (!currentUser?.uid) return;
+
+        const { db } = require('../../services/firebase');
+        const { doc, onSnapshot } = require('firebase/firestore');
+
+        const unsub = onSnapshot(doc(db, 'users', currentUser.uid), (snap: any) => {
+            if (snap.exists()) {
+                const userData = snap.data();
+                // If status changed from 'analise' (PENDING) or balance is updated
+                if (userData.status === 'competicao' || (userData.balance > 30)) {
+                    setPaymentConfirmed(true);
+                    // Clear storage once confirmed
+                    localStorage.removeItem('signup_step');
+                    localStorage.removeItem('signup_currentSubStep');
+                    localStorage.removeItem('signup_generatedId');
+                    localStorage.removeItem('signup_paymentData');
+                    localStorage.removeItem('signup_formData');
+                }
+            }
+        });
+
+        return () => unsub();
+    }, [currentUser]);
+
     const maskPhone = (value: string) => {
         return value
             .replace(/\D/g, '')
@@ -65,18 +115,6 @@ const ExternalSignup: React.FC = () => {
             .replace(/(-\d{2})\d+?$/, '$1');
     };
 
-    const [formData, setFormData] = useState({
-        name: '',
-        phone: '',
-        email: '',
-        street: '',
-        neighborhood: '',
-        city: '',
-        depositedValue: 30,
-        pixKey: '',
-        cpf: '',
-        photoUrl: ''
-    });
 
     const generateUniqueCode = () => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -512,7 +550,31 @@ const ExternalSignup: React.FC = () => {
                             {/* STEP 3: INVESTIMENTO E PERFIL / PAYMENT */}
                             {currentSubStep === 3 && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                                    {paymentData ? (
+                                    {paymentConfirmed ? (
+                                        <div className="space-y-6 text-center py-10 animate-in zoom-in-95 duration-500">
+                                            <div className="flex justify-center">
+                                                <div className="w-20 h-20 bg-lime-400 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(163,230,53,0.4)]">
+                                                    <Check className="w-10 h-10 text-black stroke-[4px]" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <h2 className="text-2xl font-black italic font-sport uppercase text-lime-400">Inscrição Confirmada!</h2>
+                                                <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Parabéns Atleta! Seu acesso foi liberado.</p>
+                                            </div>
+                                            <div className="p-6 bg-zinc-800/50 border border-zinc-700 rounded-[2rem] space-y-4">
+                                                <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest">Seu ID de Atleta</p>
+                                                <div className="text-4xl font-black italic font-sport tracking-tighter text-white">
+                                                    {generatedId}
+                                                </div>
+                                                <button
+                                                    onClick={() => navigate('/')}
+                                                    className="w-full py-4 bg-lime-400 text-black rounded-xl font-black uppercase tracking-widest text-xs hover:scale-[1.03] active:scale-95 transition-all"
+                                                >
+                                                    Ir para o Dashboard
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : paymentData ? (
                                         // PAGAMENTO INLINE
                                         <div className="space-y-6">
                                             <div className="space-y-2 text-center">
