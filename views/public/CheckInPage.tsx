@@ -3,7 +3,7 @@ import { User, UserStatus, TimeSlot, CheckIn, Distribution, SystemSettings } fro
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToDistributions, subscribeToSettings } from '../../services/db';
 import { runWeeklyPenaltyCheck, syncUserAbsences, getEffectiveMonday } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
-import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell, Wallet, X } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell, Wallet, X, PlusCircle, Copy, ExternalLink } from 'lucide-react';
 import { sendCheckInConfirmation } from '../../services/whatsapp';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -39,6 +39,10 @@ const CheckInPage: React.FC = () => {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('10.00');
+  const [isGeneratingDeposit, setIsGeneratingDeposit] = useState(false);
+  const [depositPaymentData, setDepositPaymentData] = useState<any>(null);
 
   // Ranking Positions
   const [positions, setPositions] = useState({ daily: '-', weekly: '-', general: '-' });
@@ -335,6 +339,59 @@ const CheckInPage: React.FC = () => {
     }
   };
 
+  const handleDepositRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    const amount = parseFloat(depositAmount);
+    if (isNaN(amount) || amount < 10) {
+      alert("O valor mínimo para depósito é R$ 10,00.");
+      return;
+    }
+
+    setIsGeneratingDeposit(true);
+    setError(null);
+
+    try {
+      const { generateSignupPix } = await import('../../services/abacatePay');
+      const data = await generateSignupPix({
+        name: user.name,
+        email: user.email || '',
+        phone: user.phone || '',
+        cpf: user.cpf || '',
+        amount: amount
+      });
+      setDepositPaymentData(data);
+    } catch (err: any) {
+      console.error('Erro ao gerar depósito:', err);
+      setError(err.message || "Erro ao gerar cobrança PIX.");
+    } finally {
+      setIsGeneratingDeposit(false);
+    }
+  };
+
+  const handleCopyPix = async (payload: string) => {
+    try {
+      if (payload) {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(payload);
+        } else {
+          const textArea = document.createElement("textarea");
+          textArea.value = payload;
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+        }
+        alert("Código PIX copiado com sucesso!");
+      }
+    } catch (err) {
+      console.error('Falha ao copiar:', err);
+      alert("Erro ao copiar o código.");
+    }
+  };
+
   const userCheckIns = checkIns.filter(c => c.userId === user?.id).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const todayChecked = user?.id ? checkIns.some(c => c.userId === user.id && c.date === getTodayISO()) : false;
 
@@ -403,13 +460,25 @@ const CheckInPage: React.FC = () => {
                 </span>
                 <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20 shadow-[0_0_15px_rgba(163,230,53,0.1)]">LIVE</span>
               </div>
-              <button
-                onClick={() => setIsWithdrawModalOpen(true)}
-                className="mt-2 py-2 px-4 bg-lime-400 text-black rounded-xl font-black uppercase tracking-widest text-[9px] hover:scale-[1.05] active:scale-95 transition-all shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 relative z-10 w-fit"
-              >
-                <Wallet className="w-3.5 h-3.5" />
-                Resgatar Saldo
-              </button>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <button
+                  onClick={() => setIsWithdrawModalOpen(true)}
+                  className="py-2 px-4 bg-lime-400 text-black rounded-xl font-black uppercase tracking-widest text-[9px] hover:scale-[1.05] active:scale-95 transition-all shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 relative z-10 w-fit"
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  Resgatar Saldo
+                </button>
+                <button
+                  onClick={() => {
+                    setDepositPaymentData(null);
+                    setIsDepositModalOpen(true);
+                  }}
+                  className="py-2 px-4 bg-zinc-800 text-white border border-zinc-700 rounded-xl font-black uppercase tracking-widest text-[9px] hover:scale-[1.05] active:scale-95 transition-all flex items-center justify-center gap-2 relative z-10 w-fit"
+                >
+                  <PlusCircle className="w-3.5 h-3.5 text-lime-400" />
+                  Adicionar Saldo
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-2">
@@ -653,9 +722,9 @@ const CheckInPage: React.FC = () => {
 
       {/* Withdrawal Modal */}
       {isWithdrawModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center animate-in fade-in duration-300 p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center animate-in fade-in duration-300 p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsWithdrawModalOpen(false)}></div>
-          <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 space-y-8 animate-in slide-in-from-bottom-full duration-500 mb-20 shadow-2xl">
+          <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl overflow-y-auto max-h-[90vh]">
             <header className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter">Resgatar Saldo</h2>
@@ -710,6 +779,110 @@ const CheckInPage: React.FC = () => {
                 {isSubmittingWithdraw ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Solicitação'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Deposit Modal */}
+      {isDepositModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center animate-in fade-in duration-300 p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsDepositModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <header className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black italic font-sport text-white uppercase tracking-tighter">Adicionar Saldo</h2>
+                <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Depósito via PIX</p>
+              </div>
+              <button
+                onClick={() => setIsDepositModalOpen(false)}
+                className="p-3 bg-zinc-800 text-zinc-400 rounded-2xl hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </header>
+
+            {!depositPaymentData ? (
+              <form onSubmit={handleDepositRequest} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Valor do Depósito (Mín. R$ 10)</label>
+                  <div className="relative">
+                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">R$</span>
+                    <input
+                      required
+                      type="number"
+                      step="0.01"
+                      min="10"
+                      placeholder="10,00"
+                      className="w-full pl-14 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all"
+                      value={depositAmount}
+                      onChange={e => setDepositAmount(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 bg-lime-400/5 border border-lime-400/20 rounded-2xl space-y-1">
+                  <p className="text-[10px] font-black text-lime-400 uppercase tracking-widest">Informação</p>
+                  <p className="text-[10px] text-zinc-400 font-medium">
+                    O saldo será creditado automaticamente após a confirmação do pagamento.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isGeneratingDeposit}
+                  className="w-full py-5 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-lime-400/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isGeneratingDeposit ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Gerar QR Code PIX'}
+                </button>
+              </form>
+            ) : (
+              <div className="space-y-6 animate-in zoom-in-95 duration-300">
+                <div className="bg-black border-2 border-zinc-800 p-6 rounded-[2rem] space-y-6">
+                  {depositPaymentData?.pix?.qrcode ? (
+                    <div className="bg-white p-4 rounded-2xl mx-auto w-48 h-48 shadow-xl">
+                      <img src={depositPaymentData.pix.qrcode} alt="QR Code PIX" className="w-full h-full" />
+                    </div>
+                  ) : (
+                    <div className="py-8 text-zinc-600 italic text-xs text-center flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Gerando QR Code...
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPix(depositPaymentData.pix.payload)}
+                      className="w-full py-5 bg-zinc-800 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 border border-zinc-700"
+                    >
+                      <Copy className="w-4 h-4" /> Copiar Código PIX
+                    </button>
+
+                    {depositPaymentData?.url && (
+                      <a
+                        href={depositPaymentData.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-5 bg-lime-400/5 text-lime-400 border border-lime-400/20 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-lime-400/10 transition-all flex items-center justify-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" /> Abrir no Navegador
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-zinc-800/50 border border-zinc-800 rounded-2xl text-center">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase leading-relaxed">
+                    Pagamento via PIX • R$ {parseFloat(depositAmount).toFixed(2)}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setDepositPaymentData(null)}
+                  className="w-full text-[10px] font-black text-zinc-600 uppercase tracking-widest hover:text-white transition-colors"
+                >
+                  Alterar Valor
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
