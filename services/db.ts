@@ -42,6 +42,9 @@ export const subscribeToUsers = (callback: (users: User[]) => void) => {
     return onSnapshot(q, (snapshot) => {
         const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         callback(users);
+    }, (error) => {
+        console.error("Error subscribing to users:", error);
+        callback([]);
     });
 };
 
@@ -95,6 +98,9 @@ export const subscribeToTimeSlots = (callback: (slots: TimeSlot[]) => void) => {
     return onSnapshot(q, (snapshot) => {
         const slots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TimeSlot));
         callback(slots);
+    }, (error) => {
+        console.error("Error subscribing to time slots:", error);
+        callback([]);
     });
 };
 
@@ -120,6 +126,9 @@ export const subscribeToCheckIns = (callback: (checkIns: CheckIn[]) => void) => 
     return onSnapshot(q, (snapshot) => {
         const checkIns = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CheckIn));
         callback(checkIns);
+    }, (error) => {
+        console.error("Error subscribing to check-ins:", error);
+        callback([]);
     });
 };
 
@@ -148,16 +157,22 @@ export const registerCheckIn = async (checkIn: Omit<CheckIn, 'id'>) => {
 export const subscribeToPenalties = (callback: (data: Penalty[]) => void) => {
     const q = query(collection(db, PENALTIES_COLLECTION), orderBy('date', 'desc'));
     return onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Penalty));
-        callback(data);
+        const penalties = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Penalty));
+        callback(penalties);
+    }, (error) => {
+        console.error("Error subscribing to penalties:", error);
+        callback([]);
     });
 };
 
 export const subscribeToAbsences = (callback: (data: Absence[]) => void) => {
     const q = query(collection(db, ABSENCES_COLLECTION), orderBy('date', 'desc'));
     return onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Absence));
-        callback(data);
+        const absences = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Absence));
+        callback(absences);
+    }, (error) => {
+        console.error("Error subscribing to absences:", error);
+        callback([]);
     });
 };
 
@@ -240,6 +255,9 @@ export const subscribeToDistributions = (callback: (distributions: Distribution[
     return onSnapshot(q, (snapshot) => {
         const distributions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Distribution));
         callback(distributions);
+    }, (error) => {
+        console.error("Error subscribing to distributions:", error);
+        callback([]);
     });
 };
 
@@ -297,6 +315,9 @@ export const getTodayActiveQRCode = (callback: (qr: QRCodeData | null) => void) 
         } else {
             callback(null);
         }
+    }, (error) => {
+        console.error("Error subscribing to active QR code:", error);
+        callback(null);
     });
 };
 
@@ -331,6 +352,9 @@ export const subscribeToCategories = (callback: (categories: Category[]) => void
     return onSnapshot(q, (snapshot) => {
         const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
         callback(categories);
+    }, (error) => {
+        console.error("Error subscribing to categories:", error);
+        callback([]);
     });
 };
 
@@ -404,6 +428,9 @@ export const subscribeToNotifications = (userId: string, callback: (notification
     return onSnapshot(q, (snapshot) => {
         const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
         callback(notifications);
+    }, (error) => {
+        console.error("Error subscribing to notifications:", error);
+        callback([]);
     });
 };
 

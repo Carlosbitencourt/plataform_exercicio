@@ -129,6 +129,7 @@ export interface Notification {
 export interface SystemSettings {
   id: string;
   dailyLossAmount: number;
+  minDepositValue?: number;
   welcomeMessage?: string;
   absenceMessage?: string;
   checkInMessage?: string;

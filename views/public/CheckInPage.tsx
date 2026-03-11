@@ -3,6 +3,8 @@ import { User, UserStatus, TimeSlot, CheckIn, Distribution, SystemSettings } fro
 import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToDistributions, subscribeToSettings } from '../../services/db';
 import { runWeeklyPenaltyCheck, syncUserAbsences, getEffectiveMonday } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
+import { db } from '../../services/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { Clock, AlertCircle, CheckCircle, MapPin, Star, Camera, Loader2, Zap, ArrowRight, History, Award, Navigation, Trophy, Bell, Wallet, X, PlusCircle, Copy, ExternalLink } from 'lucide-react';
 import { sendCheckInConfirmation } from '../../services/whatsapp';
 import { useAuth } from '../../contexts/AuthContext';
@@ -62,6 +64,19 @@ const CheckInPage: React.FC = () => {
     const unsubDist = subscribeToDistributions(setDistributions);
     const unsubSettings = subscribeToSettings(setSettings);
 
+    // Direct subscription to personal user document for immediate updates
+    let unsubUserDoc = () => { };
+    if (currentUser?.uid) {
+      unsubUserDoc = onSnapshot(doc(db, 'users', currentUser.uid), (snap: any) => {
+        if (snap.exists()) {
+          const userData = { id: snap.id, ...snap.data() } as User;
+          setUser(userData);
+        }
+      }, (error: any) => {
+        console.error("Error subscribing to personal user doc:", error);
+      });
+    }
+
     // Initial Permission Check
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions.query({ name: 'geolocation' as PermissionName })
@@ -79,6 +94,7 @@ const CheckInPage: React.FC = () => {
       unsubCheckIns();
       unsubDist();
       unsubSettings();
+      unsubUserDoc();
     };
   }, []);
 
@@ -100,7 +116,7 @@ const CheckInPage: React.FC = () => {
         alert("Pagamento confirmado! Seu saldo foi atualizado.");
         setIsDepositModalOpen(false);
         setDepositPaymentData(null);
-        setDepositAmount('10.00');
+        setDepositAmount((settings?.minDepositValue || 10).toFixed(2));
       }
     }
     if (user) {
@@ -113,7 +129,6 @@ const CheckInPage: React.FC = () => {
       const foundUser = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
       if (foundUser) {
         if (foundUser.status !== UserStatus.ELIMINATED && foundUser.status !== 'eliminado') {
-          setUser(foundUser);
           syncUserAbsences(foundUser.id);
 
           // Calculate Positions
@@ -133,6 +148,7 @@ const CheckInPage: React.FC = () => {
           const weeklyRank = users
             .map(u => {
               const uCheckIns = checkIns.filter(c => {
+                if (!c || !c.date) return false; // Defensive check
                 const [y, m, d] = c.date.split('-').map(Number);
                 const cDate = new Date(y, m - 1, d);
                 return u.id === c.userId && cDate >= startOfWeek;
@@ -339,7 +355,7 @@ const CheckInPage: React.FC = () => {
   const handleWithdrawalRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    const amount = parseFloat(withdrawAmount);
+    const amount = parseFloat(withdrawAmount.replace(',', '.'));
     if (isNaN(amount) || amount <= 0) {
       alert("Por favor, insira um valor válido.");
       return;
@@ -372,17 +388,26 @@ const CheckInPage: React.FC = () => {
     e.preventDefault();
     if (!user) return;
 
-    const amount = parseFloat(depositAmount);
-    if (isNaN(amount) || amount < 10) {
-      alert("O valor mínimo para depósito é R$ 10,00.");
+    const minVal = settings?.minDepositValue || 10;
+    const amount = parseFloat(depositAmount.replace(',', '.'));
+    if (isNaN(amount) || amount < minVal) {
+      alert(`O valor mínimo para depósito é R$ ${minVal.toFixed(2).replace('.', ',')}.`);
       return;
     }
 
     setIsGeneratingDeposit(true);
     setError(null);
 
+    console.log('DEBUG: Iniciando geração de PIX para depositAmount:', depositAmount);
     try {
       const { generateSignupPix } = await import('../../services/abacatePay');
+      console.log('DEBUG: Chamando generateSignupPix com payload:', {
+        name: user.name,
+        email: user.email || '',
+        phone: user.phone || '',
+        cpf: user.cpf || '',
+        amount: amount
+      });
       const data = await generateSignupPix({
         name: user.name,
         email: user.email || '',
@@ -390,6 +415,7 @@ const CheckInPage: React.FC = () => {
         cpf: user.cpf || '',
         amount: amount
       });
+      console.log('DEBUG: Resposta AbacatePay:', data);
       setDepositPaymentData(data);
     } catch (err: any) {
       console.error('Erro ao gerar depósito:', err);
@@ -421,7 +447,7 @@ const CheckInPage: React.FC = () => {
     }
   };
 
-  const userCheckIns = checkIns.filter(c => c.userId === user?.id).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const userCheckIns = checkIns.filter(c => c && c.userId === user?.id).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const todayChecked = user?.id ? checkIns.some(c => c.userId === user.id && c.date === getTodayISO()) : false;
 
   if (success) {
@@ -781,14 +807,12 @@ const CheckInPage: React.FC = () => {
                   <span className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">R$</span>
                   <input
                     required
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max={user?.balance || 0}
+                    type="text"
+                    inputMode="decimal"
                     placeholder="0,00"
                     className="w-full pl-14 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all"
                     value={withdrawAmount}
-                    onChange={e => setWithdrawAmount(e.target.value)}
+                    onChange={e => setWithdrawAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
                   />
                 </div>
               </div>
@@ -814,7 +838,7 @@ const CheckInPage: React.FC = () => {
       {/* Deposit Modal */}
       {isDepositModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center animate-in fade-in duration-300 p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsDepositModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
           <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl overflow-y-auto max-h-[90vh]">
             <header className="flex items-center justify-between">
               <div>
@@ -832,18 +856,17 @@ const CheckInPage: React.FC = () => {
             {!depositPaymentData ? (
               <form onSubmit={handleDepositRequest} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Valor do Depósito (Mín. R$ 10)</label>
+                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Valor do Depósito (Mín. R$ {settings?.minDepositValue || 10})</label>
                   <div className="relative">
                     <span className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">R$</span>
                     <input
                       required
-                      type="number"
-                      step="0.01"
-                      min="10"
-                      placeholder="10,00"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder={(settings?.minDepositValue || 10).toFixed(2).replace('.', ',')}
                       className="w-full pl-14 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all"
                       value={depositAmount}
-                      onChange={e => setDepositAmount(e.target.value)}
+                      onChange={e => setDepositAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
                     />
                   </div>
                 </div>
@@ -854,6 +877,13 @@ const CheckInPage: React.FC = () => {
                     O saldo será creditado automaticamente após a confirmação do pagamento.
                   </p>
                 </div>
+
+                {error && (
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+                    <p className="text-xs text-red-400 font-medium">{error}</p>
+                  </div>
+                )}
 
                 <button
                   type="submit"
@@ -870,22 +900,35 @@ const CheckInPage: React.FC = () => {
                     <div className="bg-white p-4 rounded-2xl mx-auto w-48 h-48 shadow-xl">
                       <img src={depositPaymentData.pix.qrcode} alt="QR Code PIX" className="w-full h-full" />
                     </div>
+                  ) : depositPaymentData?.url ? (
+                    <div className="space-y-4">
+                      <p className="text-zinc-500 text-xs text-center border p-4 border-zinc-700/50 rounded-xl bg-zinc-800/30">
+                        Para realizar seu depósito, clique no botão abaixo e acesse a área segura do AbacatePay.
+                      </p>
+                      <a href={depositPaymentData.url} target="_blank" rel="noopener noreferrer" className="block w-full py-4 bg-lime-400 text-black text-center font-black rounded-xl uppercase hover:scale-[1.03] active:scale-95 transition-all shadow-xl shadow-lime-400/20">
+                        Pagar Pix no Navegador
+                      </a>
+                    </div>
                   ) : (
                     <div className="py-8 text-zinc-600 italic text-xs text-center flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Gerando QR Code...
+                      <Loader2 className="w-4 h-4 animate-spin" /> Gerando Pagamento...
                     </div>
                   )}
 
-                  <div className="space-y-3">
-                    <button
-                      type="button"
-                      onClick={() => handleCopyPix(depositPaymentData.pix.payload)}
-                      className="w-full py-5 bg-zinc-800 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 border border-zinc-700"
-                    >
-                      <Copy className="w-4 h-4" /> Copiar Código PIX
-                    </button>
+                  {depositPaymentData?.pix?.payload && (
+                    <div className="space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPix(depositPaymentData.pix!.payload)}
+                        className="w-full py-5 bg-zinc-800 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 border border-zinc-700"
+                      >
+                        <Copy className="w-4 h-4" /> Copiar Código PIX
+                      </button>
+                    </div>
+                  )}
 
-                    {depositPaymentData?.url && (
+                  {depositPaymentData?.url && depositPaymentData?.pix?.qrcode && (
+                    <div className="mt-4 border-t border-zinc-800 pt-4 space-y-3">
                       <a
                         href={depositPaymentData.url}
                         target="_blank"
@@ -894,8 +937,8 @@ const CheckInPage: React.FC = () => {
                       >
                         <ExternalLink className="w-4 h-4" /> Abrir no Navegador
                       </a>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-4 bg-zinc-800/50 border border-zinc-800 rounded-2xl text-center">

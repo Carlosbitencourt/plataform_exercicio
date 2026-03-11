@@ -21,7 +21,7 @@ export interface AbacateProduct {
     externalId: string;
     name: string;
     quantity: number;
-    priceUnit: number; // In cents
+    price: number; // In cents
 }
 
 export interface AbacateBillingRequest {

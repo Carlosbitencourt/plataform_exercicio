@@ -1,15 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Camera, Loader2, User as UserIcon, Phone, CreditCard, MapPin, Upload, UserPlus, ArrowRight, ArrowLeft, CheckCircle2, Activity, QrCode, Copy, ExternalLink, Mail, Check } from 'lucide-react';
-import { addUser } from '../../services/db';
-import { safeUploadFile } from '../../services/firebaseGuard';
+import { User, UserStatus, SystemSettings } from '../../types';
+import { subscribeToSettings } from '../../services/db';
+import { Loader2, Check, User as UserIcon, Mail, Phone, MapPin, Camera, Zap, Copy, ExternalLink, QrCode, ArrowLeft, ArrowRight, UserPlus, Upload, Activity, CheckCircle2, CreditCard, RefreshCw } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { generateSignupPix } from '../../services/abacatePay';
+import { db } from '../../services/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth } from '../../services/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { useAuth } from '../../contexts/AuthContext';
+import { addUser } from '../../services/db';
+import { safeUploadFile } from '../../services/firebaseGuard';
 import { sendWelcomeMessage } from '../../services/whatsapp';
-import { subscribeToSettings } from '../../services/db';
-import { SystemSettings } from '../../types';
-import { generateSignupPix } from '../../services/abacatePay';
 
 const ExternalSignup: React.FC = () => {
     const navigate = useNavigate();
@@ -36,6 +38,22 @@ const ExternalSignup: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
     const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+    const [balanceBeforePayment, setBalanceBeforePayment] = useState<number | null>(null);
+    const [formData, setFormData] = useState(() => {
+        const saved = localStorage.getItem('signup_formData');
+        return saved ? JSON.parse(saved) : {
+            name: '',
+            email: '',
+            phone: '',
+            cpf: '',
+            street: '',
+            neighborhood: '',
+            city: '',
+            photoUrl: '',
+            pixKey: '',
+            depositedValue: ''
+        };
+    });
 
     // Efeito para preencher dados quando o usuário logar ou se já estiver logado
     React.useEffect(() => {
@@ -72,31 +90,40 @@ const ExternalSignup: React.FC = () => {
         localStorage.setItem('signup_formData', JSON.stringify(formData));
     }, [step, currentSubStep, generatedId, paymentData, formData]);
 
-    // Monitor payment status via user balance/status in real-time
+    // Monitor payment status via user BALANCE in real-time - only confirms when PIX is actually paid
     React.useEffect(() => {
-        if (!currentUser?.uid) return;
-
-        const { db } = require('../../services/firebase');
-        const { doc, onSnapshot } = require('firebase/firestore');
+        if (!currentUser?.uid || !paymentData) return; // Only listen if payment was generated
 
         const unsub = onSnapshot(doc(db, 'users', currentUser.uid), (snap: any) => {
             if (snap.exists()) {
                 const userData = snap.data();
-                // If status changed from 'analise' (PENDING) or balance is updated
-                if (userData.status === 'competicao' || (userData.balance > 30)) {
-                    setPaymentConfirmed(true);
-                    // Clear storage once confirmed
-                    localStorage.removeItem('signup_step');
-                    localStorage.removeItem('signup_currentSubStep');
-                    localStorage.removeItem('signup_generatedId');
-                    localStorage.removeItem('signup_paymentData');
-                    localStorage.removeItem('signup_formData');
-                }
+                const currentBalance = userData.balance || 0;
+
+                // Record the baseline balance on first read after PIX was generated
+                setBalanceBeforePayment(prev => {
+                    const baseline = prev !== null ? prev : currentBalance;
+
+                    // ONLY confirm when balance INCREASES beyond the baseline (new payment received)
+                    const depositedAmount = parseFloat(String(formData.depositedValue || '0').replace(',', '.'));
+                    const expectedIncrease = isNaN(depositedAmount) ? 1 : depositedAmount;
+
+                    if (currentBalance >= baseline + expectedIncrease * 0.9) {
+                        setPaymentConfirmed(true);
+                        // Clear storage once confirmed
+                        localStorage.removeItem('signup_step');
+                        localStorage.removeItem('signup_currentSubStep');
+                        localStorage.removeItem('signup_generatedId');
+                        localStorage.removeItem('signup_paymentData');
+                        localStorage.removeItem('signup_formData');
+                    }
+
+                    return baseline; // Keep tracking the same baseline
+                });
             }
         });
 
         return () => unsub();
-    }, [currentUser]);
+    }, [currentUser?.uid, paymentData]);
 
     const maskPhone = (value: string) => {
         return value
@@ -125,6 +152,36 @@ const ExternalSignup: React.FC = () => {
         return result;
     };
 
+    const resetRegistration = () => {
+        if (window.confirm("Tem certeza que deseja cancelar e iniciar um novo cadastro do zero?")) {
+            setPaymentData(null);
+            setCurrentSubStep(1);
+            setGeneratedId('');
+            setPaymentConfirmed(false);
+            setFormData({
+                name: currentUser?.displayName || '',
+                email: currentUser?.email || '',
+                phone: '',
+                cpf: '',
+                street: '',
+                neighborhood: '',
+                city: '',
+                photoUrl: '',
+                pixKey: '',
+                depositedValue: ''
+            });
+            setError(null);
+            setPhotoPreview(null);
+
+            // Clear all localStorage signup states
+            localStorage.removeItem('signup_step');
+            localStorage.removeItem('signup_currentSubStep');
+            localStorage.removeItem('signup_generatedId');
+            localStorage.removeItem('signup_paymentData');
+            localStorage.removeItem('signup_formData');
+        }
+    };
+
     const copyId = async () => {
         try {
             await navigator.clipboard.writeText(generatedId);
@@ -149,7 +206,7 @@ const ExternalSignup: React.FC = () => {
         // Upload
         setUploadingPhoto(true);
         try {
-            const url = await safeUploadFile(file, `profiles/external/${Date.now()}_${file.name}`);
+            const url = await safeUploadFile(file, `profiles / external / ${Date.now()}_${file.name} `);
             setFormData(prev => ({ ...prev, photoUrl: url }));
         } catch (error: any) {
             alert("Erro ao enviar foto: " + error.message);
@@ -310,6 +367,16 @@ const ExternalSignup: React.FC = () => {
             return;
         }
 
+        // Validate amount
+        const rawAmount = String(formData.depositedValue || '');
+        const numericAmount = parseFloat(rawAmount.replace(',', '.'));
+        const minVal = systemSettings?.minDepositValue || 30;
+
+        if (isNaN(numericAmount) || numericAmount < minVal) {
+            alert(`O valor do depósito deve ser pelo menos R$ ${minVal.toFixed(2).replace('.', ',')}`);
+            return;
+        }
+
         console.log("SIGNUP: Submitting form...", formData);
         setLoading(true);
         setError(null);
@@ -320,6 +387,7 @@ const ExternalSignup: React.FC = () => {
             // 1. Salvar usuário no Firestore com status 'analise'
             await addUser({
                 ...formData,
+                depositedValue: numericAmount,
                 uniqueCode,
                 status: 'analise' as any
             } as any, currentUser?.uid);
@@ -328,13 +396,20 @@ const ExternalSignup: React.FC = () => {
 
             // 2. Gerar Cobrança no AbacatePay
             try {
-                console.log("SIGNUP: Iniciando geração de PIX para", formData.name);
+                const pixName = (formData.name || currentUser?.displayName || '').trim();
+                const pixEmail = (formData.email || currentUser?.email || '').trim();
+
+                if (!pixName || !pixEmail) {
+                    throw new Error("Nome e e-mail são obrigatórios para gerar o PIX. Volte e preencha seus dados.");
+                }
+
+                console.log("SIGNUP: Iniciando geração de PIX para", pixName);
                 const billing = await generateSignupPix({
-                    name: formData.name,
-                    email: currentUser?.email || '',
-                    phone: formData.phone,
-                    cpf: formData.cpf,
-                    amount: formData.depositedValue
+                    name: pixName,
+                    email: pixEmail,
+                    phone: formData.phone || '',
+                    cpf: formData.cpf || '',
+                    amount: numericAmount
                 });
                 console.log("SIGNUP: PIX gerado com sucesso:", billing);
                 setPaymentData(billing);
@@ -393,7 +468,7 @@ const ExternalSignup: React.FC = () => {
                                     ? 'bg-lime-900/50 text-lime-400'
                                     : 'bg-zinc-800 text-zinc-600'
                                 }`}>
-                                {currentSubStep > s ? <CheckCircle2 className="w-4 h-4" /> : s}
+                                {currentSubStep > s ? <Check className="w-4 h-4" /> : s}
                             </div>
                             {s < 3 && (
                                 <div className={`h-1 flex-1 mx-2 rounded-full ${currentSubStep > s ? 'bg-lime-900/50' : 'bg-zinc-800'}`}>
@@ -579,7 +654,7 @@ const ExternalSignup: React.FC = () => {
                                         <div className="space-y-6">
                                             <div className="space-y-2 text-center">
                                                 <h2 className="text-xl font-black italic font-sport uppercase text-lime-400">Pagamento PIX</h2>
-                                                <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">Aguardando seu depósito de R$ {formData.depositedValue},00</p>
+                                                <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">Aguardando seu depósito de R$ {parseFloat(String(formData.depositedValue || '0').replace(',', '.')).toFixed(2).replace('.', ',')}</p>
                                             </div>
 
                                             <div className="bg-black border-2 border-zinc-800 p-6 rounded-[2rem] space-y-6">
@@ -587,38 +662,62 @@ const ExternalSignup: React.FC = () => {
                                                     <div className="bg-white p-4 rounded-2xl mx-auto w-40 h-40 shadow-xl">
                                                         <img src={paymentData.pix.qrcode} alt="QR Code PIX" className="w-full h-full" />
                                                     </div>
+                                                ) : paymentData?.url ? (
+                                                    <div className="space-y-4">
+                                                        <p className="text-zinc-500 text-xs text-center border p-4 border-zinc-700/50 rounded-xl bg-zinc-800/30">
+                                                            Para realizar seu depósito, clique no botão abaixo e acesse a área segura do AbacatePay.
+                                                        </p>
+                                                        <a href={paymentData.url} target="_blank" rel="noopener noreferrer" className="block w-full py-4 bg-lime-400 text-black text-center font-black rounded-xl uppercase hover:scale-[1.03] active:scale-95 transition-all">
+                                                            Pagar Pix no Navegador
+                                                        </a>
+                                                    </div>
                                                 ) : (
                                                     <div className="py-8 text-zinc-600 italic text-xs text-center flex items-center justify-center gap-2">
-                                                        <Loader2 className="w-4 h-4 animate-spin" /> Gerando QR Code...
+                                                        <Loader2 className="w-4 h-4 animate-spin" /> Gerando Pagamento...
                                                     </div>
                                                 )}
 
-                                                <div className="space-y-3">
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleCopyPix}
-                                                        className="w-full py-4 bg-zinc-800 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-zinc-700 transition-all flex items-center justify-center gap-2 border border-zinc-700"
-                                                    >
-                                                        <Copy className="w-4 h-4" /> Copiar Código PIX
-                                                    </button>
-
-                                                    {paymentData?.url && (
-                                                        <a
-                                                            href={paymentData.url}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="w-full py-4 bg-lime-400/5 text-lime-400 border border-lime-400/20 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-lime-400/10 transition-all flex items-center justify-center gap-2"
+                                                {paymentData?.pix?.payload && (
+                                                    <div className="space-y-3">
+                                                        <button
+                                                            onClick={handleCopyPix}
+                                                            className="w-full py-4 bg-zinc-800 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-700 flex items-center justify-center gap-2 transition-all"
                                                         >
-                                                            <ExternalLink className="w-4 h-4" /> Abrir no Navegador
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            </div>
+                                                            {copied ? <Check className="w-4 h-4 text-lime-400" /> : <Copy className="w-4 h-4" />}
+                                                            {copied ? 'Copiado!' : 'Copiar código PIX'}
+                                                        </button>
+                                                        <p className="text-zinc-600 text-[10px] text-center w-full px-4">
+                                                            Escaneie o QR Code ou copie a chave para realizar o depósito. O sistema identificará automaticamente.
+                                                        </p>
+                                                    </div>
+                                                )}
 
+                                                {paymentData?.url && paymentData?.pix?.qrcode && (
+                                                    <div className="mt-4 border-t border-zinc-800 pt-4">
+                                                        <button
+                                                            onClick={() => window.open(paymentData.url, '_blank')}
+                                                            className="w-full py-3 border border-lime-400/30 text-lime-400 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-lime-400/10 flex items-center justify-center gap-2 transition-all"
+                                                        >
+                                                            <ExternalLink className="w-4 h-4" />
+                                                            Abrir no navegador
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="p-4 bg-lime-400/5 border border-lime-400/20 rounded-2xl">
                                                 <p className="text-[10px] font-bold text-zinc-400 uppercase leading-relaxed text-center">
                                                     Escaneie o QR Code ou copie a chave para realizar o depósito. O sistema identificará automaticamente.
                                                 </p>
+                                            </div>
+
+                                            <div className="mt-6 flex justify-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={resetRegistration}
+                                                    className="text-[10px] font-black uppercase text-zinc-500 hover:text-white transition-colors tracking-widest flex items-center gap-2"
+                                                >
+                                                    <RefreshCw className="w-3 h-3" /> Fazer novo cadastro do zero
+                                                </button>
                                             </div>
                                         </div>
                                     ) : (
@@ -686,14 +785,19 @@ const ExternalSignup: React.FC = () => {
 
                                             <div className="space-y-6">
                                                 <div className="space-y-4">
-                                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block text-center">Valor do deposito</label>
-                                                    <div className="grid grid-cols-3 gap-3">
-                                                        {[30, 40, 50].map(value => (
+                                                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block text-center">Valor do deposito (Mín. R$ {systemSettings?.minDepositValue || 30})</label>
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {[
+                                                            systemSettings?.minDepositValue || 30,
+                                                            30,
+                                                            40,
+                                                            50
+                                                        ].reduce((acc, val) => acc.includes(val) ? acc : [...acc, val], [] as number[]).sort((a, b) => a - b).map(value => (
                                                             <button
                                                                 key={value}
                                                                 type="button"
-                                                                onClick={() => setFormData({ ...formData, depositedValue: value })}
-                                                                className={`py-3 rounded-xl font-black italic font-sport text-lg transition-all border-2 ${formData.depositedValue === value
+                                                                onClick={() => setFormData({ ...formData, depositedValue: String(value) })}
+                                                                className={`py-3 rounded-xl font-black italic font-sport text-sm transition-all border-2 ${formData.depositedValue === String(value)
                                                                     ? 'bg-lime-400 text-black border-lime-400 scale-[1.05] shadow-[0_0_20px_rgba(163,230,53,0.2)]'
                                                                     : 'bg-black text-zinc-700 border-zinc-800'
                                                                     }`}
@@ -701,6 +805,18 @@ const ExternalSignup: React.FC = () => {
                                                                 {value}
                                                             </button>
                                                         ))}
+                                                    </div>
+                                                    <div className="relative">
+                                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">R$</span>
+                                                        <input
+                                                            required
+                                                            type="text"
+                                                            inputMode="decimal"
+                                                            placeholder="Outro valor..."
+                                                            className="w-full pl-14 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold focus:border-lime-400 outline-none transition-all"
+                                                            value={formData.depositedValue}
+                                                            onChange={e => setFormData({ ...formData, depositedValue: e.target.value.replace(/[^0-9.,]/g, '') })}
+                                                        />
                                                     </div>
                                                 </div>
 
@@ -744,10 +860,10 @@ const ExternalSignup: React.FC = () => {
                                 ) : paymentData ? (
                                     <button
                                         type="button"
-                                        onClick={() => navigate(`/analise/${generatedId}`)}
+                                        onClick={() => navigate('/analise')}
                                         className="flex-1 py-6 bg-lime-400 text-black rounded-2xl font-black text-xl shadow-[0_20px_40px_rgba(163,230,53,0.3)] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-tighter italic font-sport border-b-4 border-lime-600"
                                     >
-                                        <CheckCircle2 className="w-6 h-6" /> Já Paguei
+                                        <Check className="w-6 h-6" /> Já Paguei
                                     </button>
                                 ) : (
                                     <button

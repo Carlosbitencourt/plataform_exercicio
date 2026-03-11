@@ -7,6 +7,7 @@ const Settings: React.FC = () => {
     const [settings, setSettings] = useState<SystemSettings | null>(null);
     const [formData, setFormData] = useState({
         dailyLossAmount: 5,
+        minDepositValue: 30,
         welcomeMessage: '',
         absenceMessage: '',
         checkInMessage: ''
@@ -21,6 +22,7 @@ const Settings: React.FC = () => {
                 setSettings(data);
                 setFormData({
                     dailyLossAmount: data.dailyLossAmount,
+                    minDepositValue: data.minDepositValue || 30,
                     welcomeMessage: data.welcomeMessage || '',
                     absenceMessage: data.absenceMessage || '',
                     checkInMessage: data.checkInMessage || ''
@@ -39,6 +41,7 @@ const Settings: React.FC = () => {
         try {
             await updateSettings({
                 dailyLossAmount: formData.dailyLossAmount,
+                minDepositValue: formData.minDepositValue,
                 welcomeMessage: formData.welcomeMessage,
                 absenceMessage: formData.absenceMessage,
                 checkInMessage: formData.checkInMessage
@@ -86,8 +89,8 @@ const Settings: React.FC = () => {
                             <DollarSign className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="font-black italic uppercase font-sport text-slate-900 tracking-tight">Regras de Penalidade</h3>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Defina os valores cobrados por faltas</p>
+                            <h3 className="font-black italic uppercase font-sport text-slate-900 tracking-tight">Regras Financeiras</h3>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Defina valores de penalidades e depósitos</p>
                         </div>
                     </div>
 
@@ -107,6 +110,23 @@ const Settings: React.FC = () => {
                                 </div>
                                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
                                     Este valor será descontado do saldo do atleta para cada dia de falta não justificada.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Valor Mínimo para Depósito</label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</div>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xl font-black text-slate-900 focus:ring-4 focus:ring-lime-400/10 focus:border-lime-500 outline-none transition-all shadow-inner"
+                                        value={formData.minDepositValue}
+                                        onChange={(e) => setFormData({ ...formData, minDepositValue: parseFloat(e.target.value) || 0 })}
+                                    />
+                                </div>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                                    Valor mínimo permitido para depósitos via PIX (Cadastro e Área do Atleta).
                                 </p>
                             </div>
 

@@ -141,7 +141,8 @@ export const createAbacateBilling = onCall({
     const { name, email, phone, cpf, amount } = request.data;
 
     if (!name || !email || !amount) {
-        throw new HttpsError("invalid-argument", "Dados insuficientes para gerar faturamento.");
+        console.error("[Abacate] Dados recebidos:", { name, email, phone, cpf, amount });
+        throw new HttpsError("invalid-argument", `Dados insuficientes para gerar faturamento. Recebido: name=${name}, email=${email}, amount=${amount}`);
     }
 
     // 1. Fetch config from Firestore
@@ -162,16 +163,18 @@ export const createAbacateBilling = onCall({
     // Sanitize API Key
     const sanitizedApiKey = apiKey.trim().replace(/[^\x00-\x7F]/g, "");
 
-    // Use V1 pixQrCode/create for direct PIX data (compatible with user's V1 API Key)
-    const API_BASE = "https://api.abacatepay.com/v1";
+    const V1_API = "https://api.abacatepay.com/v1/pixQrCode/create";
+    const V2_API = "https://api.abacatepay.com/v1/billing/create";
 
+    const billingAmount = Math.round(Number(amount) * 100);
+
+    // Try V1 first because our app relies on the inline PIX QR Code payload which V1 provides directly.
     try {
-        const billingAmount = Math.round(Number(amount) * 100);
+        console.log(`[Abacate] Tentando V1 pixQrCode/create para ${email}...`);
 
-        // V1 pixQrCode/create allows sending customer data directly
-        const billingPayload = {
+        const v1Payload = {
             amount: billingAmount,
-            description: "Depósito Inicial - Impulso Club",
+            description: "Depósito - Impulso Club",
             customer: {
                 name,
                 email,
@@ -180,43 +183,103 @@ export const createAbacateBilling = onCall({
             }
         };
 
-        console.log(`[Abacate] Enviando payload V1 pixQrCode: ${JSON.stringify(billingPayload)}`);
-
-        const response = await fetch(`${API_BASE}/pixQrCode/create`, {
+        const v1Response = await fetch(V1_API, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${sanitizedApiKey}`
             },
-            body: JSON.stringify(billingPayload)
+            body: JSON.stringify(v1Payload)
         });
 
-        const result: any = await response.json().catch(() => ({}));
-        console.log(`[Abacate] Resposta V1 pixQrCode: ${JSON.stringify(result)}`);
+        const v1Result: any = await v1Response.json().catch(() => ({}));
 
-        if (!response.ok) {
-            console.error("[Abacate] Erro V1:", JSON.stringify(result));
-            const errorMsg = result.error || result.message || response.status;
-            throw new Error(`Falha ao gerar pagamento PIX: ${errorMsg}`);
+        const isVersionMismatch = v1Result?.error?.includes("version mismatch") ||
+            v1Result?.message?.includes("version mismatch") ||
+            v1Result?.error === "API key version mismatch";
+
+        if (v1Response.ok && v1Result.data) {
+            console.log(`[Abacate] Sucesso na V1!`);
+            const data = v1Result.data;
+            return {
+                id: data.id,
+                amount: data.amount,
+                status: data.status,
+                url: data.url || "",
+                pix: {
+                    qrcode: data.brCodeBase64 || "",
+                    payload: data.brCode || ""
+                }
+            };
         }
 
-        // Map V1 response to the format expected by the frontend
-        // V1 returned data directly in result.data or root depending on exact success structure
-        const data = result.data || result;
+        if (!isVersionMismatch && !v1Response.ok) {
+            console.error("[Abacate] Erro V1 Real:", JSON.stringify(v1Result));
+            const errorMsg = v1Result.message || v1Result.error || "Erro na API V1";
+            throw new Error(errorMsg);
+        }
 
-        return {
-            id: data.id,
-            amount: data.amount,
-            status: data.status,
-            url: data.url, // V1 bills might have a payment URL
-            pix: {
-                qrcode: data.brCodeBase64,
-                payload: data.brCode
+        console.log(`[Abacate] Fallback para V2 devido ao erro de versão da key...`);
+    } catch (v1Error: any) {
+        if (!v1Error.message?.includes("version mismatch")) {
+            throw v1Error;
+        }
+    }
+
+    // Fallback to V2 (Hosted checkout or future transparent V2 mapping)
+    try {
+        console.log(`[Abacate] Tentando V2 billing/create para ${email}...`);
+
+        const v2Payload = {
+            frequency: "ONE_TIME",
+            methods: ["PIX"],
+            products: [{
+                externalId: "deposit",
+                name: "Depósito - Impulso Club",
+                quantity: 1,
+                price: billingAmount
+            }],
+            returnUrl: "https://impulso.club",
+            completionUrl: "https://impulso.club",
+            customer: {
+                name,
+                email,
+                taxId: cpf.replace(/\D/g, ""),
+                cellphone: phone.replace(/\D/g, "")
             }
         };
 
-    } catch (error: any) {
-        console.error("AbacatePay Exception:", error);
-        throw new HttpsError("internal", error.message);
+        const v2Response = await fetch(V2_API, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${sanitizedApiKey}`
+            },
+            body: JSON.stringify(v2Payload)
+        });
+
+        const v2Result: any = await v2Response.json().catch(() => ({}));
+
+        if (v2Response.ok && v2Result.data) {
+            console.log(`[Abacate] Sucesso na V2!`);
+            const data = v2Result.data;
+            return {
+                id: data.id,
+                amount: data.amount,
+                status: data.status,
+                url: data.url,
+                pix: {
+                    qrcode: data.pix?.qrcode || "",
+                    payload: data.pix?.payload || ""
+                }
+            };
+        }
+
+        console.error("[Abacate] Erro V2 Final:", JSON.stringify(v2Result));
+        const errorMsg = v2Result.message || v2Result.error || "Erro na API V2";
+        throw new Error(errorMsg);
+    } catch (finalError) {
+        console.error("[Abacate] Erro inesperado ao gerar pagamento:", finalError);
+        throw new HttpsError("internal", "Falha interna ao comunicar com portal AbacatePay.");
     }
 });

@@ -123,6 +123,7 @@ const App: React.FC = () => {
             <Route path="/perfil/atleta" element={<AppShell><AthleteProfile /></AppShell>} />
 
             <Route path="/inscrever" element={<ExternalSignup />} />
+            <Route path="/external-signup" element={<ExternalSignup />} />
             <Route path="/analise" element={<UnderAnalysis />} />
 
             {/* Default Redirects */}
