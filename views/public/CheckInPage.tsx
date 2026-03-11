@@ -39,10 +39,14 @@ const CheckInPage: React.FC = () => {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [depositAmount, setDepositAmount] = useState('10.00');
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(() => localStorage.getItem('isDepositModalOpen') === 'true');
+  const [depositAmount, setDepositAmount] = useState(() => localStorage.getItem('depositAmount') || '10.00');
   const [isGeneratingDeposit, setIsGeneratingDeposit] = useState(false);
-  const [depositPaymentData, setDepositPaymentData] = useState<any>(null);
+  const [depositPaymentData, setDepositPaymentData] = useState(() => {
+    const saved = localStorage.getItem('depositPaymentData');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [prevBalance, setPrevBalance] = useState<number | null>(null);
 
   // Ranking Positions
   const [positions, setPositions] = useState({ daily: '-', weekly: '-', general: '-' });
@@ -78,7 +82,32 @@ const CheckInPage: React.FC = () => {
     };
   }, []);
 
-  // Auto-identify user and calculate positions
+  // Persist deposit state
+  useEffect(() => {
+    localStorage.setItem('isDepositModalOpen', String(isDepositModalOpen));
+    localStorage.setItem('depositAmount', depositAmount);
+    if (depositPaymentData) {
+      localStorage.setItem('depositPaymentData', JSON.stringify(depositPaymentData));
+    } else {
+      localStorage.removeItem('depositPaymentData');
+    }
+  }, [isDepositModalOpen, depositAmount, depositPaymentData]);
+
+  // Monitor payment status via balance updates
+  useEffect(() => {
+    if (user && prevBalance !== null && user.balance > prevBalance) {
+      if (isDepositModalOpen && depositPaymentData) {
+        alert("Pagamento confirmado! Seu saldo foi atualizado.");
+        setIsDepositModalOpen(false);
+        setDepositPaymentData(null);
+        setDepositAmount('10.00');
+      }
+    }
+    if (user) {
+      setPrevBalance(user.balance);
+    }
+  }, [user?.balance, isDepositModalOpen, depositPaymentData]);
+
   useEffect(() => {
     if (currentUser?.email && users.length > 0) {
       const foundUser = users.find(u => u.email?.toLowerCase() === currentUser.email?.toLowerCase());
