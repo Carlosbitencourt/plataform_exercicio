@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserStatus, TimeSlot, CheckIn, Distribution, SystemSettings } from '../../types';
-import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToDistributions, subscribeToSettings } from '../../services/db';
+import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToUserDistributions, subscribeToSettings } from '../../services/db';
 import { runWeeklyPenaltyCheck, syncUserAbsences, getEffectiveMonday } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { db } from '../../services/firebase';
@@ -61,38 +61,51 @@ const CheckInPage: React.FC = () => {
   // iOS Detection for specific instructions
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    const unsubUsers = subscribeToUsers(setUsers);
-    const unsubSlots = subscribeToTimeSlots(setTimeSlots);
-    const unsubCheckIns = subscribeToCheckIns(setCheckIns);
-    const unsubDist = subscribeToDistributions(setDistributions);
-    const unsubSettings = subscribeToSettings(setSettings);
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        const unsubUsers = subscribeToUsers(setUsers);
+        const unsubSlots = subscribeToTimeSlots(setTimeSlots);
+        const unsubCheckIns = subscribeToCheckIns(setCheckIns);
+        const unsubSettings = subscribeToSettings(setSettings);
 
-    /* 
-    Legacy/Direct subscription removed - now handled by fallback lookup in users array effect below 
-    to support mismatched UIDs.
-    */
+        /* 
+        Legacy/Direct subscription removed - now handled by fallback lookup in users array effect below 
+        to support mismatched UIDs.
+        */
 
-    // Initial Permission Check
-    if (navigator.permissions && navigator.permissions.query) {
-      navigator.permissions.query({ name: 'geolocation' as PermissionName })
-        .then(result => {
-          setPermissionStatus(result.state as any);
-          result.onchange = () => setPermissionStatus(result.state as any);
-        })
-        .catch(() => setPermissionStatus('prompt'));
-    }
+        // Initial Permission Check
+        if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' as PermissionName })
+            .then(result => {
+            setPermissionStatus(result.state as any);
+            result.onchange = () => setPermissionStatus(result.state as any);
+            })
+            .catch(() => setPermissionStatus('prompt'));
+        }
 
-    return () => {
-      clearInterval(timer);
-      unsubUsers();
-      unsubSlots();
-      unsubCheckIns();
-      unsubDist();
-      unsubSettings();
-    };
-  }, [currentUser]);
+        return () => {
+        clearInterval(timer);
+        unsubUsers();
+        unsubSlots();
+        unsubCheckIns();
+        unsubSettings();
+        };
+    }, []);
+
+    // Subscribe to distributions specifically for the logged in user
+    useEffect(() => {
+      let unsubDist: (() => void) | undefined;
+      
+      if (user?.id) {
+          unsubDist = subscribeToUserDistributions(user.id, setDistributions);
+      } else {
+          setDistributions([]);
+      }
+
+      return () => {
+          if (unsubDist) unsubDist();
+      };
+    }, [user?.id]);
 
   // Load manual PIX config from integrations
   useEffect(() => {

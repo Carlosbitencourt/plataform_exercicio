@@ -292,6 +292,20 @@ export const subscribeToDistributions = (callback: (distributions: Distribution[
     });
 };
 
+export const subscribeToUserDistributions = (userId: string, callback: (distributions: Distribution[]) => void) => {
+    const q = query(
+        collection(db, DISTRIBUTIONS_COLLECTION),
+        where("userId", "==", userId)
+    );
+    return onSnapshot(q, (snapshot) => {
+        const distributions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Distribution));
+        callback(distributions);
+    }, (error) => {
+        console.error("Error subscribing to user distributions:", error);
+        callback([]);
+    });
+};
+
 
 export const addDistribution = async (distData: Omit<Distribution, 'id'>) => {
     await addDoc(collection(db, DISTRIBUTIONS_COLLECTION), distData);

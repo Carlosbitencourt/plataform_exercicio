@@ -1,7 +1,7 @@
 import React from 'react';
 import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon, Loader2, Camera, Wallet, Bell, Info } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { subscribeToUsers, subscribeToCheckIns, subscribeToDistributions, subscribeToPenalties, registerCheckIn, subscribeToAbsences, subscribeToNotifications } from '../../services/db';
+import { subscribeToUsers, subscribeToCheckIns, subscribeToUserDistributions, subscribeToPenalties, registerCheckIn, subscribeToAbsences, subscribeToNotifications } from '../../services/db';
 import { syncUserAbsences } from '../../services/rewardSystem';
 import { User, UserStatus, CheckIn, Penalty, Absence, Notification } from '../../types';
 import { auth as firebaseAuth } from '../../services/firebase';
@@ -75,8 +75,7 @@ const AthleteProfile: React.FC = () => {
             setCheckIns(userChecks);
         });
 
-        const unsubDist = subscribeToDistributions((allDists) => {
-            const userDists = allDists.filter(d => d.userId === userData.id);
+        const unsubDist = subscribeToUserDistributions(userData.id, (userDists) => {
             setDistributions(userDists);
         });
 
