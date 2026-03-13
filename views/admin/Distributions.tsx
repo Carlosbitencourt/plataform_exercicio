@@ -3,7 +3,8 @@ import { TrendingUp, Users, DollarSign, Calendar, Play, CheckCircle2, Zap, Alert
 import { subscribeToDistributions, subscribeToUsers, subscribeToCheckIns, deleteDistribution, addDistribution } from '../../services/db';
 import {
   closeWeeklySession,
-  syncAllUsersAbsences
+  syncAllUsersAbsences,
+  getEffectiveMonday
 } from '../../services/rewardSystem';
 import { Distribution, User, CheckIn, UserStatus } from '../../types';
 
@@ -49,9 +50,13 @@ const Distributions: React.FC = () => {
     }
   };
 
-  const activeUsers = users.filter(u => u.status === UserStatus.ACTIVE);
-  const totalAbsences = activeUsers.reduce((acc, u) => acc + (u.weeklyMisses || 0), 0);
-  const currentPool = totalAbsences * 5; // Fixed at 5 per absence as requested
+  const activeUsers = users.filter(u => u.status === UserStatus.ACTIVE || (u.status as string) === 'competicao');
+  const monday = getEffectiveMonday();
+  const mondayStr = monday.toISOString().split('T')[0];
+
+  const currentPool = distributions
+    .filter(d => d.amount < 0 && d.date >= mondayStr && d.reason.includes('FALTA'))
+    .reduce((acc, curr) => acc + Math.abs(curr.amount), 0);
 
   const totalDistributed = distributions
     .filter(d => d.amount > 0)
