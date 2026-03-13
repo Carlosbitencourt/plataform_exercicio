@@ -140,13 +140,11 @@ const Dashboard: React.FC = () => {
             }
 
             weekdaysInRange.forEach(date => {
-                // Removido o filtro de data de cadastro para alinhar com as expectativas de faltas semanais do usuário
-                /*
+                // Restoration of registration date filter to ensure simulation is accurate
                 if (registrationDate) {
                     const regDateISO = registrationDate.toISOString().split('T')[0];
                     if (date < regDateISO) return;
                 }
-                */
 
                 if (!userCheckInDates.has(date)) {
                     totalMisses++;
@@ -159,8 +157,26 @@ const Dashboard: React.FC = () => {
     };
 
     const absencesResult = getAbsencesDetails();
-    const totalAbsences = absencesResult.count;
-    const estimatedPool = totalAbsences * 5; // Fixed at 5 per absence as requested
+    
+    // Switch to transaction-based calculation for primary metrics
+    const penaltyDistributions = distributions.filter(d => 
+        d.amount < 0 && 
+        d.reason?.includes('FALTA') && 
+        isDateInRange(d.date.split('T')[0])
+    );
+    
+    const totalAbsences = penaltyDistributions.length;
+    const estimatedPool = Math.abs(penaltyDistributions.reduce((acc, curr) => acc + curr.amount, 0));
+    
+    // For the modal details, we now use the actual penalty distributions
+    const actualAbsenceDetails = penaltyDistributions.map(d => {
+        const user = users.find(u => u.id === d.userId);
+        return {
+            userName: user?.name || 'Desconhecido',
+            userId: d.userId,
+            date: d.date.split('T')[0]
+        };
+    });
 
     const getTodayISO = () => {
         const d = new Date();
@@ -317,7 +333,7 @@ const Dashboard: React.FC = () => {
                 {/* Absences Card (Clickable) */}
                 <div
                     onClick={() => {
-                        setAbsenceDetails(absencesResult.details);
+                        setAbsenceDetails(actualAbsenceDetails);
                         setShowAbsenceModal(true);
                     }}
                     className="group bg-white border border-slate-100 p-8 rounded-[2.5rem] space-y-4 hover:shadow-2xl hover:shadow-rose-100 hover:border-rose-200 transition-all cursor-pointer relative overflow-hidden"

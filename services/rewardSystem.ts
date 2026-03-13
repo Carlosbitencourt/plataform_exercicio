@@ -104,15 +104,11 @@ export const runWeeklyPenaltyCheck = async () => {
       }
 
       const activeDaysToCheck = daysToCheck.filter(day => {
-        // Removido o filtro de data de cadastro para que o pool da semana seja completo para todos os ativos
-        /*
         if (!registrationDate) return true;
         const [y, m, d] = day.split('-').map(Number);
         const dayDate = new Date(y, m - 1, d);
         dayDate.setHours(0, 0, 0, 0);
         return dayDate >= registrationDate;
-        */
-        return true;
       });
 
       if (activeDaysToCheck.length === 0) continue;
@@ -423,15 +419,12 @@ export const syncUserAbsences = async (userId: string, fullSync: boolean = false
       // Skip if present
       if (presentDays.has(day)) continue;
 
-      // Removido filtro de data de cadastro para sincronização semanal completa
-      /*
       if (registrationDate) {
         const [y, m, d] = day.split('-').map(Number);
         const dayDate = new Date(y, m - 1, d);
         dayDate.setHours(0, 0, 0, 0);
         if (dayDate < registrationDate) continue;
       }
-      */
 
       missingPenaltyDays.push(day);
     }
