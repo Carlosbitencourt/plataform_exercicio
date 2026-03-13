@@ -54,31 +54,58 @@ export const subscribeToUsers = (callback: (users: User[]) => void) => {
 export const checkUserExists = async (email?: string, phone?: string, cpf?: string, excludeUserId?: string) => {
     const usersRef = collection(db, USERS_COLLECTION);
     
-    if (email) {
-        const qEmail = query(usersRef, where("email", "==", email.toLowerCase()));
+    if (email && email.trim()) {
+        const qEmail = query(usersRef, where("email", "==", email.trim().toLowerCase()));
         const snapEmail = await getDocs(qEmail);
         const docs = snapEmail.docs.filter(d => d.id !== excludeUserId);
         if (docs.length > 0) throw new Error("Este e-mail já está em uso por outro atleta.");
     }
 
-    if (phone) {
-        const qPhone = query(usersRef, where("phone", "==", phone));
-        const snapPhone = await getDocs(qPhone);
-        const docs = snapPhone.docs.filter(d => d.id !== excludeUserId);
-        if (docs.length > 0) throw new Error("Este telefone já está cadastrado em outra conta.");
+    if (phone && phone.trim()) {
+        const cleanPhone = phone.replace(/\D/g, '');
+        if (cleanPhone) {
+            const qPhone = query(usersRef, where("phone", "==", phone.trim()));
+            const snapPhone = await getDocs(qPhone);
+            const docs = snapPhone.docs.filter(d => d.id !== excludeUserId);
+            if (docs.length > 0) throw new Error("Este telefone já está cadastrado em outra conta.");
+        }
     }
 
-    if (cpf) {
-        const qCpf = query(usersRef, where("cpf", "==", cpf));
+    if (cpf && cpf.trim()) {
+        const qCpf = query(usersRef, where("cpf", "==", cpf.trim()));
         const snapCpf = await getDocs(qCpf);
         const docs = snapCpf.docs.filter(d => d.id !== excludeUserId);
         if (docs.length > 0) throw new Error("Este CPF já está cadastrado no sistema.");
     }
 };
 
+/**
+ * Checks if a specific field value is already in use by another user.
+ * Useful for real-time validation.
+ */
+export const isFieldDuplicate = async (field: 'email' | 'phone' | 'cpf', value: string, excludeUserId?: string): Promise<string | null> => {
+    if (!value || !value.trim()) return null;
+    
+    const usersRef = collection(db, USERS_COLLECTION);
+    let searchValue = value.trim();
+    if (field === 'email') searchValue = searchValue.toLowerCase();
+
+    const q = query(usersRef, where(field, "==", searchValue));
+    const snap = await getDocs(q);
+    const docs = snap.docs.filter(d => d.id !== excludeUserId);
+
+    if (docs.length > 0) {
+        if (field === 'email') return "Este e-mail já está em uso.";
+        if (field === 'phone') return "Este telefone já está cadastrado.";
+        if (field === 'cpf') return "Este CPF já está cadastrado.";
+    }
+    
+    return null;
+};
+
 export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status' | 'balance'> & { status?: UserStatus }, customId?: string) => {
-    // 1. Prevent duplicates
-    await checkUserExists(userData.email, userData.phone, userData.cpf);
+    // 1. Prevent duplicates (passing customId if available to avoid self-conflict)
+    await checkUserExists(userData.email, userData.phone, userData.cpf, customId);
 
     const newUser: Omit<User, 'id'> = {
         ...userData,

@@ -10,7 +10,7 @@ import { db } from '../../services/firebase';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { auth } from '../../services/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { addUser } from '../../services/db';
+import { addUser, isFieldDuplicate } from '../../services/db';
 import { safeUploadFile } from '../../services/firebaseGuard';
 import { sendWelcomeMessage } from '../../services/whatsapp';
 import { QRCodeSVG } from 'qrcode.react';
@@ -59,6 +59,8 @@ const ExternalSignup: React.FC = () => {
             depositedValue: ''
         };
     });
+    const [fieldErrors, setFieldErrors] = useState<{ email?: string; phone?: string; cpf?: string }>({});
+    const [checkingDuplicates, setCheckingDuplicates] = useState(false);
 
     // Efeito para preencher dados quando o usuário logar ou se já estiver logado
     React.useEffect(() => {
@@ -262,12 +264,51 @@ const ExternalSignup: React.FC = () => {
         return true;
     };
 
-    const nextStep = () => {
-        if (validateStep(currentSubStep)) {
-            setCurrentSubStep(prev => prev + 1);
-            window.scrollTo(0, 0);
-        } else {
-            alert("Por favor, preencha todos os campos obrigatórios da etapa atual.");
+    const handleFieldBlur = async (field: 'email' | 'phone' | 'cpf', value: string) => {
+        if (!value || value.trim().length < 5) return;
+        
+        setCheckingDuplicates(true);
+        try {
+            const errorMsg = await isFieldDuplicate(field, value, currentUser?.uid);
+            setFieldErrors(prev => ({ ...prev, [field]: errorMsg || undefined }));
+        } catch (err) {
+            console.error(`Error checking duplicate for ${field}:`, err);
+        } finally {
+            setCheckingDuplicates(false);
+        }
+    };
+
+    const nextStep = async () => {
+        if (Object.values(fieldErrors).some(err => !!err)) {
+            setError("CORRIJA OS CAMPOS DUPLICADOS ANTES DE PROSSEGUIR.");
+            return;
+        }
+
+        setCheckingDuplicates(true);
+        try {
+            // Final check before moving
+            if (currentSubStep === 1) {
+                const emailErr = await isFieldDuplicate('email', formData.email, currentUser?.uid);
+                const phoneErr = await isFieldDuplicate('phone', formData.phone, currentUser?.uid);
+                const cpfErr = await isFieldDuplicate('cpf', formData.cpf, currentUser?.uid);
+                
+                if (emailErr || phoneErr || cpfErr) {
+                    setFieldErrors({ email: emailErr || undefined, phone: phoneErr || undefined, cpf: cpfErr || undefined });
+                    setError("DADOS DUPLICADOS ENCONTRADOS. VERIFIQUE OS CAMPOS.");
+                    return;
+                }
+            }
+
+            if (validateStep(currentSubStep)) {
+                setCurrentSubStep(prev => prev + 1);
+                window.scrollTo(0, 0);
+            } else {
+                alert("Por favor, preencha todos os campos obrigatórios da etapa atual.");
+            }
+        } catch (err: any) {
+            setError("ERRO AO VALIDAR DADOS: " + err.message);
+        } finally {
+            setCheckingDuplicates(false);
         }
     };
 
@@ -555,13 +596,16 @@ const ExternalSignup: React.FC = () => {
                                                         maxLength={15}
                                                         className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-base"
                                                         value={formData.phone}
+                                                        onBlur={() => handleFieldBlur('phone', formData.phone)}
                                                         onChange={e => {
                                                             const maskedValue = maskPhone(e.target.value);
                                                             setFormData({ ...formData, phone: maskedValue });
                                                             if (error) setError(null);
+                                                            if (fieldErrors.phone) setFieldErrors(prev => ({ ...prev, phone: undefined }));
                                                         }}
                                                     />
                                                 </div>
+                                                {fieldErrors.phone && <p className="text-[9px] text-rose-500 font-bold mt-1 ml-1 animate-pulse uppercase font-sport">{fieldErrors.phone}</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">CPF</label>
@@ -574,13 +618,16 @@ const ExternalSignup: React.FC = () => {
                                                         maxLength={14}
                                                         className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none text-base"
                                                         value={formData.cpf}
+                                                        onBlur={() => handleFieldBlur('cpf', formData.cpf)}
                                                         onChange={e => {
                                                             const maskedValue = maskCPF(e.target.value);
                                                             setFormData({ ...formData, cpf: maskedValue });
                                                             if (error) setError(null);
+                                                            if (fieldErrors.cpf) setFieldErrors(prev => ({ ...prev, cpf: undefined }));
                                                         }}
                                                     />
                                                 </div>
+                                                {fieldErrors.cpf && <p className="text-[9px] text-rose-500 font-bold mt-1 ml-1 animate-pulse uppercase font-sport">{fieldErrors.cpf}</p>}
                                             </div>
                                         </div>
                                         <div className="space-y-2">
@@ -593,9 +640,14 @@ const ExternalSignup: React.FC = () => {
                                                     placeholder="SEU@EMAIL.COM"
                                                     className="w-full pl-12 pr-6 py-4 bg-black border border-zinc-800 rounded-xl text-white font-bold placeholder:text-zinc-800 focus:ring-2 focus:ring-lime-400/20 focus:border-lime-400 transition-all outline-none uppercase text-base"
                                                     value={formData.email}
-                                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                                    onBlur={() => handleFieldBlur('email', formData.email)}
+                                                    onChange={e => {
+                                                        setFormData({ ...formData, email: e.target.value });
+                                                        if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: undefined }));
+                                                    }}
                                                 />
                                             </div>
+                                            {fieldErrors.email && <p className="text-[9px] text-rose-500 font-bold mt-1 ml-1 animate-pulse uppercase font-sport">{fieldErrors.email}</p>}
                                         </div>
                                     </div>
                                 </div>
@@ -979,9 +1031,11 @@ const ExternalSignup: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={nextStep}
-                                            className="flex-[2] py-5 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2 italic font-sport border-b-4 border-lime-600 shadow-xl shadow-lime-900/10"
+                                            disabled={checkingDuplicates}
+                                            className="flex-[2] py-5 bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-lg hover:scale-[1.02] transition-all flex items-center justify-center gap-2 italic font-sport border-b-4 border-lime-600 shadow-xl shadow-lime-900/10 disabled:opacity-50"
                                         >
-                                            Avançar <ArrowRight className="w-6 h-6" />
+                                            {checkingDuplicates ? 'Verificando...' : 'Avançar'} 
+                                            <ArrowRight className={`w-6 h-6 ${checkingDuplicates ? 'animate-spin' : ''}`} />
                                         </button>
                                     ) : paymentData || depositPending ? (
                                         <button
