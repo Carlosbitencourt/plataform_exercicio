@@ -3,13 +3,37 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Lock, User, UserPlus, AlertCircle, Activity } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../services/firebase';
+import { subscribeToModalities, addUser } from '../../services/db';
+import { Modality, UserStatus } from '../../types';
+import { useEffect } from 'react';
 
 const Signup: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [modalities, setModalities] = useState<Modality[]>([]);
+    const [modalityId, setModalityId] = useState('');
     const navigate = useNavigate();
+
+    const generateUniqueCode = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 4; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    };
+
+    useEffect(() => {
+        const unsubscribe = subscribeToModalities((data) => {
+            setModalities(data);
+            if (data.length > 0 && !modalityId) {
+                setModalityId(data[0].id);
+            }
+        });
+        return () => unsubscribe();
+    }, [modalityId]);
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -17,7 +41,18 @@ const Signup: React.FC = () => {
         setError('');
 
         try {
-            await createUserWithEmailAndPassword(auth, email, password);
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            // Save additional user data
+            await addUser({
+                email,
+                name: email.split('@')[0], // Default name
+                modalityId,
+                phone: '', 
+                cpf: '', 
+                uniqueCode: generateUniqueCode(),
+                depositedValue: 0,
+                status: UserStatus.ACTIVE
+            }, userCredential.user.uid);
             navigate('/admin/usuarios');
         } catch (err: any) {
             if (err.code === 'auth/email-already-in-use') {
@@ -77,6 +112,25 @@ const Signup: React.FC = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                 />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-3 ml-1">Sua Atividade</label>
+                            <div className="grid grid-cols-3 gap-3">
+                                {modalities.map((mod) => (
+                                    <button
+                                        key={mod.id}
+                                        type="button"
+                                        onClick={() => setModalityId(mod.id)}
+                                        className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 group ${modalityId === mod.id
+                                                ? 'bg-lime-400 border-lime-400 text-black shadow-[0_0_20px_rgba(163,230,53,0.3)]'
+                                                : 'bg-black border-zinc-800 text-zinc-600 hover:border-zinc-700'
+                                            }`}
+                                    >
+                                        <span className="font-black italic uppercase font-sport text-[10px] tracking-tight text-center">{mod.name}</span>
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     </div>

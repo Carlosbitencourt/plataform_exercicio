@@ -19,7 +19,7 @@ import { safeAddDoc, safeUpdateDoc, safeSetDoc, ensureAuth } from './firebaseGua
 import {
     User, UserStatus, TimeSlot, QRCodeData,
     CheckIn, Distribution, Withdrawal, WithdrawalStatus,
-    Notification, Absence, Penalty, Category, SystemSettings
+    Notification, Absence, Penalty, Category, Modality, SystemSettings
 } from '../types';
 
 // Collections
@@ -34,6 +34,7 @@ const NOTIFICATIONS_COLLECTION = 'notifications';
 const ABSENCES_COLLECTION = 'absences';
 const PENALTIES_COLLECTION = 'penalties';
 const SETTINGS_COLLECTION = 'settings';
+export const MODALITIES_COLLECTION = 'modalities';
 
 // --- Users ---
 
@@ -441,6 +442,32 @@ export const updateCategory = async (category: Category) => {
 
 export const deleteCategory = async (id: string) => {
     await deleteDoc(doc(db, CATEGORIES_COLLECTION, id));
+};
+
+// --- Modalities ---
+
+export const subscribeToModalities = (callback: (modalities: Modality[]) => void) => {
+    const q = query(collection(db, MODALITIES_COLLECTION));
+    return onSnapshot(q, (snapshot) => {
+        const modalities = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Modality));
+        callback(modalities);
+    }, (error) => {
+        console.error("Error subscribing to modalities:", error);
+        callback([]);
+    });
+};
+
+export const addModality = async (modalityData: Omit<Modality, 'id'>) => {
+    await safeAddDoc(MODALITIES_COLLECTION, modalityData);
+};
+
+export const updateModality = async (modality: Modality) => {
+    const { id, ...data } = modality;
+    await safeUpdateDoc(MODALITIES_COLLECTION, id, data);
+};
+
+export const deleteModality = async (id: string) => {
+    await deleteDoc(doc(db, MODALITIES_COLLECTION, id));
 };
 
 // --- Withdrawals ---

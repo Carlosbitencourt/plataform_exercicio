@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, RefreshCw, AlertCircle, CheckCircle, DollarSign, Clock } from 'lucide-react';
-import { subscribeToSettings, updateSettings } from '../../services/db';
-import { SystemSettings } from '../../types';
+import { Settings as SettingsIcon, Save, RefreshCw, AlertCircle, CheckCircle, DollarSign, Clock, Plus, Trash2, Edit2, Activity as ActivityIcon, Dumbbell, Footprints, Zap, Bike } from 'lucide-react';
+import { subscribeToSettings, updateSettings, subscribeToModalities, addModality, updateModality, deleteModality } from '../../services/db';
+import { SystemSettings, Modality } from '../../types';
 
 const Settings: React.FC = () => {
     const [settings, setSettings] = useState<SystemSettings | null>(null);
@@ -13,6 +13,9 @@ const Settings: React.FC = () => {
         checkInMessage: ''
     });
     const [loading, setLoading] = useState(true);
+    const [modalities, setModalities] = useState<Modality[]>([]);
+    const [newModalityName, setNewModalityName] = useState('');
+    const [newModalityIcon, setNewModalityIcon] = useState('Activity');
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -30,8 +33,65 @@ const Settings: React.FC = () => {
             }
             setLoading(false);
         });
-        return () => unsubscribe();
+
+        const unsubModalities = subscribeToModalities((data) => {
+            setModalities(data);
+        });
+
+        return () => {
+            unsubscribe();
+            unsubModalities();
+        };
     }, []);
+
+    const handleAddModality = async () => {
+        if (!newModalityName.trim()) return;
+        try {
+            await addModality({
+                name: newModalityName,
+                icon: newModalityIcon,
+                color: '#bef264'
+            });
+            setNewModalityName('');
+            setNewModalityIcon('Activity');
+        } catch (error) {
+            console.error("Error adding modality:", error);
+        }
+    };
+
+    const handleDeleteModality = async (id: string) => {
+        if (window.confirm("Deseja realmente excluir esta modalidade?")) {
+            try {
+                await deleteModality(id);
+            } catch (error) {
+                console.error("Error deleting modality:", error);
+            }
+        }
+    };
+
+    const seedInitialModalities = async () => {
+        const initial = [
+            { name: 'Academia', icon: 'Dumbbell' },
+            { name: 'Caminhada', icon: 'Footprints' },
+            { name: 'Corrida', icon: 'Zap' }
+        ];
+
+        for (const mod of initial) {
+            if (!modalities.find(m => m.name === mod.name)) {
+                await addModality({ ...mod, color: '#bef264' });
+            }
+        }
+    };
+
+    const getIconComponent = (iconName: string) => {
+        switch (iconName) {
+            case 'Dumbbell': return <Dumbbell className="w-5 h-5" />;
+            case 'Footprints': return <Footprints className="w-5 h-5" />;
+            case 'Zap': return <Zap className="w-5 h-5" />;
+            case 'Bike': return <Bike className="w-5 h-5" />;
+            default: return <ActivityIcon className="w-5 h-5" />;
+        }
+    };
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -142,6 +202,93 @@ const Settings: React.FC = () => {
                                 <div className="flex items-center gap-2 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-white p-3 rounded-xl border border-slate-100">
                                     <Clock className="w-3 h-3" />
                                     Última atualização: {settings?.lastUpdated ? new Date(settings.lastUpdated).toLocaleString('pt-BR') : 'Nunca'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Categories Management Section */}
+                <div className="bg-white rounded-[2.5rem] border-4 border-slate-200 shadow-2xl overflow-hidden mt-8">
+                    <div className="p-6 bg-slate-50 border-b-2 border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-500/20">
+                                <ActivityIcon className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h3 className="font-black italic uppercase font-sport text-slate-900 tracking-tight">Categorias de Atividades</h3>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Gerencie as modalidades disponíveis</p>
+                            </div>
+                        </div>
+
+                        {modalities.length === 0 && (
+                            <button
+                                type="button"
+                                onClick={seedInitialModalities}
+                                className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-100 transition-colors border border-indigo-100"
+                            >
+                                Inicializar Padrão
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="p-8 space-y-6">
+                        {/* List Categories */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {modalities.sort((a, b) => a.name.localeCompare(b.name)).map(mod => (
+                                <div key={mod.id} className="flex items-center justify-between p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl group hover:border-lime-400 transition-all">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white rounded-xl border border-slate-200 text-slate-900 shadow-sm group-hover:text-lime-500 transition-colors">
+                                            {getIconComponent(mod.icon || 'Activity')}
+                                        </div>
+                                        <span className="font-black italic uppercase font-sport text-slate-900 text-sm tracking-tight">{mod.name}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteModality(mod.id)}
+                                        className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Add New Category */}
+                        <div className="pt-6 border-t border-slate-100">
+                            <div className="flex flex-col md:flex-row gap-4">
+                                <div className="flex-1 space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nova Categoria</label>
+                                    <input
+                                        type="text"
+                                        placeholder="EX: NATAÇÃO, CROSSFIT..."
+                                        className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-slate-900 focus:border-lime-500 outline-none transition-all uppercase"
+                                        value={newModalityName}
+                                        onChange={(e) => setNewModalityName(e.target.value)}
+                                    />
+                                </div>
+                                <div className="w-full md:w-48 space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Ícone</label>
+                                    <select
+                                        className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-bold text-slate-900 focus:border-lime-500 outline-none transition-all appearance-none"
+                                        value={newModalityIcon}
+                                        onChange={(e) => setNewModalityIcon(e.target.value)}
+                                    >
+                                        <option value="Activity">Padrão</option>
+                                        <option value="Dumbbell">Academia / Crossfit</option>
+                                        <option value="Footprints">Caminhada</option>
+                                        <option value="Zap">Corrida</option>
+                                        <option value="Bike">Ciclismo / Bike</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-end">
+                                    <button
+                                        type="button"
+                                        onClick={handleAddModality}
+                                        className="w-full md:w-auto px-8 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Plus className="w-4 h-4" /> Adicionar
+                                    </button>
                                 </div>
                             </div>
                         </div>

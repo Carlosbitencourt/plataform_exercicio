@@ -12,6 +12,7 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.token.email == 'agenciaconativa@gmail.com' ||
         request.auth.token.email == 'admin@admin.com' ||
+        request.auth.token.email == 'carlosbitencourtbomfim@gmail.com' ||
         request.auth.token.email == 'carlos.bitencourt@fitreward.com.br'
       );
     }
@@ -51,6 +52,12 @@ service cloud.firestore {
 
     // Categories collection
     match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Modalities collection
+    match /modalities/{modalityId} {
       allow read: if true;
       allow write: if isAdmin();
     }

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw, Wallet, PiggyBank, History, Calendar, Clock, Star } from 'lucide-react';
-import { subscribeToUsers, addUser, updateUser, deleteUser, subscribeToCheckIns, subscribeToAbsences, deleteCheckIn, deleteAbsence, subscribeToSettings, checkUserExists } from '../../services/db';
+import { subscribeToUsers, addUser, updateUser, deleteUser, subscribeToCheckIns, subscribeToAbsences, deleteCheckIn, deleteAbsence, subscribeToSettings, checkUserExists, subscribeToModalities } from '../../services/db';
 import { sendWelcomeMessage } from '../../services/whatsapp';
 import { auth, functions } from '../../services/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { safeUploadFile } from '../../services/firebaseGuard';
-import { User, UserStatus, CheckIn, Absence, SystemSettings } from '../../types';
+import { User, UserStatus, CheckIn, Absence, SystemSettings, Modality } from '../../types';
 
 const Users: React.FC = () => {
   const { impersonate } = useAuth();
@@ -28,6 +28,7 @@ const Users: React.FC = () => {
   const [allCheckIns, setAllCheckIns] = useState<CheckIn[]>([]);
   const [allAbsences, setAllAbsences] = useState<Absence[]>([]);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [modalities, setModalities] = useState<Modality[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -43,7 +44,8 @@ const Users: React.FC = () => {
     email: '',
     password: '',
     balance: 0,
-    status: UserStatus.ACTIVE
+    status: UserStatus.ACTIVE,
+    modalityId: ''
   });
 
   const generateUniqueCode = () => {
@@ -68,11 +70,15 @@ const Users: React.FC = () => {
     const unsubscribeSettings = subscribeToSettings((settings) => {
       setSystemSettings(settings);
     });
+    const unsubscribeModalities = subscribeToModalities((data) => {
+      setModalities(data);
+    });
     return () => {
       unsubscribeUsers();
       unsubscribeCheckIns();
       unsubscribeAbsences();
       unsubscribeSettings();
+      unsubscribeModalities();
     };
   }, []);
 
@@ -154,7 +160,8 @@ const Users: React.FC = () => {
         email: '',
         password: '',
         balance: 0,
-        status: UserStatus.ACTIVE
+        status: UserStatus.ACTIVE,
+        modalityId: ''
       });
       setEditingUser(null);
       setIsModalOpen(false);
@@ -180,7 +187,8 @@ const Users: React.FC = () => {
       email: user.email || '',
       password: '',
       balance: user.balance || 0,
-      status: user.status || UserStatus.ACTIVE
+      status: user.status || UserStatus.ACTIVE,
+      modalityId: user.modalityId || ''
     });
     setIsModalOpen(true);
   };
@@ -385,7 +393,8 @@ const Users: React.FC = () => {
                 email: '',
                 password: '',
                 balance: 0,
-                status: UserStatus.ACTIVE
+                status: UserStatus.ACTIVE,
+                modalityId: ''
               });
               setIsModalOpen(true);
             }}
@@ -750,6 +759,20 @@ const Users: React.FC = () => {
                       <option value={UserStatus.ACTIVE}>EM COMPETIÇÃO (ATIVO)</option>
                       <option value={UserStatus.PENDING}>EM ANÁLISE (PENDENTE)</option>
                       <option value={UserStatus.ELIMINATED}>ELIMINADO (INATIVO)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Modalidade / Categoria</label>
+                    <select
+                      className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-lime-400 focus:border-lime-200 transition-all outline-none text-xs bg-slate-50/50 appearance-none cursor-pointer"
+                      value={formData.modalityId}
+                      onChange={e => setFormData({ ...formData, modalityId: e.target.value })}
+                    >
+                      <option value="">Selecione uma modalidade...</option>
+                      {modalities.map(m => (
+                        <option key={m.id} value={m.id}>{m.name.toUpperCase()}</option>
+                      ))}
                     </select>
                   </div>
 

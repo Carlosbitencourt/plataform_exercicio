@@ -30,6 +30,7 @@ export interface User {
   weeklyMisses?: number;
   weeklyScore?: number;
   totalScore?: number;
+  modalityId?: string;
 }
 
 export interface TimeSlot {
@@ -55,9 +56,17 @@ export interface TimeSlot {
 export interface Category {
   id: string;
   name: string;
+  icon?: string;
   color?: string;
   order?: number;
   parentId?: string;
+}
+
+export interface Modality {
+  id: string;
+  name: string;
+  icon?: string;
+  color?: string;
 }
 
 export interface QRCodeData {
