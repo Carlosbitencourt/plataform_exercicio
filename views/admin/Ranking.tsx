@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, Search, Timer, CheckCircle2, AlertCircle, Medal, Crown, TrendingUp, Info, Users, ArrowUpRight, ArrowDownRight, RotateCcw } from 'lucide-react';
+import { Trophy, Clock, Search, Timer, CheckCircle2, AlertCircle, Medal, Crown, TrendingUp, Info, Users, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { subscribeToUsers, subscribeToCheckIns, updateUser, addCheckIn } from '../../services/db';
-import { fixWeeklyDistribution } from '../../services/rewardSystem';
+
 import { User as UserType, CheckIn, UserStatus } from '../../types';
 
 interface RankedUser {
@@ -401,34 +401,6 @@ const Ranking: React.FC = () => {
                   : 'Ranking baseado no saldo total acumulado na temporada.'
               }
             </p>
-
-            {/* Botão de Emergência para Corrigir Pool (110 -> 90) */}
-            <button
-              id="temp-revert-btn"
-              onClick={async () => {
-                const participants = [
-                  { id: 'pNXIpvSjrrCj6p5unzjf', score: 30, name: 'Jully' },
-                  { id: 'KK2gZj4OOUYvKrf74x9A', score: 30, name: 'Cintia' },
-                  { id: 'oNcUUFt9SxUb1Cok9XmY', score: 50, name: 'Jutai' },
-                  { id: 'l7AKmMYmMnmGsKzIdkNn', score: 50, name: 'Gustavo' },
-                  { id: '6G69zd715eTcnOxnyLIQ', score: 40, name: 'Vinicius' },
-                  { id: 'AqkajUq09u0nFdGtIH1R', score: 40, name: 'Luiz' },
-                  { id: 'vMz5zZ8h7UCsCasrhf0J', score: 20, name: 'Carlos' }
-                ];
-                if (window.confirm('Corrigir distribuição de hoje para R$ 90.00? (Irá ajustar saldos e registros de hoje)')) {
-                  try {
-                    await fixWeeklyDistribution(participants, 110, 90);
-                    alert('Distribuição corrigida com sucesso!');
-                  } catch (e: any) {
-                    alert('Erro ao corrigir: ' + e.message);
-                  }
-                }
-              }}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20"
-            >
-              <RotateCcw className="w-3 h-3" /> Corrigir Pool (110 &rarr; 90)
-            </button>
-
           </div>
         </div>
       </div>
