@@ -1,7 +1,7 @@
 import React from 'react';
-import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon, Loader2, Camera, Wallet, Bell, Info } from 'lucide-react';
+import { User as UserIcon, Award, Zap, History, Settings, LogOut, ChevronRight, QrCode, CreditCard, X, MapPin, Calendar, Clock as ClockIcon, Loader2, Camera, Wallet, Bell, Info, Target } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { subscribeToUsers, subscribeToCheckIns, subscribeToUserDistributions, subscribeToPenalties, registerCheckIn, subscribeToAbsences, subscribeToNotifications } from '../../services/db';
+import { subscribeToUsers, subscribeToCheckIns, subscribeToPenalties, registerCheckIn, subscribeToAbsences, subscribeToNotifications } from '../../services/db';
 import { syncUserAbsences } from '../../services/rewardSystem';
 import { User, UserStatus, CheckIn, Penalty, Absence, Notification } from '../../types';
 import { auth as firebaseAuth } from '../../services/firebase';
@@ -14,7 +14,6 @@ const AthleteProfile: React.FC = () => {
     const navigate = useNavigate();
     const [userData, setUserData] = React.useState<User | null>(null);
     const [checkIns, setCheckIns] = React.useState<CheckIn[]>([]);
-    const [distributions, setDistributions] = React.useState<any[]>([]);
     const [isHistoryOpen, setIsHistoryOpen] = React.useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
@@ -75,10 +74,6 @@ const AthleteProfile: React.FC = () => {
             setCheckIns(userChecks);
         });
 
-        const unsubDist = subscribeToUserDistributions(userData.id, (userDists) => {
-            setDistributions(userDists);
-        });
-
         const unsubAbsences = subscribeToAbsences((allAbsences) => {
             const userAbsences = allAbsences.filter(a => a.userId === userData.id);
             setAbsences(userAbsences);
@@ -90,7 +85,6 @@ const AthleteProfile: React.FC = () => {
 
         return () => {
             unsubCheckIns();
-            unsubDist();
             unsubAbsences();
             unsubNotifications();
         };
@@ -247,46 +241,54 @@ const AthleteProfile: React.FC = () => {
                 </div>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-4 relative overflow-hidden group hover:border-lime-500/30 transition-all md:col-span-2">
+            {/* Wallet Section */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                {/* Free Balance */}
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-3 relative overflow-hidden group hover:border-lime-500/30 transition-all">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
-                        <Zap className="w-12 h-12 text-lime-400" />
+                        <Wallet className="w-12 h-12 text-lime-400" />
                     </div>
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Saldo Total (Portfólio)</p>
-                    <p className="text-4xl font-black text-white font-sport italic tracking-tighter relative z-10">
-                        {`R$ ${userData?.balance?.toFixed(2) || '0.00'}`}
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">💰 Saldo Livre</p>
+                    <p className="text-4xl font-black text-lime-400 font-sport italic tracking-tighter relative z-10">
+                        R$ {(userData?.freeBalance ?? 0).toFixed(2)}
                     </p>
-
-
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/50">
-                        <div>
-                            <p className="text-[7px] font-black text-zinc-600 uppercase tracking-widest mb-1">Lucro</p>
-                            <p className="text-xs font-black text-lime-400 font-sport italic">R$ {distributions.filter(d => d.amount > 0).reduce((acc, d) => acc + d.amount, 0).toFixed(2)}</p>
-                        </div>
-                        <div>
-                            <p className="text-[7px] font-black text-zinc-600 uppercase tracking-widest mb-1">Faltas</p>
-                            <p className="text-xs font-black text-rose-500 font-sport italic">R$ {Math.abs(distributions.filter(d => d.amount < 0).reduce((acc, d) => acc + d.amount, 0)).toFixed(2)}</p>
-                        </div>
-                    </div>
+                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Pode ser usado no marketplace ou sacado</p>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-4 relative overflow-hidden group hover:border-lime-500/30 transition-all">
+
+                {/* Locked Balance */}
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-3 relative overflow-hidden group hover:border-amber-500/30 transition-all">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
-                        <Wallet className="w-12 h-12 text-zinc-500" />
+                        <Zap className="w-12 h-12 text-amber-400" />
                     </div>
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Depósito Inicial</p>
-                    <p className="text-3xl font-black text-white font-sport italic tracking-tighter relative z-10 leading-none">
-                        R$ {userData?.depositedValue?.toFixed(2) || '0.00'}
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">🔒 Saldo Travado</p>
+                    <p className="text-4xl font-black text-amber-400 font-sport italic tracking-tighter relative z-10">
+                        R$ {(userData?.lockedBalance ?? 0).toFixed(2)}
                     </p>
-                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest leading-none mt-1">Investimento</p>
+                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Acumulado por faltas — só pode ser usado no marketplace</p>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-2 relative overflow-hidden group hover:border-amber-500/30 transition-all">
+
+                {/* Coins */}
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-3 relative overflow-hidden group hover:border-yellow-500/30 transition-all">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
-                        <Award className="w-12 h-12 text-amber-500" />
+                        <Award className="w-12 h-12 text-yellow-400" />
                     </div>
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">Ranking</p>
-                    <p className="text-3xl font-black text-white font-sport italic tracking-tighter relative z-10">
-                        #12
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">🪙 Moedas</p>
+                    <p className="text-4xl font-black text-yellow-400 font-sport italic tracking-tighter relative z-10">
+                        {(userData?.coins ?? 0).toLocaleString('pt-BR')}
                     </p>
+                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Usadas para resgatar produtos novos</p>
+                </div>
+                
+                {/* Ranking Points */}
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-3 relative overflow-hidden group hover:border-indigo-500/30 transition-all">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+                        <Target className="w-12 h-12 text-indigo-400" />
+                    </div>
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest relative z-10">🎯 Pontos</p>
+                    <p className="text-4xl font-black text-indigo-400 font-sport italic tracking-tighter relative z-10">
+                        {userData?.totalScore ?? 0}
+                    </p>
+                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Acumulados no ranking geral</p>
                 </div>
             </div>
 

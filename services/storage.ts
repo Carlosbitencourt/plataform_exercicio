@@ -31,7 +31,7 @@ const defaultSettings: SystemSettings[] = [
   }
 ];
 
-const initialData: Database = {
+const initialData: Omit<Database, 'products' | 'distributions'> & { users: any[] } = {
   users: [
     {
       id: '1',
@@ -39,7 +39,9 @@ const initialData: Database = {
       cpf: '12345678901',
       uniqueCode: 'JOAO123',
       phone: '11999999999',
-      balance: 100,
+      freeBalance: 100,
+      lockedBalance: 0,
+      coins: 0,
       depositedValue: 500,
       status: UserStatus.ACTIVE,
       createdAt: new Date().toISOString()
@@ -47,12 +49,11 @@ const initialData: Database = {
   ],
   qrCodes: [],
   checkIns: [],
-  distributions: [],
   timeSlots: defaultTimeSlots,
   settings: defaultSettings
 };
 
-export const getDB = (): Database => {
+export const getDB = (): any => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return initialData;
   const parsed = JSON.parse(data);
@@ -65,12 +66,14 @@ export const saveDB = (db: Database) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
 };
 
-export const addUser = (user: Omit<User, 'id' | 'createdAt' | 'balance' | 'status'>) => {
+export const addUser = (user: Omit<User, 'id' | 'createdAt' | 'status'>) => {
   const db = getDB();
   const newUser: User = {
     ...user,
     id: crypto.randomUUID(),
-    balance: user.depositedValue,
+    freeBalance: user.freeBalance ?? 0,
+    lockedBalance: user.lockedBalance ?? 0,
+    coins: user.coins ?? 0,
     status: UserStatus.ACTIVE,
     createdAt: new Date().toISOString()
   };
@@ -115,14 +118,10 @@ export const addCheckIn = (checkIn: Omit<CheckIn, 'id'>) => {
   return newCheckIn;
 };
 
-export const addDistribution = (dist: Omit<Distribution, 'id'>) => {
-  const db = getDB();
-  const newDist: Distribution = {
-    ...dist,
-    id: crypto.randomUUID()
-  };
-  db.distributions.push(newDist);
-  saveDB(db);
+// addDistribution kept for legacy DB references but pool system has been removed
+export const addDistribution = (_dist: Omit<Distribution, 'id'>) => {
+  // No-op: pool distribution system removed. Penalties are now handled individually.
+  console.warn('addDistribution called but pool system is removed.');
 };
 
 export const addTimeSlot = (slot: Omit<TimeSlot, 'id'>) => {

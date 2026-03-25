@@ -23,6 +23,9 @@ import Integrations from './views/admin/Integrations';
 import Settings from './views/admin/Settings';
 import UnderAnalysis from './views/public/UnderAnalysis';
 import DepositRequests from './views/admin/DepositRequests';
+import Marketplace from './views/public/Marketplace';
+import MarketplaceAdmin from './views/admin/MarketplaceAdmin';
+import Partners from './views/admin/Partners';
 
 // Componente para proteger rotas administrativas
 const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -123,11 +126,24 @@ const App: React.FC = () => {
               </ProtectedAdminRoute>
             } />
 
+            <Route path="/admin/marketplace" element={
+              <ProtectedAdminRoute>
+                <MarketplaceAdmin />
+              </ProtectedAdminRoute>
+            } />
+
+            <Route path="/admin/parceiros" element={
+              <ProtectedAdminRoute>
+                <Partners />
+              </ProtectedAdminRoute>
+            } />
+
             {/* Athlete App Shell Routes */}
             <Route path="/checkin" element={<AppShell><CheckInPage /></AppShell>} />
             <Route path="/ranking" element={<AppShell><AthleteRanking /></AppShell>} />
             <Route path="/locais" element={<AppShell><AthleteLocations /></AppShell>} />
             <Route path="/perfil/atleta" element={<AppShell><AthleteProfile /></AppShell>} />
+            <Route path="/marketplace" element={<AppShell><Marketplace /></AppShell>} />
 
             <Route path="/inscrever" element={<ExternalSignup />} />
             <Route path="/external-signup" element={<ExternalSignup />} />

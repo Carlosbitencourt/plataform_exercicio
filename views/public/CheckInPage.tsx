@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserStatus, TimeSlot, CheckIn, Distribution, SystemSettings } from '../../types';
-import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToUserDistributions, subscribeToSettings } from '../../services/db';
+import { User, UserStatus, TimeSlot, CheckIn, SystemSettings } from '../../types';
+import { subscribeToUsers, subscribeToTimeSlots, subscribeToCheckIns, subscribeToSettings } from '../../services/db';
 import { runWeeklyPenaltyCheck, syncUserAbsences, getEffectiveMonday } from '../../services/rewardSystem';
 import { GYM_LOCATION } from '../../constants';
 import { db } from '../../services/firebase';
@@ -25,7 +25,7 @@ const CheckInPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
-  const [distributions, setDistributions] = useState<Distribution[]>([]);
+  const [distributions, setDistributions] = React.useState<never[]>([]);// kept for compat
 
   // Geolocation & UI States
   const [loading, setLoading] = useState(false);
@@ -92,20 +92,7 @@ const CheckInPage: React.FC = () => {
         };
     }, []);
 
-    // Subscribe to distributions specifically for the logged in user
-    useEffect(() => {
-      let unsubDist: (() => void) | undefined;
-      
-      if (user?.id) {
-          unsubDist = subscribeToUserDistributions(user.id, setDistributions);
-      } else {
-          setDistributions([]);
-      }
-
-      return () => {
-          if (unsubDist) unsubDist();
-      };
-    }, [user?.id]);
+  // Distributions subscription removed — wallet fields read directly from user doc
 
   // Load manual PIX config from integrations
   useEffect(() => {
@@ -133,9 +120,9 @@ const CheckInPage: React.FC = () => {
     }
   }, [isDepositModalOpen, depositAmount, depositPaymentData]);
 
-  // Monitor payment status via balance updates
+  // Monitor payment status via freeBalance updates
   useEffect(() => {
-    if (user && prevBalance !== null && user.balance > prevBalance) {
+    if (user && prevBalance !== null && (user.freeBalance ?? 0) > prevBalance) {
       if (isDepositModalOpen && depositPaymentData) {
         alert("Pagamento confirmado! Seu saldo foi atualizado.");
         setIsDepositModalOpen(false);
@@ -144,9 +131,9 @@ const CheckInPage: React.FC = () => {
       }
     }
     if (user) {
-      setPrevBalance(user.balance);
+      setPrevBalance(user.freeBalance ?? 0);
     }
-  }, [user?.balance, isDepositModalOpen, depositPaymentData]);
+  }, [user?.freeBalance, isDepositModalOpen, depositPaymentData]);
 
   useEffect(() => {
     if (currentUser?.uid && users.length > 0) {
@@ -334,7 +321,9 @@ const CheckInPage: React.FC = () => {
 
     if (!selectedSlot) selectedSlot = activeSlots[0];
 
-    const score = 10 * (selectedSlot.weight || 1);
+    const baseScore = selectedSlot.scoreReward ?? 10;
+    const score = baseScore * (selectedSlot.weight || 1);
+    const coinsEarned = selectedSlot.coinsReward ?? 10;
     setEarnedPoints(score);
     const today = getTodayISO();
 
@@ -354,7 +343,8 @@ const CheckInPage: React.FC = () => {
     setLastCheckInId(checkInRef.id);
     await safeUpdateDoc('users', user!.id, {
       weeklyScore: (user!.weeklyScore || 0) + score,
-      totalScore: (user!.totalScore || 0) + score
+      totalScore: (user!.totalScore || 0) + score,
+      coins: (user!.coins || 0) + coinsEarned,
     });
     setSuccess(true);
 
@@ -388,8 +378,8 @@ const CheckInPage: React.FC = () => {
       alert("Por favor, insira um valor válido.");
       return;
     }
-    if (amount > (user.balance || 0)) {
-      alert("Saldo insuficiente.");
+    if (amount > (user.freeBalance ?? 0)) {
+      alert("Saldo livre insuficiente.");
       return;
     }
     if (!user.pixKey) {
@@ -540,13 +530,14 @@ const CheckInPage: React.FC = () => {
           </div>
 
           <div className="space-y-4">
+            {/* Free Balance */}
             <div className="space-y-1">
-              <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Saldo Total (Portfólio)</p>
+              <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">💰 Saldo Livre</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-6xl font-black text-white font-sport italic tracking-tighter text-shadow-glow">
-                  {`R$ ${user?.balance?.toFixed(2) || '0.00'}`}
+                <span className="text-5xl font-black text-lime-400 font-sport italic tracking-tighter">
+                  {`R$ ${(user?.freeBalance ?? 0).toFixed(2)}`}
                 </span>
-                <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20 shadow-[0_0_15px_rgba(163,230,53,0.1)]">LIVE</span>
+                <span className="text-lime-400 text-sm font-black uppercase tracking-tighter animate-pulse bg-lime-400/10 px-2 py-0.5 rounded-md border border-lime-400/20">LIVE</span>
               </div>
               <div className="flex gap-2 mt-2">
                 <button
@@ -569,38 +560,26 @@ const CheckInPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="bg-lime-400/5 border border-lime-400/20 p-4 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-1 opacity-20">
-                  <Award className="w-4 h-4 text-lime-400" />
-                </div>
-                <p className="text-[8px] font-black text-lime-600/60 uppercase tracking-widest mb-1">Lucro Gerado</p>
-                <p className="text-xl font-black text-lime-400 font-sport italic leading-none">
-                  {(() => {
-                    const userDist = distributions.filter(d => d.userId === user?.id);
-                    const positiveProfit = userDist.filter(d => d.amount > 0).reduce((acc, d) => acc + d.amount, 0);
-                    return `R$ ${positiveProfit.toFixed(2)}`;
-                  })()}
+            {/* Locked Balance + Coins + Points */}
+            <div className="grid grid-cols-3 gap-2 pt-2">
+              <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-2xl relative overflow-hidden flex flex-col justify-center">
+                <p className="text-[7.5px] font-black text-amber-500/60 uppercase tracking-widest mb-1">🔒 Travado</p>
+                <p className="text-lg font-black text-amber-400 font-sport italic leading-none">
+                  R$ {(user?.lockedBalance ?? 0).toFixed(2)}
                 </p>
               </div>
 
-              <div className="bg-rose-500/5 border border-rose-500/20 p-4 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-1 opacity-20">
-                  <AlertCircle className="w-4 h-4 text-rose-500" />
-                </div>
-                <p className="text-[8px] font-black text-rose-500/60 uppercase tracking-widest mb-1">Penalidades (Semana)</p>
-                <p className="text-xl font-black text-rose-500 font-sport italic leading-none">
-                  {(() => {
-                    const startOfWeek = getEffectiveMonday();
-                    const userDist = distributions.filter(d => {
-                      if (d.userId !== user?.id || d.amount >= 0) return false;
-                      const [y, m, d_part] = d.date.split('-').map(Number);
-                      const distDate = new Date(y, m - 1, d_part);
-                      return distDate >= startOfWeek;
-                    });
-                    const penalties = userDist.reduce((acc, d) => acc + d.amount, 0);
-                    return `R$ ${Math.abs(penalties).toFixed(2)}`;
-                  })()}
+              <div className="bg-yellow-500/5 border border-yellow-500/20 p-3 rounded-2xl relative overflow-hidden flex flex-col justify-center">
+                <p className="text-[7.5px] font-black text-yellow-500/60 uppercase tracking-widest mb-1">🪙 Moedas</p>
+                <p className="text-lg font-black text-yellow-400 font-sport italic leading-none">
+                  {(user?.coins ?? 0).toLocaleString('pt-BR')}
+                </p>
+              </div>
+
+              <div className="bg-indigo-500/5 border border-indigo-500/20 p-3 rounded-2xl relative overflow-hidden flex flex-col justify-center">
+                <p className="text-[7.5px] font-black text-indigo-500/60 uppercase tracking-widest mb-1 flex items-center gap-1">🎯 Pontos <span className="text-[5px]">(Ranking)</span></p>
+                <p className="text-lg font-black text-indigo-400 font-sport italic leading-none">
+                  {user?.totalScore ?? 0}
                 </p>
               </div>
             </div>
@@ -708,46 +687,27 @@ const CheckInPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Histórico de Faltas (Penalidades Totais) */}
-      <section className="bg-zinc-900/40 border border-zinc-800/50 p-5 rounded-[1.5rem] space-y-4">
+      {/* Penalidades — Saldo Travado */}
+      <section className="bg-zinc-900/40 border border-zinc-800/50 p-5 rounded-[1.5rem] space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-            <AlertCircle className="w-3.5 h-3.5 text-rose-500" /> Faltas Totais por Período
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500" /> Penalidades por Falta
           </h3>
-          <p className="text-[9px] font-black text-rose-500 uppercase tracking-tighter">
-            Total: R$ {Math.abs(distributions.filter(d => d.userId === user?.id && d.amount < 0).reduce((acc, d) => acc + d.amount, 0)).toFixed(2)}
+          <p className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">
+            R$ 5,00 por falta
           </p>
         </div>
-
-        <div className="space-y-2">
-          {distributions
-            .filter(d => d.userId === user?.id && d.amount < 0)
-            .sort((a, b) => b.date.localeCompare(a.date))
-            .map((dist, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-black/40 border border-zinc-800 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 bg-rose-500 rounded-full"></div>
-                  <div className="text-left">
-                    <p className="text-[10px] font-black text-white uppercase tracking-tight">
-                      {new Date(dist.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </p>
-                    <p className="text-[7px] font-bold text-zinc-500 uppercase tracking-widest">
-                      {new Date(dist.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-black text-rose-500 font-sport italic">
-                    -R$ {Math.abs(dist.amount).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          {distributions.filter(d => d.userId === user?.id && d.amount < 0).length === 0 && (
-            <div className="py-4 text-center">
-              <p className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">Nenhuma falta registrada</p>
-            </div>
-          )}
+        <div className="flex items-center justify-between p-4 bg-black/40 border border-zinc-800 rounded-2xl">
+          <div>
+            <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mb-1">Total Travado</p>
+            <p className="text-2xl font-black text-amber-400 font-sport italic tracking-tighter">
+              R$ {(user?.lockedBalance ?? 0).toFixed(2)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[7px] font-black text-zinc-600 uppercase tracking-widest">Só disponível</p>
+            <p className="text-[7px] font-black text-zinc-600 uppercase tracking-widest">no marketplace</p>
+          </div>
         </div>
       </section>
 

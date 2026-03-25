@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw, Wallet, PiggyBank, History, Calendar, Clock, Star } from 'lucide-react';
+import { Plus, Edit2, ShieldAlert, CheckCircle, Search, X, Camera, Upload, Link as LinkIcon, Copy, ExternalLink, Trash2, LogIn, RefreshCw, Wallet, PiggyBank, History, Calendar, Clock, Star, Target } from 'lucide-react';
 import { subscribeToUsers, addUser, updateUser, deleteUser, subscribeToCheckIns, subscribeToAbsences, deleteCheckIn, deleteAbsence, subscribeToSettings, checkUserExists, subscribeToModalities } from '../../services/db';
 import { sendWelcomeMessage } from '../../services/whatsapp';
 import { auth, functions } from '../../services/firebase';
@@ -43,7 +43,9 @@ const Users: React.FC = () => {
     photoUrl: '',
     email: '',
     password: '',
-    balance: 0,
+    freeBalance: 0,
+    lockedBalance: 0,
+    coins: 0,
     status: UserStatus.ACTIVE,
     modalityId: ''
   });
@@ -159,7 +161,9 @@ const Users: React.FC = () => {
         photoUrl: '',
         email: '',
         password: '',
-        balance: 0,
+        freeBalance: 0,
+        lockedBalance: 0,
+        coins: 0,
         status: UserStatus.ACTIVE,
         modalityId: ''
       });
@@ -186,7 +190,9 @@ const Users: React.FC = () => {
       photoUrl: user.photoUrl || '',
       email: user.email || '',
       password: '',
-      balance: user.balance || 0,
+      freeBalance: user.freeBalance ?? 0,
+      lockedBalance: user.lockedBalance ?? 0,
+      coins: user.coins ?? 0,
       status: user.status || UserStatus.ACTIVE,
       modalityId: user.modalityId || ''
     });
@@ -392,7 +398,9 @@ const Users: React.FC = () => {
                 photoUrl: '',
                 email: '',
                 password: '',
-                balance: 0,
+                freeBalance: 0,
+                lockedBalance: 0,
+                coins: 0,
                 status: UserStatus.ACTIVE,
                 modalityId: ''
               });
@@ -435,21 +443,33 @@ const Users: React.FC = () => {
               </div>
 
               <div className="mt-4 flex flex-col gap-2">
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <div className="flex flex-col p-3 bg-slate-50 rounded-2xl border-2 border-slate-100 group/fin transition-all">
-                    <div className="flex items-center gap-1.5 mb-2 text-slate-400">
-                      <PiggyBank className="w-3.5 h-3.5" />
-                      <span className="text-[9px] font-black uppercase tracking-widest">Investido</span>
+                  <div className="mt-4 grid grid-cols-3 gap-3">
+                  <div className="flex flex-col items-center justify-center p-3 bg-gradient-to-br from-lime-50 to-lime-100/50 rounded-2xl border border-lime-200 shadow-sm">
+                    <div className="flex items-center gap-1.5 mb-1 text-lime-600">
+                      <Wallet className="w-4 h-4 drop-shadow-sm" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-lime-700/80">Saldo</span>
                     </div>
-                    <span className="font-bold text-slate-900 text-sm">R$ {user.depositedValue?.toFixed(2)}</span>
+                    <span className="font-black text-lime-600 font-sport tracking-tight text-lg">R$ {(user.freeBalance ?? 0).toFixed(2)}</span>
                   </div>
-
-                  <div className="flex flex-col p-3 bg-lime-400 rounded-2xl border-2 border-lime-500 shadow-sm transition-all group/fin">
-                    <div className="flex items-center gap-1.5 mb-2 text-black/60">
-                      <Wallet className="w-3.5 h-3.5" />
-                      <span className="text-[9px] font-black uppercase tracking-widest text-black/80">Saldo Atual</span>
+                  <div className="flex flex-col items-center justify-center p-3 bg-gradient-to-br from-indigo-50 to-indigo-100/50 rounded-2xl border border-indigo-200 shadow-sm">
+                    <div className="flex items-center gap-1.5 mb-1 text-indigo-500">
+                      <Target className="w-4 h-4 drop-shadow-sm" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600/80">Pontos</span>
                     </div>
-                    <span className="font-black text-black italic font-sport text-xl tracking-tighter leading-none">R$ {user.balance?.toFixed(2)}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="font-black text-indigo-500 font-sport tracking-tight text-lg">{user.totalScore ?? 0}</span>
+                      <span className="text-sm drop-shadow-sm">🎯</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center justify-center p-3 bg-gradient-to-br from-amber-50 to-amber-100/50 rounded-2xl border border-amber-200 shadow-sm">
+                    <div className="flex items-center gap-1.5 mb-1 text-amber-500">
+                      <Star className="w-4 h-4 drop-shadow-sm" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-600/80">Moedas</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-black text-amber-500 font-sport tracking-tight text-lg">{user.coins ?? 0}</span>
+                      <span className="text-sm drop-shadow-sm">🪙</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -539,21 +559,35 @@ const Users: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex flex-col gap-1.5 w-max">
-                    <div className="flex items-center justify-between gap-4 px-3 py-1 bg-slate-100 rounded-lg border border-slate-200 group-hover:bg-slate-200 transition-colors">
-                      <div className="flex items-center gap-1.5 opacity-60">
-                        <PiggyBank className="w-3 h-3 text-slate-500" />
-                        <span className="text-[8px] font-black uppercase tracking-tighter">Investido</span>
+                  <div className="flex items-center gap-3 w-max">
+                    <div className="flex flex-col items-center justify-center min-w-[110px] px-4 py-2 bg-gradient-to-br from-lime-50 to-lime-100/50 rounded-xl border border-lime-200 shadow-sm transition-transform hover:scale-105 group-hover:border-lime-300">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Wallet className="w-3.5 h-3.5 text-lime-600 drop-shadow-sm" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-lime-700/80">Saldo Livre</span>
                       </div>
-                      <span className="text-[10px] font-black text-slate-700">R$ {user.depositedValue?.toFixed(2)}</span>
+                      <span className="text-base font-black text-lime-600 font-sport tracking-tight">R$ {(user.freeBalance ?? 0).toFixed(2)}</span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-4 px-3 py-1.5 bg-lime-400 rounded-lg border-2 border-lime-500 shadow-sm group-hover:shadow-md transition-all">
-                      <div className="flex items-center gap-1.5">
-                        <Wallet className="w-3.5 h-3.5 text-black" />
-                        <span className="text-[9px] font-black uppercase tracking-tighter text-black/80">Disponível</span>
+                    <div className="flex flex-col items-center justify-center min-w-[110px] px-4 py-2 bg-gradient-to-br from-indigo-50 to-indigo-100/50 rounded-xl border border-indigo-200 shadow-sm transition-transform hover:scale-105 group-hover:border-indigo-300">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Target className="w-3.5 h-3.5 text-indigo-500 drop-shadow-sm" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-indigo-600/80">Pontos</span>
                       </div>
-                      <span className="text-sm font-black text-black font-sport italic tracking-tighter leading-none">R$ {user.balance?.toFixed(2)}</span>
+                      <div className="flex items-center justify-center min-w-[32px]">
+                         <span className="text-base font-black text-indigo-500 font-sport tracking-tight leading-none">{user.totalScore ?? 0}</span>
+                         <span className="text-xs ml-1 leading-none drop-shadow-sm">🎯</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center min-w-[110px] px-4 py-2 bg-gradient-to-br from-amber-50 to-amber-100/50 rounded-xl border border-amber-200 shadow-sm transition-transform hover:scale-105 group-hover:border-amber-300">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Star className="w-3.5 h-3.5 text-amber-500 drop-shadow-sm" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-600/80">Moedas</span>
+                      </div>
+                      <div className="flex items-center justify-center min-w-[32px]">
+                        <span className="text-base font-black text-amber-500 font-sport tracking-tight leading-none">{user.coins ?? 0}</span>
+                        <span className="text-xs ml-1 leading-none drop-shadow-sm">🪙</span>
+                      </div>
                     </div>
                   </div>
                 </td>

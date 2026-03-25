@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Trophy, MapPin, User as UserIcon, LogOut, Bell, Menu, ShieldAlert, X } from 'lucide-react';
+import { Home, Trophy, MapPin, User as UserIcon, LogOut, Bell, ShieldAlert, X, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { auth as firebaseAuth } from '../services/firebase';
 import { subscribeToUsers } from '../services/db';
@@ -22,6 +22,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         if (path.includes('/ranking')) setActiveTab('ranking');
         else if (path.includes('/locais')) setActiveTab('locais');
         else if (path.includes('/perfil')) setActiveTab('perfil');
+        else if (path.includes('/marketplace')) setActiveTab('marketplace');
         else setActiveTab('home');
     }, [location]);
 
@@ -47,6 +48,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     const tabs = [
         { id: 'home', icon: Home, label: 'Início', path: '/checkin' },
         { id: 'ranking', icon: Trophy, label: 'Ranking', path: '/ranking' },
+        { id: 'marketplace', icon: ShoppingBag, label: 'Loja', path: '/marketplace' },
         { id: 'locais', icon: MapPin, label: 'Locais', path: '/locais' },
         { id: 'perfil', icon: UserIcon, label: 'Perfil', path: '/perfil/atleta' },
     ];

@@ -42,6 +42,8 @@ const TimeSlots: React.FC = () => {
     endTime: '',
     intervals: [] as { startTime: string; endTime: string }[],
     weight: 1,
+    scoreReward: 10,
+    coinsReward: 10,
     days: [1, 2, 3, 4, 5], // Default SEG-SEX
     locationName: 'ACADEMIA SEDE',
     latitude: GYM_LOCATION.lat,
@@ -257,6 +259,8 @@ const TimeSlots: React.FC = () => {
         startTime: '',
         endTime: '',
         weight: 1,
+        scoreReward: 10,
+        coinsReward: 10,
         days: [1, 2, 3, 4, 5],
         locationName: 'ACADEMIA SEDE',
         latitude: GYM_LOCATION.lat,
@@ -288,6 +292,8 @@ const TimeSlots: React.FC = () => {
       startTime: slot.startTime,
       endTime: slot.endTime,
       weight: slot.weight,
+      scoreReward: slot.scoreReward ?? 10,
+      coinsReward: slot.coinsReward ?? 10,
       days: slot.days,
       locationName: slot.locationName,
       latitude: slot.latitude,
@@ -309,6 +315,8 @@ const TimeSlots: React.FC = () => {
       startTime: slot.startTime,
       endTime: slot.endTime,
       weight: slot.weight,
+      scoreReward: slot.scoreReward ?? 10,
+      coinsReward: slot.coinsReward ?? 10,
       days: slot.days,
       locationName: slot.locationName,
       latitude: slot.latitude,
@@ -504,6 +512,8 @@ const TimeSlots: React.FC = () => {
                 startTime: '',
                 endTime: '',
                 weight: 1,
+                scoreReward: 10,
+                coinsReward: 10,
                 days: [1, 2, 3, 4, 5],
                 locationName: 'ACADEMIA SEDE',
                 latitude: GYM_LOCATION.lat,
@@ -937,6 +947,31 @@ const TimeSlots: React.FC = () => {
                       className="w-full px-3 py-2 bg-slate-900 text-lime-400 rounded-lg font-black text-[15px] border-none outline-none"
                       value={formData.weight}
                       onChange={e => setFormData({ ...formData, weight: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Pontos por Check-in</label>
+                    <input
+                      required
+                      type="number"
+                      min="0"
+                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-slate-900 font-bold text-xs"
+                      value={formData.scoreReward}
+                      onChange={e => setFormData({ ...formData, scoreReward: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Moedas por Check-in</label>
+                    <input
+                      required
+                      type="number"
+                      min="0"
+                      className="w-full px-3 py-2 bg-slate-900 text-amber-500 rounded-lg font-black text-[15px] border-none outline-none"
+                      value={formData.coinsReward}
+                      onChange={e => setFormData({ ...formData, coinsReward: Number(e.target.value) })}
                     />
                   </div>
                 </div>

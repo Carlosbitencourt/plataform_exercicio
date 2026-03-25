@@ -2,12 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Helper function to check if user is admin
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.email == 'agenciaconativa@gmail.com' ||
@@ -17,69 +15,75 @@ service cloud.firestore {
       );
     }
 
-    // Users collection
     match /users/{userId} {
       allow read: if true;
-      // Broadened update permission for authenticated users to avoid ID/UID mismatch failures
       allow update: if isAuthenticated();
       allow create, delete: if isAuthenticated();
     }
 
-    // TimeSlots collection
     match /timeSlots/{slotId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // CheckIns collection
     match /checkIns/{checkInId} {
       allow read: if true;
       allow create, update: if true; 
       allow delete: if isAdmin();
     }
 
-    // Distributions collection
     match /distributions/{distId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
-    // QRCodes collection
     match /qrCodes/{qrId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Categories collection
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Modalities collection
     match /modalities/{modalityId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Withdrawals collection
     match /withdrawals/{withdrawalId} {
-      // Allow authenticated users to read and create withdrawals
-      // Restricted update/delete to admins
       allow read, create: if isAuthenticated();
       allow update, delete: if isAdmin();
     }
 
-    // Settings collection
     match /settings/{docId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Deposit requests: authenticated users can create, admins manage
     match /depositRequests/{requestId} {
       allow create: if isAuthenticated();
       allow read, update, delete: if isAdmin();
+    }
+
+    // Marketplace products: public read, admin write
+    match /marketplaceProducts/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Marketplace purchases: authenticated users can create, admins read all
+    match /marketplacePurchases/{purchaseId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Marketplace Partners
+    match /partners/{partnerId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

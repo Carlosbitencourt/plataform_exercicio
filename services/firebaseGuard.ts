@@ -12,6 +12,7 @@ import {
     addDoc,
     updateDoc,
     setDoc,
+    deleteDoc,
     doc,
     DocumentReference,
     DocumentData
@@ -113,6 +114,17 @@ export const safeSetDoc = async (
     logOperation('setDoc', fullPath, data);
     const docRef = doc(db, collectionPath, docId);
     return await setDoc(docRef, data);
+};
+
+export const safeDeleteDoc = async (
+    collectionPath: string,
+    docId: string
+): Promise<void> => {
+    await ensureAuth();
+    const fullPath = `${collectionPath}/${docId}`;
+    logOperation('deleteDoc', fullPath);
+    const docRef = doc(db, collectionPath, docId);
+    return await deleteDoc(docRef);
 };
 
 // --- Storage Operations ---

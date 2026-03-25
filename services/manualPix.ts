@@ -165,7 +165,8 @@ export const subscribeToUserDepositRequests = (
 };
 
 /**
- * Approve a deposit request — credits user balance and marks as approved.
+ * Approve a deposit request — applies 10% admin fee and credits net amount
+ * to freeBalance. Marks request as approved.
  */
 export const approveDepositRequest = async (requestId: string): Promise<void> => {
     const reqRef = doc(db, COLLECTION, requestId);
@@ -176,15 +177,25 @@ export const approveDepositRequest = async (requestId: string): Promise<void> =>
     const request = reqSnap.data() as DepositRequest;
     if (request.status !== 'pendente') throw new Error('Esta solicitação já foi processada.');
 
-    // Credit user balance
+    // Credit user freeBalance with 90% of deposit (10% admin fee)
+    const ADMIN_FEE_RATE = 0.10;
+    const netAmount = parseFloat((request.amount * (1 - ADMIN_FEE_RATE)).toFixed(2));
+    const adminFee = parseFloat((request.amount * ADMIN_FEE_RATE).toFixed(2));
+
     const userRef = doc(db, 'users', request.userId);
     const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) throw new Error('Usuário não encontrado.');
 
-    const currentBalance = userSnap.data().balance || 0;
+    const userData = userSnap.data();
+    const currentFreeBalance = userData.freeBalance ?? userData.balance ?? 0;
+    const currentDepositedValue = userData.depositedValue ?? 0;
+
     await updateDoc(userRef, {
-        balance: currentBalance + request.amount
+        freeBalance: currentFreeBalance + netAmount,
+        depositedValue: currentDepositedValue + request.amount,
     });
+
+    console.log(`[Deposit] Approved for ${request.userName}: R$ ${request.amount} deposited. Fee: R$ ${adminFee}, Net to freeBalance: R$ ${netAmount}`);
 
     // Mark request as approved
     await updateDoc(reqRef, {

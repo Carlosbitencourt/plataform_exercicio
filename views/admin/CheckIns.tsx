@@ -378,7 +378,7 @@ const CheckIns: React.FC = () => {
                       setFormData({
                         ...formData,
                         timeSlotId: e.target.value,
-                        score: slot ? 10 * (slot.weight || 1) : 10
+                        score: slot ? (slot.scoreReward ?? 10) * (slot.weight || 1) : 10
                       });
                     }}
                   >

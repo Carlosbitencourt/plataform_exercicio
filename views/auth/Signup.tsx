@@ -51,6 +51,9 @@ const Signup: React.FC = () => {
                 cpf: '', 
                 uniqueCode: generateUniqueCode(),
                 depositedValue: 0,
+                freeBalance: 0,
+                lockedBalance: 0,
+                coins: 0,
                 status: UserStatus.ACTIVE
             }, userCredential.user.uid);
             navigate('/admin/usuarios');

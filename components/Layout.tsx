@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Users, ClipboardList, TrendingUp, CheckSquare, LogOut, Activity, Clock, Trophy, User, Menu, X, Puzzle, DollarSign, Settings as SettingsIcon } from 'lucide-react';
+import { Users, ClipboardList, TrendingUp, CheckSquare, LogOut, Activity, Clock, Trophy, User, Menu, X, Puzzle, DollarSign, Settings as SettingsIcon, ShoppingBag, Store } from 'lucide-react';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -30,6 +30,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { path: '/admin/distribuicoes', icon: TrendingUp, label: 'Recompensas' },
     { path: '/admin/resgates', icon: DollarSign, label: 'Resgates' },
     { path: '/admin/depositos', icon: DollarSign, label: 'Dep. Pendentes' },
+    { path: '/admin/parceiros', icon: Store, label: 'Parceiros' },
+    { path: '/admin/marketplace', icon: ShoppingBag, label: 'Marketplace' },
     { path: '/admin/integracoes', icon: Puzzle, label: 'Integrações' },
     { path: '/admin/configuracoes', icon: SettingsIcon, label: 'Configurações' },
     { path: '/admin/perfil', icon: User, label: 'Meu Perfil' },

@@ -240,9 +240,6 @@ const Ranking: React.FC = () => {
                         <CheckCircle2 className="w-3 h-3 text-lime-500" />
                         Check-in: <span className="text-slate-900 font-sport italic text-xs">{item.checkInTime}</span>
                       </span>
-                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 flex items-center gap-1">
-                        Saldo: <span className="text-slate-900 font-bold tracking-tight">R$ {(item.user.balance || 0).toFixed(2)}</span>
-                      </span>
                     </div>
                   </div>
 
@@ -311,7 +308,7 @@ const Ranking: React.FC = () => {
                       )}
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <span className="text-slate-500">Saldo: <span className="text-slate-900">R$ {user.balance.toFixed(2)}</span></span>
+                      <span className="text-slate-500">Atleta em competição</span>
                     </div>
                   </div>
 
@@ -372,7 +369,7 @@ const Ranking: React.FC = () => {
                       )}
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <span className="text-slate-500">Saldo: <span className="text-slate-900">R$ {(user.balance || 0).toFixed(2)}</span></span>
+                      <span className="text-slate-500">Pontuação semanal acumulada</span>
                     </div>
                   </div>
 
@@ -398,7 +395,7 @@ const Ranking: React.FC = () => {
                 ? 'Critério de Desempate: Horário do Check-in (Mais cedo = Melhor posição)'
                 : view === 'weekly'
                   ? 'Ranking baseado na pontuação acumulada na semana atual.'
-                  : 'Ranking baseado no saldo total acumulado na temporada.'
+                  : 'Ranking baseado na pontuação total de check-ins na temporada.'
               }
             </p>
           </div>

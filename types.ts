@@ -17,8 +17,11 @@ export interface User {
   cpf: string;
   uniqueCode: string;
   phone: string;
-  balance: number;
-  depositedValue: number;
+  // New individual wallet fields
+  freeBalance: number;    // Saldo Livre: can be withdrawn or used in marketplace
+  lockedBalance: number;  // Saldo Travado: only usable in marketplace, from absence penalties
+  coins: number;          // Moedas: earned from check-ins, used in marketplace
+  depositedValue: number; // Total amount ever deposited (for reference)
   status: UserStatus;
   createdAt: string;
   pixKey?: string;
@@ -28,8 +31,8 @@ export interface User {
   photoUrl?: string;
   email?: string;
   weeklyMisses?: number;
-  weeklyScore?: number;
   totalScore?: number;
+  weeklyScore?: number;   // Accumulated score in the current week
   modalityId?: string;
 }
 
@@ -40,6 +43,8 @@ export interface TimeSlot {
   endTime: string;   // HH:mm (Legacy/Primary)
   intervals?: { startTime: string; endTime: string }[];
   weight: number;
+  scoreReward?: number; // Score points awarded per check-in
+  coinsReward?: number; // Coins awarded per check-in
   days: number[];    // 0 = Sunday, 1 = Monday, etc.
   locationName: string;
   latitude: number;
@@ -90,12 +95,38 @@ export interface CheckIn {
   photoUrl?: string;
 }
 
+// Distribution is kept for backwards-compatibility with history records
+// New code should NOT create Distribution records for pool rewards
 export interface Distribution {
   id: string;
   userId: string;
   amount: number;
   date: string;
   reason: string;
+}
+
+export interface MarketplacePartner {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  description?: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface MarketplaceProduct {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  category?: string;       // ex: 'produto', 'servico', 'desconto'
+  partnerId?: string;      // Vincula o produto a uma loja parceira
+  costCoins?: number;             // Moedas necessárias
+  costFreeBalance?: number;       // Saldo livre necessário (R$)
+  costLockedBalance?: number;     // Saldo travado necessário (R$)
+  stock?: number;                 // undefined = unlimited
+  active: boolean;
+  createdAt: string;
 }
 
 export interface Withdrawal {
@@ -166,7 +197,7 @@ export interface Database {
   users: User[];
   qrCodes: QRCodeData[];
   checkIns: CheckIn[];
-  distributions: Distribution[];
   timeSlots: TimeSlot[];
   settings: SystemSettings[];
+  products: MarketplaceProduct[];
 }

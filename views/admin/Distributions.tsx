@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, Users, DollarSign, Calendar, Play, CheckCircle2, Zap, AlertTriangle, Trash2 } from 'lucide-react';
 import { subscribeToDistributions, subscribeToUsers, subscribeToCheckIns, deleteDistribution, addDistribution } from '../../services/db';
 import {
-  closeWeeklySession,
   syncAllUsersAbsences,
   getEffectiveMonday
 } from '../../services/rewardSystem';
@@ -35,19 +34,7 @@ const Distributions: React.FC = () => {
   };
 
   const handleWeeklyClose = async () => {
-    if (!window.confirm("ATENÇÃO: Este é o fechamento FINAL da semana.\n\nO sistema irá:\n1. Aplicar penalidades de faltas (Seg-Sex)\n2. Calcular o Pool de lucro\n3. Distribuir proporcionalmente aos pontos\n4. ZERAR pontos e faltas para a nova semana.\n\nDeseja continuar?")) return;
-
-    setIsProcessing(true);
-    setLastResult(null);
-    try {
-      const result = await closeWeeklySession();
-      setLastResult({ type: 'distribution', ...result });
-    } catch (error: any) {
-      console.error("Weekly close failed:", error);
-      alert(`Erro: ${error.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+    alert('O sistema de pool foi removido. Penalidades agora são aplicadas automaticamente via rewardSystem. Não é necessário fechamento manual.');
   };
 
   const activeUsers = users.filter(u => u.status === UserStatus.ACTIVE || (u.status as string) === 'competicao');

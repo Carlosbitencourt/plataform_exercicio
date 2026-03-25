@@ -15,11 +15,13 @@ import {
     limit,
     Timestamp
 } from 'firebase/firestore';
-import { safeAddDoc, safeUpdateDoc, safeSetDoc, ensureAuth } from './firebaseGuard';
+import { safeAddDoc, safeUpdateDoc, safeSetDoc, ensureAuth, safeDeleteDoc } from './firebaseGuard';
 import {
     User, UserStatus, TimeSlot, QRCodeData,
     CheckIn, Distribution, Withdrawal, WithdrawalStatus,
-    Notification, Absence, Penalty, Category, Modality, SystemSettings
+    Notification, Absence, Penalty, Category, Modality, SystemSettings,
+    MarketplaceProduct,
+    MarketplacePartner
 } from '../types';
 
 // Collections
@@ -35,6 +37,35 @@ const ABSENCES_COLLECTION = 'absences';
 const PENALTIES_COLLECTION = 'penalties';
 const SETTINGS_COLLECTION = 'settings';
 export const MODALITIES_COLLECTION = 'modalities';
+export const MARKETPLACE_PRODUCTS_COLLECTION = 'marketplaceProducts';
+export const MARKETPLACE_PURCHASES_COLLECTION = 'marketplacePurchases';
+
+// --- MARKETPLACE PARTNERS ---
+export const PARTNERS_COLLECTION = 'partners';
+
+export const subscribeToPartners = (callback: (partners: MarketplacePartner[]) => void) => {
+    const q = query(collection(db, PARTNERS_COLLECTION), orderBy('name', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+        const partners = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MarketplacePartner));
+        callback(partners);
+    }, (error) => {
+        console.error("Error subscribing to partners:", error);
+        callback([]);
+    });
+};
+
+export const addPartner = async (partner: Omit<MarketplacePartner, 'id'>) => {
+    return await safeAddDoc(PARTNERS_COLLECTION, partner);
+};
+
+export const updatePartner = async (partner: MarketplacePartner) => {
+    const { id, ...data } = partner;
+    return await safeUpdateDoc(PARTNERS_COLLECTION, id, data);
+};
+
+export const deletePartner = async (id: string) => {
+    return await safeDeleteDoc(PARTNERS_COLLECTION, id);
+};
 
 // --- Users ---
 
@@ -110,7 +141,9 @@ export const addUser = async (userData: Omit<User, 'id' | 'createdAt' | 'status'
 
     const newUser: Omit<User, 'id'> = {
         ...userData,
-        balance: 0,
+        freeBalance: 0,
+        lockedBalance: 0,
+        coins: 0,
         status: userData.status || UserStatus.PENDING,
         createdAt: new Date().toISOString(),
         photoUrl: userData.photoUrl || ''
@@ -198,11 +231,23 @@ export const addCheckIn = async (checkInData: Omit<CheckIn, 'id'>) => {
     const userRef = doc(db, USERS_COLLECTION, checkInData.userId);
     const userSnap = await getDoc(userRef);
 
+    // Fetch time slot to get dynamic coinsReward
+    const slotRef = doc(db, TIMESLOTS_COLLECTION, checkInData.timeSlotId);
+    const slotSnap = await getDoc(slotRef);
+    let coinsEarned = 10;
+    if (slotSnap.exists()) {
+        const slotData = slotSnap.data() as TimeSlot;
+        if (slotData.coinsReward !== undefined) {
+            coinsEarned = slotData.coinsReward;
+        }
+    }
+
     if (userSnap.exists()) {
         const userData = userSnap.data() as User;
         await updateDoc(userRef, {
             totalScore: (userData.totalScore || 0) + checkInData.score,
-            weeklyScore: (userData.weeklyScore || 0) + checkInData.score
+            weeklyScore: (userData.weeklyScore || 0) + checkInData.score,
+            coins: (userData.coins || 0) + coinsEarned
         });
     }
 
@@ -353,7 +398,7 @@ export const deleteDistribution = async (id: string) => {
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
-            const userData = userSnap.data() as User;
+            const userData = userSnap.data() as any; // legacy balance field
             await updateDoc(userRef, {
                 balance: (userData.balance || 0) - amountToRevert // Subtracting (negative amount) adds it back
             });
@@ -487,7 +532,8 @@ export const requestWithdrawal = async (userId: string, userName: string, amount
     if (!userSnap.exists()) throw new Error("Usuário não encontrado.");
     const userData = userSnap.data() as User;
 
-    if (userData.balance < amount) throw new Error("Saldo insuficiente.");
+    const free = userData.freeBalance ?? (userSnap.data() as any).balance ?? 0;
+    if (free < amount) throw new Error("Saldo livre insuficiente.");
 
     // 1. Create withdrawal request
     const withdrawal: Omit<Withdrawal, 'id'> = {
@@ -502,9 +548,9 @@ export const requestWithdrawal = async (userId: string, userName: string, amount
 
     const withdrawalRef = await safeAddDoc(WITHDRAWALS_COLLECTION, withdrawal);
 
-    // 2. Deduct from balance immediately
+    // 2. Deduct from freeBalance immediately
     await updateDoc(userRef, {
-        balance: parseFloat((userData.balance - amount).toFixed(2))
+        freeBalance: parseFloat((free - amount).toFixed(2))
     });
 
     return withdrawalRef.id;
@@ -567,19 +613,20 @@ export const updateWithdrawalStatus = async (withdrawal: Withdrawal, status: Wit
                 'success'
             );
         } else if (status === WithdrawalStatus.REJECTED) {
-            // Refund balance if rejected
+            // Refund freeBalance if rejected
             const userRef = doc(db, USERS_COLLECTION, withdrawal.userId);
             const userSnap = await getDoc(userRef);
             if (userSnap.exists()) {
                 const userData = userSnap.data();
+                const free = userData.freeBalance ?? userData.balance ?? 0;
                 await updateDoc(userRef, {
-                    balance: (userData.balance || 0) + withdrawal.amount
+                    freeBalance: parseFloat((free + withdrawal.amount).toFixed(2))
                 });
 
                 await addNotification(
                     withdrawal.userId,
                     "Solicitação de Resgate Rejeitada",
-                    `Seu pedido de resgate de R$ ${withdrawal.amount.toFixed(2)} foi rejeitado. O valor foi estornado ao seu saldo.`,
+                    `Seu pedido de resgate de R$ ${withdrawal.amount.toFixed(2)} foi rejeitado. O valor foi estornado ao seu saldo livre.`,
                     'error'
                 );
             }
@@ -588,4 +635,80 @@ export const updateWithdrawalStatus = async (withdrawal: Withdrawal, status: Wit
         console.error("Error updating withdrawal status:", error);
         throw error;
     }
+};
+
+// --- Marketplace ---
+
+export const subscribeToMarketplaceProducts = (callback: (products: MarketplaceProduct[]) => void) => {
+    const q = query(collection(db, MARKETPLACE_PRODUCTS_COLLECTION));
+    return onSnapshot(q, (snapshot) => {
+        const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MarketplaceProduct));
+        callback(products);
+    }, (error) => {
+        console.error("Error subscribing to marketplace products:", error);
+        callback([]);
+    });
+};
+
+export const addMarketplaceProduct = async (product: Omit<MarketplaceProduct, 'id'>) => {
+    return await safeAddDoc(MARKETPLACE_PRODUCTS_COLLECTION, product);
+};
+
+export const updateMarketplaceProduct = async (product: MarketplaceProduct) => {
+    const { id, ...data } = product;
+    await safeUpdateDoc(MARKETPLACE_PRODUCTS_COLLECTION, id, data);
+};
+
+export const deleteMarketplaceProduct = async (id: string) => {
+    await deleteDoc(doc(db, MARKETPLACE_PRODUCTS_COLLECTION, id));
+};
+
+/**
+ * Process a marketplace purchase:
+ * - Deducts coins and/or freeBalance/lockedBalance from the user
+ * - Creates a purchase record
+ */
+export const purchaseMarketplaceProduct = async (
+    userId: string,
+    product: MarketplaceProduct
+): Promise<void> => {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) throw new Error("Usuário não encontrado.");
+    const userData = userSnap.data() as User;
+
+    const currentCoins = userData.coins ?? 0;
+    const currentFree = userData.freeBalance ?? 0;
+    const currentLocked = userData.lockedBalance ?? 0;
+
+    if (product.costCoins && currentCoins < product.costCoins)
+        throw new Error(`Moedas insuficientes. Você tem ${currentCoins} 🪙 e precisa de ${product.costCoins}.`);
+    if (product.costFreeBalance && currentFree < product.costFreeBalance)
+        throw new Error(`Saldo livre insuficiente. Voce tem R$ ${currentFree.toFixed(2)} e precisa de R$ ${product.costFreeBalance.toFixed(2)}.`);
+    if (product.costLockedBalance && currentLocked < product.costLockedBalance)
+        throw new Error(`Saldo travado insuficiente. Você tem R$ ${currentLocked.toFixed(2)} e precisa de R$ ${product.costLockedBalance.toFixed(2)}.`);
+
+    const updates: Record<string, number> = {};
+    if (product.costCoins)         updates.coins        = parseFloat((currentCoins  - product.costCoins).toFixed(2));
+    if (product.costFreeBalance)   updates.freeBalance  = parseFloat((currentFree   - product.costFreeBalance).toFixed(2));
+    if (product.costLockedBalance) updates.lockedBalance = parseFloat((currentLocked - product.costLockedBalance).toFixed(2));
+
+    await updateDoc(userRef, updates);
+
+    await addDoc(collection(db, MARKETPLACE_PURCHASES_COLLECTION), {
+        userId,
+        productId: product.id,
+        productName: product.name,
+        costCoins: product.costCoins ?? 0,
+        costFreeBalance: product.costFreeBalance ?? 0,
+        costLockedBalance: product.costLockedBalance ?? 0,
+        purchasedAt: new Date().toISOString()
+    });
+
+    await addNotification(
+        userId,
+        "Compra Realizada! 🎉",
+        `Sua compra de "${product.name}" foi confirmada.`,
+        'success'
+    );
 };
