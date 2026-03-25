@@ -560,26 +560,20 @@ const CheckInPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Locked Balance + Coins + Points */}
-            <div className="grid grid-cols-3 gap-2 pt-2">
-              <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-2xl relative overflow-hidden flex flex-col justify-center">
-                <p className="text-[7.5px] font-black text-amber-500/60 uppercase tracking-widest mb-1">🔒 Travado</p>
-                <p className="text-lg font-black text-amber-400 font-sport italic leading-none">
+            {/* Locked Balance + Coins */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-2xl relative overflow-hidden">
+                <p className="text-[8px] font-black text-amber-500/60 uppercase tracking-widest mb-1">🔒 Saldo Travado</p>
+                <p className="text-xl font-black text-amber-400 font-sport italic leading-none">
                   R$ {(user?.lockedBalance ?? 0).toFixed(2)}
                 </p>
+                <p className="text-[7px] text-zinc-600 font-bold uppercase tracking-widest mt-1">Só marketplace</p>
               </div>
 
-              <div className="bg-yellow-500/5 border border-yellow-500/20 p-3 rounded-2xl relative overflow-hidden flex flex-col justify-center">
-                <p className="text-[7.5px] font-black text-yellow-500/60 uppercase tracking-widest mb-1">🪙 Moedas</p>
-                <p className="text-lg font-black text-yellow-400 font-sport italic leading-none">
+              <div className="bg-yellow-500/5 border border-yellow-500/20 p-4 rounded-2xl relative overflow-hidden flex flex-col items-center justify-center">
+                <p className="text-[8px] font-black text-yellow-500/60 uppercase tracking-widest mb-1 flex items-center justify-center">🪙 Moedas</p>
+                <p className="text-xl font-black text-yellow-400 font-sport italic leading-none">
                   {(user?.coins ?? 0).toLocaleString('pt-BR')}
-                </p>
-              </div>
-
-              <div className="bg-indigo-500/5 border border-indigo-500/20 p-3 rounded-2xl relative overflow-hidden flex flex-col justify-center">
-                <p className="text-[7.5px] font-black text-indigo-500/60 uppercase tracking-widest mb-1 flex items-center gap-1">🎯 Pontos <span className="text-[5px]">(Ranking)</span></p>
-                <p className="text-lg font-black text-indigo-400 font-sport italic leading-none">
-                  {user?.totalScore ?? 0}
                 </p>
               </div>
             </div>
